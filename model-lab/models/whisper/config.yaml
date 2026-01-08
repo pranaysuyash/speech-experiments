@@ -1,0 +1,53 @@
+# Whisper Model Configuration
+# OpenAI's Whisper model for ASR baseline comparison
+
+model_name: base
+model_type: whisper
+device: mps  # Use 'mps' for Apple Silicon, 'cuda' for NVIDIA GPUs, 'cpu' for CPU
+dtype: float16  # Data type: float16 or float32
+
+# Supported modes (Whisper is ASR-only)
+modes:
+  - asr  # Automatic Speech Recognition only
+
+# Model constraints
+constraints:
+  max_audio_length: 30  # Maximum audio length in seconds (Whisper constraint)
+  max_memory_mb: 2000   # Maximum memory usage in MB
+  target_latency: 500   # Target latency in milliseconds
+
+# Audio processing
+audio:
+  sample_rate: 16000    # Native sample rate (Whisper requirement)
+  channels: 1           # Mono audio
+  format: wav           # Preferred format
+
+# Testing parameters
+testing:
+  batch_size: 1         # Batch size for inference
+  num_workers: 0        # Number of workers (0 for MPS/CPU)
+  precision: high       # Precision level
+
+# Language settings
+language:
+  auto_detect: true     # Auto-detect language
+  fallback_language: en # Fallback if detection fails
+
+# Paths (relative to model directory)
+paths:
+  notebooks: ./notebooks
+  results: ../../runs/whisper
+  data: ../../data
+
+# Metadata
+metadata:
+  provider: OpenAI
+  version: large-v3
+  released: 2023
+  description: |
+    Whisper is a general-purpose speech recognition model.
+    It is trained on 680,000 hours of multilingual data.
+    This is the baseline for ASR comparison.
+  license: MIT
+  paper_url: https://arxiv.org/abs/2212.04356
+  repo_url: https://github.com/openai/whisper

@@ -1,0 +1,44 @@
+# SeamlessM4T Configuration
+# Meta's unified speech translation and transcription model
+
+model_type: seamlessm4t
+model_name: 'facebook/seamless-m4t-v2-large'
+model_id: 'facebook/seamless-m4t-v2-large'
+
+# Capabilities
+capabilities:
+  asr: true
+  tts: false
+  chat: false
+  translation: true
+
+# Model specifications
+parameters: 1200000000 # 1.2B
+precision: float32
+license: 'CC-BY-NC 4.0'
+
+# Performance expectations
+expected_wer: 0.25 # 25% on LibriSpeech test-other
+rtf: 0.15 # Expected real-time factor
+memory_mb: 3500 # Approximate GPU memory
+
+# Device support
+device_support:
+  cpu: true
+  mps: true # Apple Silicon
+  cuda: true
+  tpu: false
+
+# Audio specifications
+audio:
+  sample_rate: 16000
+  channels: 1
+  format: 'wav'
+  max_duration: 3600 # seconds
+
+# Model details
+meta:
+  date_added: '2024-01-08'
+  status: 'experimental'
+  source: 'Meta AI'
+  paper: 'https://arxiv.org/abs/2308.11596'

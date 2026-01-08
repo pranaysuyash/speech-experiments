@@ -1,0 +1,1 @@
+This is a smoke test for automatic speech recognition validation. Testing entity extraction with numbers like 123 and 45.67, dates like 01/08/2024, and currency like $19.99. The quick brown fox jumps over the lazy dog.

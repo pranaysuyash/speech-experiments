@@ -1,0 +1,173 @@
+# Model Lab - Git Ignore File
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# UV Package Manager
+.uv-cache/
+uv.lock
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+*.ipynb_checkpoints
+
+# Jupyter Lab
+.jupyter/
+.jupyter_lab/
+
+# PyTorch
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+
+# Model Cache (but keep our models/ folder structure)
+checkpoints/
+*.bin
+*.gguf
+*.safetensors
+
+# Large model files (but keep config files)
+models/*/models/
+models/*/*.bin
+models/*/*.safetensors
+models/*/*.gguf
+models/*/*.pth
+
+# Audio Files (keep our data/audio structure but ignore large binaries)
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.aac
+# But keep the data/audio directory structure
+!data/audio/.gitkeep
+!data/audio/**/.gitkeep
+
+# Results and Outputs (keep structure but ignore large files)
+results/
+outputs/
+logs/
+*.log
+runs/**/*.json
+runs/**/*.png
+runs/**/*.jpg
+# But keep the runs directory structure
+!runs/.gitkeep
+!runs/*/.gitkeep
+
+# Environment files (keep structure but ignore sensitive data)
+env/
+.env
+*.env
+.env.local
+
+# Temporary Files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Documentation
+docs/_build/
+site/
+
+# Data (keep structure but ignore large generated files)
+data/audio/*.tmp
+data/text/*.tmp
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Scripts (keep but ignore logs)
+scripts/*.log
+scripts/*.tmp
+
+# Large test files and caches
+*.pkl
+*.parquet
+*.feather
+*.h5
+*.hdf5
+
+# HuggingFace cache
+.huggingface/
+
+# IPython
+ipython_log.py
+profile_default/
+.ipynb_checkpoints/
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might contain personal data
+*_recordings.*
+*_personal.*
+*_*_private.*
+
+# Large result files (>10MB)
+*.large
+*.big
+
+# Keep essential directory structure
+!runs/*/
+!models/*/
+!data/*/
+!harness/*/

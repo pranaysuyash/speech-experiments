@@ -1,0 +1,57 @@
+# LFM2.5-Audio Model Configuration
+# This file defines model-specific parameters for testing
+
+model_name: LiquidAI/LFM2.5-Audio-1.5B
+model_type: lfm2_5_audio
+device: mps  # Use 'mps' for Apple Silicon, 'cuda' for NVIDIA GPUs, 'cpu' for CPU
+dtype: bfloat16  # Data type: bfloat16, float16, or float32
+
+# Supported modes
+modes:
+  - asr  # Automatic Speech Recognition
+  - tts  # Text-to-Speech
+  - chat # Multi-turn conversation
+
+# Voice options (for TTS)
+voices:
+  - us_female
+  - us_male
+  - uk_female
+  - uk_male
+
+# Model constraints
+constraints:
+  max_audio_length: 600  # Maximum audio length in seconds
+  max_text_length: 1000   # Maximum text length in characters
+  target_latency: 500     # Target latency in milliseconds
+  max_memory_mb: 2000     # Maximum memory usage in MB
+
+# Audio processing
+audio:
+  sample_rate: 24000     # Native sample rate
+  channels: 1            # Mono audio
+  format: wav            # Preferred format
+
+# Testing parameters
+testing:
+  batch_size: 1          # Batch size for inference
+  num_workers: 0         # Number of workers (0 for MPS/CPU)
+  precision: high        # Precision level: high, medium, low
+
+# Paths (relative to model directory)
+paths:
+  notebooks: ./notebooks
+  results: ../../runs/lfm2_5_audio
+  data: ../../data
+
+# Metadata
+metadata:
+  provider: Liquid AI
+  version: 1.5B
+  released: 2024
+  description: |
+    LFM-2.5-Audio is a multi-modal model for audio understanding and generation.
+    Supports ASR, TTS, and conversational speech processing.
+  license: Unknown
+  paper_url: https://www.liquid.ai/
+  repo_url: https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B

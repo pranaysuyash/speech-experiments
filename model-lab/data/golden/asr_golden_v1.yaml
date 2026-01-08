@@ -1,0 +1,36 @@
+# Golden Test Set for ASR Regression Testing
+# v1.0 - Frozen dataset for consistent evaluation
+
+name: asr_golden
+version: "1.0"
+task_type: asr
+
+# Promotion thresholds
+thresholds:
+  wer_mean: 0.10        # Max 10% WER
+  success_rate: 0.95    # 95% of tests must pass
+  latency_mean_ms: 2000 # Max 2 second latency
+
+metadata:
+  description: "Golden test set for ASR model evaluation"
+  created: "2026-01-08"
+  author: "model-lab"
+  frozen: true
+
+test_cases:
+  - id: clean_speech_10s
+    audio_path: ../audio/clean_speech_10s.wav
+    ground_truth_path: null
+    ground_truth_text: ""
+    metadata:
+      category: clean
+      duration_s: 10
+      notes: "Clean speech sample for basic testing"
+
+  # Add more test cases as you create ground truth:
+  # - id: llm_recording
+  #   audio_path: ../audio/PRIMARY/llm_recording_pranay.m4a
+  #   ground_truth_path: ../truth/llm.txt
+  #   metadata:
+  #     category: real_speech
+  #     duration_s: 120

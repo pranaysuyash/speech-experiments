@@ -1,0 +1,44 @@
+{
+  "conversation_2ppl_10s": {
+    "description": "10-second conversation segment for multi-speaker testing",
+    "expected_characteristics": [
+      "Two distinct speakers",
+      "Natural conversation flow",
+      "Speaker transitions",
+      "UX/AI topic discussion"
+    ],
+    "test_objectives": [
+      "Speaker diarization accuracy",
+      "Multi-speaker transcription",
+      "Speaker change detection",
+      "Conversation structure analysis"
+    ],
+    "challenges": [
+      "Overlapping speech",
+      "Speaker similarity",
+      "Background noise",
+      "Natural speech patterns"
+    ]
+  },
+  "conversation_2ppl_30s": {
+    "description": "30-second conversation segment for extended multi-speaker analysis",
+    "expected_characteristics": [
+      "Multiple speaker exchanges",
+      "Topic development",
+      "Natural dialogue rhythm",
+      "Professional discussion tone"
+    ],
+    "test_objectives": [
+      "Extended conversation tracking",
+      "Topic identification",
+      "Speaker consistency",
+      "Long-form transcription accuracy"
+    ],
+    "challenges": [
+      "Maintaining speaker identity",
+      "Context preservation",
+      "Topic coherence",
+      "Natural language understanding"
+    ]
+  }
+}

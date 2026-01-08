@@ -1,0 +1,7 @@
+{"level":"info","message":"MCP Shell Server started","timestamp":"2026-01-08T08:54:09.517Z"}
+{"level":"info","message":"Shell: /bin/zsh","timestamp":"2026-01-08T08:54:09.518Z"}
+{"level":"info","message":"Working Directory: /Users/pranay","timestamp":"2026-01-08T08:54:09.519Z"}
+{"level":"info","message":"Platform: darwin","timestamp":"2026-01-08T08:54:09.519Z"}
+{"level":"info","message":"Hostname: pranay.local","timestamp":"2026-01-08T08:54:09.519Z"}
+{"level":"info","message":"Username: pranay","timestamp":"2026-01-08T08:54:09.520Z"}
+{"level":"info","message":"MCP Shell Server ready","timestamp":"2026-01-08T08:54:09.521Z"}

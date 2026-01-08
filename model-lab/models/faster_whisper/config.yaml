@@ -1,0 +1,64 @@
+# Faster-Whisper Configuration
+# Optimized Whisper implementation for production inference
+
+model_name: base
+model_type: faster_whisper
+device: mps  # Use 'mps' for Apple Silicon, 'cuda' for NVIDIA GPUs, 'cpu' for CPU
+dtype: float16  # Data type: float16 or float32 (int8 not supported on MPS)
+
+# Supported modes (ASR only, same as Whisper)
+modes:
+  - asr  # Automatic Speech Recognition only
+
+# Model constraints
+constraints:
+  max_audio_length: 30  # Maximum audio length in seconds
+  max_memory_mb: 2000   # Maximum memory usage in MB
+  target_latency: 200   # Target latency in milliseconds (faster than base Whisper)
+
+# Audio processing
+audio:
+  sample_rate: 16000    # Native sample rate (Whisper requirement)
+  channels: 1           # Mono audio
+  format: wav           # Preferred format
+
+# Faster-Whisper specific settings
+inference:
+  compute_type: float32 # int8_float16, float16, float32 (MPS doesn't support float16 efficiently)
+  beam_size: 5          # Beam size for decoding
+  best_of: 5            # Number of independent samples
+  patience: 1.0         # Beam search patience
+
+# Testing parameters
+testing:
+  batch_size: 1         # Batch size for inference
+  num_workers: 0        # Number of workers (0 for MPS/CPU)
+  precision: high       # Precision level
+
+# Language settings
+language:
+  auto_detect: true     # Auto-detect language
+  fallback_language: en # Fallback if detection fails
+
+# Paths (relative to model directory)
+paths:
+  notebooks: ./notebooks
+  results: ../../runs/faster_whisper
+  data: ../../data
+
+# Metadata
+metadata:
+  provider: guillaumekln
+  version: large-v3
+  released: 2023
+  description: |
+    Faster-Whisper is an optimized reimplementation of OpenAI Whisper.
+    Uses CTranslate2 for faster inference with lower memory usage.
+    This serves as a production-optimized baseline for ASR comparison.
+  license: MIT
+  repo_url: https://github.com/guillaumekln/faster-whisper
+  advantages: |
+    - 4x+ faster than original Whisper
+    - Lower memory footprint
+    - Same accuracy as base Whisper
+    - Better for real-time applications

@@ -1,0 +1,63 @@
+{
+  "created_at": "2026-01-08T08:55:37",
+  "sample_rate": 16000,
+  "files": {
+    "silence_5s.wav": {
+      "path": "data/audio/silence_5s.wav",
+      "description": "Complete silence for 5 seconds",
+      "duration": 5.0,
+      "type": "synthetic"
+    },
+    "white_noise_10s.wav": {
+      "path": "data/audio/white_noise_10s.wav",
+      "description": "White noise at 20% amplitude",
+      "duration": 10.0,
+      "type": "synthetic"
+    },
+    "pink_noise_10s.wav": {
+      "path": "data/audio/pink_noise_10s.wav",
+      "description": "Pink noise (1/f) at 20% amplitude",
+      "duration": 10.0,
+      "type": "synthetic"
+    },
+    "sine_sweep_20_2000hz_10s.wav": {
+      "path": "data/audio/sine_sweep_20_2000hz_10s.wav",
+      "description": "Logarithmic sine sweep from 20Hz to 2kHz",
+      "duration": 10.0,
+      "type": "synthetic"
+    },
+    "multitone_10s.wav": {
+      "path": "data/audio/multitone_10s.wav",
+      "description": "Multi-tone signal (A3, A4, A5, A6)",
+      "duration": 10.0,
+      "type": "synthetic"
+    },
+    "clicks_10s_10hz.wav": {
+      "path": "data/audio/clicks_10s_10hz.wav",
+      "description": "Click train at 10 Hz",
+      "duration": 10.0,
+      "type": "synthetic"
+    },
+    "noisy_speech_10s_10pct.wav": {
+      "path": "data/audio/noisy_speech_10s_10pct.wav",
+      "description": "Speech with 10% white noise",
+      "duration": 10.0,
+      "type": "noisy_speech",
+      "noise_level": 0.1
+    },
+    "noisy_speech_10s_20pct.wav": {
+      "path": "data/audio/noisy_speech_10s_20pct.wav",
+      "description": "Speech with 20% white noise",
+      "duration": 10.0,
+      "type": "noisy_speech",
+      "noise_level": 0.2
+    },
+    "noisy_speech_10s_50pct.wav": {
+      "path": "data/audio/noisy_speech_10s_50pct.wav",
+      "description": "Speech with 50% white noise",
+      "duration": 10.0,
+      "type": "noisy_speech",
+      "noise_level": 0.5
+    }
+  }
+}
