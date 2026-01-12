@@ -144,6 +144,10 @@ def cmd_recommend(args):
                 if args.task == "v2v" and getattr(args, 'prompt', None):
                     cmd.extend(["--prompt", args.prompt])
                 
+                # Add --pre for preprocessing (all tasks)
+                if getattr(args, 'pre', None):
+                    cmd.extend(["--pre", args.pre])
+                
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 
                 # Parse ARTIFACT_PATH from runner output
@@ -676,6 +680,7 @@ Examples:
     p_recommend.add_argument("--audio", "-a", type=Path, help="Audio file to run on")
     p_recommend.add_argument("--prompt", "-p", help="Text prompt for V2V (only valid with --task v2v)")
     p_recommend.add_argument("--device", help="Filter by device: cpu, mps, cuda")
+    p_recommend.add_argument("--pre", help="Preprocessing operators (comma-separated, e.g., trim_silence,normalize_loudness)")
     p_recommend.add_argument("--json", action="store_true", help="Output JSON")
     p_recommend.set_defaults(func=cmd_recommend)
     
