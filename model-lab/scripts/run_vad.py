@@ -33,6 +33,7 @@ from harness.runner_schema import (
     RunnerArtifact, RunContext, InputsSchema, QualityMetrics,
     validate_artifact, compute_pcm_hash,
 )
+from harness.media_ingest import ingest_media, IngestError, FFmpegNotFoundError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -46,111 +47,135 @@ def sha256_file(path: str) -> str:
     return h.hexdigest()
 
 
-def run_vad_adhoc(model_id: str, audio_path: str, device: str = "cpu"):
+
+def run_vad_adhoc(model_id: str, input_path: str, device: str = "cpu"):
     """
-    Run VAD on a single audio file (adhoc mode).
+    Run VAD on a single media file (adhoc mode).
     
+    Supports both audio and video files (mp4, mkv, etc).
     Produces artifact with grade=adhoc and structural metrics only.
     """
-    audio_path = Path(audio_path).resolve()
-    logger.info(f"=== VAD Adhoc: {model_id} on {audio_path.name} ===")
+    input_path = Path(input_path).resolve()
+    logger.info(f"=== VAD Adhoc: {model_id} on {input_path.name} ===")
     
-    # Create adhoc dataset metadata
-    adhoc = create_adhoc_dataset(audio_path, task="vad")
-    logger.info(f"Dataset ID: {adhoc.dataset_id}")
-    logger.info(f"Audio hash: {adhoc.audio_hash[:12]}")
+    # Ingest media (handles video extraction if needed)
+    try:
+        ingest = ingest_media(input_path)
+    except FFmpegNotFoundError as e:
+        logger.error(f"❌ {e}")
+        logger.error("   Video support requires ffmpeg. Install: brew install ffmpeg")
+        sys.exit(4)
+    except IngestError as e:
+        logger.error(f"❌ Ingest failed: {e}")
+        sys.exit(4)
     
-    # Load model
-    config_path = Path(f"models/{model_id}/config.yaml")
-    bundle = load_model_from_config(config_path, device=device)
-    detector = bundle['vad']['detect']
-    logger.info(f"✓ Model loaded")
+    logger.info(f"Source: {ingest.source_media_hash[:12]} ({ingest.original_format})")
+    logger.info(f"Audio: {ingest.audio_hash[:12]} ({ingest.audio_duration_s:.2f}s)")
+    if ingest.is_extracted:
+        logger.info(f"Extracted via: {ingest.ingest_tool} {ingest.ingest_version}")
     
-    # Load audio
-    audio, sr = sf.read(str(audio_path))
-    if audio.ndim > 1:
-        audio = audio.mean(axis=1)
-    audio = audio.astype(np.float32)
-    
-    duration_s = len(audio) / sr
-    
-    # Run VAD
-    t0 = time.time()
-    output = detector(audio, sr=sr)
-    latency = time.time() - t0
-    
-    rtf = latency / duration_s if duration_s > 0 else 0
-    segments = output.get("segments", [])
-    
-    # Calculate metrics
-    m_res = VADMetrics.calculate(segments, len(audio), sr)
-    
-    # Create schema-validated artifact
-    schema_run_context = RunContext(
-        task="vad",
-        model_id=model_id,
-        grade="adhoc",
-        timestamp=datetime.now().isoformat(),
-        git_hash=None,  # Will be populated by helper
-        command=sys.argv,
-        device=device,
-    )
-    
-    schema_inputs = InputsSchema(
-        audio_path=str(audio_path),
-        audio_hash=compute_pcm_hash(audio),
-        dataset_id=adhoc.dataset_id,
-        audio_duration_s=duration_s,
-        sample_rate=sr,
-    )
-    
-    structural_metrics = {
-        'rtf': rtf,
-        'speech_ratio': m_res.speech_ratio,
-        'num_segments': m_res.num_segments,
-        'latency_ms': latency * 1000,
-        'duration_s': duration_s,
-    }
-    
-    schema_artifact = RunnerArtifact(
-        run_context=schema_run_context,
-        inputs=schema_inputs,
-        metrics_quality=QualityMetrics(),  # All None for adhoc
-        metrics_structural=structural_metrics,
-        output={
-            'segments_count': len(segments),
-            'segments': segments[:20],  # Limit stored segments
-        },
-        provenance={'has_ground_truth': False, 'metrics_valid': True},
-        gates={'has_failure': False},
-    )
-    
-    # Validate before writing
-    validate_artifact(schema_artifact)
-    
-    # Save artifact
-    runs_dir = Path(f'runs/{model_id}/vad')
-    runs_dir.mkdir(parents=True, exist_ok=True)
-    
-    timestamp = int(time.time())
-    run_file = runs_dir / f'adhoc_{timestamp}.json'
-    
-    with open(run_file, 'w') as f:
-        json.dump(schema_artifact.to_dict(), f, indent=2, default=str)
-    
-    logger.info(f"✓ Adhoc run completed")
-    print(f"ARTIFACT_PATH:{run_file}")
-    return schema_artifact.to_dict(), str(run_file)
+    try:
+        # Load model
+        config_path = Path(f"models/{model_id}/config.yaml")
+        bundle = load_model_from_config(config_path, device=device)
+        detector = bundle['vad']['detect']
+        logger.info(f"✓ Model loaded")
+        
+        # Run VAD
+        t0 = time.time()
+        output = detector(ingest.audio, sr=ingest.sample_rate)
+        latency = time.time() - t0
+        
+        rtf = latency / ingest.audio_duration_s if ingest.audio_duration_s > 0 else 0
+        segments = output.get("segments", [])
+        
+        # Calculate metrics
+        m_res = VADMetrics.calculate(segments, len(ingest.audio), ingest.sample_rate)
+        
+        # Create schema-validated artifact
+        schema_run_context = RunContext(
+            task="vad",
+            model_id=model_id,
+            grade="adhoc",
+            timestamp=datetime.now().isoformat(),
+            git_hash=None,
+            command=sys.argv,
+            device=device,
+        )
+        
+        schema_inputs = InputsSchema(
+            audio_path=str(input_path),
+            audio_hash=ingest.audio_hash,
+            source_media_path=str(ingest.source_media_path) if ingest.is_extracted else None,
+            source_media_hash=ingest.source_media_hash if ingest.is_extracted else None,
+            dataset_id=f"adhoc_{ingest.audio_hash[:12]}",
+            audio_duration_s=ingest.audio_duration_s,
+            sample_rate=ingest.sample_rate,
+        )
+        
+        structural_metrics = {
+            'rtf': rtf,
+            'speech_ratio': m_res.speech_ratio,
+            'num_segments': m_res.num_segments,
+            'latency_ms': latency * 1000,
+            'duration_s': ingest.audio_duration_s,
+        }
+        
+        # Ingest provenance
+        ingest_provenance = {
+            'ingest_tool': ingest.ingest_tool,
+            'ingest_version': ingest.ingest_version,
+            'is_extracted': ingest.is_extracted,
+            'original_format': ingest.original_format,
+        }
+        
+        schema_artifact = RunnerArtifact(
+            run_context=schema_run_context,
+            inputs=schema_inputs,
+            metrics_quality=QualityMetrics(),  # All None for adhoc
+            metrics_structural=structural_metrics,
+            output={
+                'segments_count': len(segments),
+                'segments': segments[:20],
+            },
+            provenance={
+                'has_ground_truth': False,
+                'metrics_valid': True,
+                **ingest_provenance,
+            },
+            gates={'has_failure': False},
+        )
+        
+        # Validate before writing
+        validate_artifact(schema_artifact)
+        
+        # Save artifact
+        runs_dir = Path(f'runs/{model_id}/vad')
+        runs_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = int(time.time())
+        run_file = runs_dir / f'adhoc_{timestamp}.json'
+        
+        with open(run_file, 'w') as f:
+            json.dump(schema_artifact.to_dict(), f, indent=2, default=str)
+        
+        logger.info(f"✓ Adhoc run completed")
+        print(f"ARTIFACT_PATH:{run_file}")
+        return schema_artifact.to_dict(), str(run_file)
+        
+    finally:
+        ingest.cleanup()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run VAD Evaluation")
     parser.add_argument("--model", required=True, help="Model ID (e.g., silero_vad)")
     
-    # Mutually exclusive: --dataset or --audio
+    # Mutually exclusive: --dataset or --audio/--input
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--dataset", help="Dataset ID (e.g., vad_smoke_v1)")
-    input_group.add_argument("--audio", type=Path, help="Single audio file (adhoc mode)")
+    input_group.add_argument("--audio", type=Path, help="Single audio/video file (adhoc mode)")
+    input_group.add_argument("--input", type=Path, dest='audio', help="Alias for --audio")
     
     parser.add_argument("--device", default="cpu", help="Device to use (cpu, mps, cuda)")
     args = parser.parse_args()
