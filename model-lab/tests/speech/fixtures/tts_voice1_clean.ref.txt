@@ -1,0 +1,23 @@
+This is a speech quality and regression test for STT and TTS.
+
+Today's date is 2026-01-09. The sample rate is 16000 Hz and the file is mono.
+Numbers matter: 29.9 dB SNR, -36.1 LUFS, and true peak at -15.9 dBTP.
+If you hear "twenty-nine point nine", that is acceptable too, but the digits should appear in the transcript.
+
+Acronyms matter. Say these clearly:
+GPT, GPT-4, RLHF, ASR, TTS, VAD, LUFS, dBFS, dBTP, SNR, WER, CER, and JSON.
+
+Hyphens matter. These words should stay intact:
+self-supervised, few-shot, zero-shot, open-source, and real-time.
+Also say: "billions to trillions", not "billions tutorials".
+
+Now a small minimal-pairs block:
+context vs contact,
+acquire vs require,
+generated vs generative,
+model vs modal.
+
+Punctuation is not required in the transcript.
+But words should be correct after normalization: lowercase, no punctuation, collapsed whitespace.
+
+End of test.

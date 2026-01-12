@@ -259,3 +259,55 @@ Re-ran all 4 models on local Apple Silicon M3 MPS using the Python scripts (not 
 - All models run successfully except SeamlessM4T
 - Local MPS performance comparable to Colab GPU for Whisper variants
 - TTS comparison with LLM text pending implementation
+
+---
+
+## Addendum: Arsenal Documentation System (9 January 2026)
+
+Implemented automated Arsenal documentation system that aggregates run results into a living doc.
+
+### Latest Arsenal-Generated Results
+
+_Auto-generated from `docs/ARSENAL.md` via `make arsenal`_
+
+| Model          | Status       | WER    | RTF    | Verified | Evidence              |
+| -------------- | ------------ | ------ | ------ | -------- | --------------------- |
+| faster_whisper | ✅ production | 24.1%  | 0.07x  | mps      | Best run w/ ground truth |
+| whisper        | ✅ production | 28.5%  | 0.06x  | mps      | Best run w/ ground truth |
+| lfm2_5_audio   | 🟡 candidate | 137.8% | 0.09x  | mps      | Best run w/ ground truth |
+| seamlessm4t    | 🔬 experimental | 97.8%  | 0.11x  | mps      | Best run w/ ground truth |
+| distil_whisper | 🔬 experimental | -      | -      | -        | No runs yet           |
+| whisper_cpp    | 🔬 experimental | -      | -      | -        | No runs yet           |
+
+### Run Files Used
+
+| Model          | Run File                     | Dataset  |
+| -------------- | ---------------------------- | -------- |
+| whisper        | 2026-01-08_21-24-58.json     | PRIMARY  |
+| faster_whisper | 2026-01-08_14-08-12.json     | PRIMARY  |
+| lfm2_5_audio   | 2026-01-08_21-27-55.json     | PRIMARY  |
+| seamlessm4t    | 2026-01-08_21-30-21.json     | PRIMARY  |
+
+### Infrastructure Changes
+
+- **Bundle Contract v1**: All model loaders now return standardized interface
+- **Arsenal Doc System**: Auto-generated `docs/ARSENAL.md` + `docs/arsenal.json`
+- **Pre-commit Guards**: Block per-model functions, enforce doc freshness
+- **Promotion Rules**: Evidence-based status (production requires verified runs)
+
+### Commands
+
+```bash
+# Regenerate Arsenal docs from runs
+make arsenal
+
+# Run ASR test (populates runs/)
+make asr MODEL=whisper DATASET=primary
+```
+
+### Notes on WER Discrepancies
+
+Some runs show WER >100% due to ground truth mismatches:
+- Different audio/text pairs used in prior experiments
+- System correctly reports what was measured
+- Re-run with matched ground truth for accurate WER

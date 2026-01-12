@@ -1,0 +1,326 @@
+{
+  "generated_at": "2026-01-12T16:13:59.253242",
+  "models": {
+    "seamlessm4t": {
+      "model_id": "seamlessm4t",
+      "version": "2.0.0",
+      "model_type": "seamlessm4t",
+      "status": "experimental",
+      "devices_supported": [
+        "cpu",
+        "mps",
+        "cuda"
+      ],
+      "declared_capabilities": [
+        "asr",
+        "mt"
+      ],
+      "tasks": {
+        "asr": {
+          "declared": true,
+          "has_evidence": true,
+          "best_grade": "smoke",
+          "run_count": 1,
+          "last_run": null,
+          "metrics_summary": {
+            "latency_ms_p50": 20379.066875000717,
+            "rtf": 0.1248880425944149
+          }
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u26a0\ufe0f not selected",
+        "real_time_assistant": "\u274c missing: ['vad', 'v2v']",
+        "meeting_analysis": "\u274c missing: ['diarization']"
+      }
+    },
+    "silero_vad": {
+      "model_id": "silero_vad",
+      "version": "4.0.0",
+      "model_type": "silero_vad",
+      "status": "production",
+      "devices_supported": [
+        "cpu",
+        "mps",
+        "cuda"
+      ],
+      "declared_capabilities": [
+        "vad"
+      ],
+      "tasks": {
+        "vad": {
+          "declared": true,
+          "has_evidence": true,
+          "best_grade": "smoke",
+          "run_count": 2,
+          "last_run": null,
+          "metrics_summary": {
+            "rtf": 0.008568954467773438,
+            "speech_ratio": 0.4373,
+            "num_segments": 1.0
+          }
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u274c missing: ['asr']",
+        "real_time_assistant": "\u274c missing: ['v2v']",
+        "meeting_analysis": "\u274c missing: ['asr', 'diarization']"
+      }
+    },
+    "whisper_cpp": {
+      "model_id": "whisper_cpp",
+      "version": "1.0.0",
+      "model_type": "whisper_cpp",
+      "status": "experimental",
+      "devices_supported": [
+        "cpu"
+      ],
+      "declared_capabilities": [
+        "asr"
+      ],
+      "tasks": {
+        "asr": {
+          "declared": true,
+          "has_evidence": false,
+          "best_grade": null,
+          "run_count": 0,
+          "last_run": null,
+          "metrics_summary": {}
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u26a0\ufe0f not selected",
+        "real_time_assistant": "\u274c missing: ['vad', 'v2v']",
+        "meeting_analysis": "\u274c missing: ['diarization']"
+      }
+    },
+    "lfm2_5_audio": {
+      "model_id": "lfm2_5_audio",
+      "version": "2.5.0",
+      "model_type": "lfm2_5_audio",
+      "status": "candidate",
+      "devices_supported": [
+        "cpu",
+        "mps"
+      ],
+      "declared_capabilities": [
+        "asr",
+        "tts",
+        "chat"
+      ],
+      "tasks": {
+        "asr": {
+          "declared": true,
+          "has_evidence": true,
+          "best_grade": "smoke",
+          "run_count": 1,
+          "last_run": null,
+          "metrics_summary": {
+            "latency_ms_p50": 31658.166708002682,
+            "rtf": 0.19400920054589044
+          }
+        },
+        "v2v": {
+          "declared": false,
+          "has_evidence": true,
+          "best_grade": "smoke",
+          "run_count": 2,
+          "last_run": null,
+          "metrics_summary": {
+            "latency_ms": 4446.698904037476,
+            "input_duration_s": 4.0,
+            "response_duration_s": 0.0,
+            "rtf_like": 1.111674726009369
+          }
+        },
+        "tts": {
+          "declared": true,
+          "has_evidence": true,
+          "best_grade": "smoke",
+          "run_count": 1,
+          "last_run": null,
+          "metrics_summary": {
+            "latency_ms_total": 18198.32579200738,
+            "latency_ms_avg": 6066.108597335794,
+            "rtf": 2.049361012613444,
+            "duration_s": 8.88
+          }
+        },
+        "chat": {
+          "declared": true,
+          "has_evidence": false,
+          "best_grade": null,
+          "run_count": 0,
+          "last_run": null,
+          "metrics_summary": {}
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u26a0\ufe0f not selected",
+        "real_time_assistant": "\u274c missing: ['vad', 'v2v']",
+        "meeting_analysis": "\u274c missing: ['diarization']"
+      }
+    },
+    "faster_whisper": {
+      "model_id": "faster_whisper",
+      "version": "1.0.0",
+      "model_type": "faster_whisper",
+      "status": "production",
+      "devices_supported": [
+        "cpu",
+        "cuda"
+      ],
+      "declared_capabilities": [
+        "asr"
+      ],
+      "tasks": {
+        "asr": {
+          "declared": true,
+          "has_evidence": true,
+          "best_grade": "golden_batch",
+          "run_count": 2,
+          "last_run": null,
+          "metrics_summary": {
+            "latency_ms_p50": 3237.7279160064063,
+            "rtf": 0.10792426386688021,
+            "wer": 1.3448275862068966,
+            "cer": 0.8488372093023255
+          }
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u26a0\ufe0f not selected",
+        "real_time_assistant": "\u274c missing: ['vad', 'v2v']",
+        "meeting_analysis": "\u274c missing: ['diarization']"
+      }
+    },
+    "heuristic_diarization": {
+      "model_id": "heuristic_diarization",
+      "version": "1.0.0",
+      "model_type": "heuristic_diarization",
+      "status": "experimental",
+      "devices_supported": [
+        "cpu",
+        "cuda",
+        "mps"
+      ],
+      "declared_capabilities": [
+        "diarization"
+      ],
+      "tasks": {
+        "diarization": {
+          "declared": true,
+          "has_evidence": true,
+          "best_grade": "smoke",
+          "run_count": 2,
+          "last_run": null,
+          "metrics_summary": {
+            "num_speakers_pred": 1.0,
+            "speaker_count_error": 0.0,
+            "der_proxy": 0.0,
+            "rtf": 0.007543436686197917
+          }
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u274c missing: ['asr']",
+        "real_time_assistant": "\u274c missing: ['vad', 'v2v']",
+        "meeting_analysis": "\u274c missing: ['asr']"
+      }
+    },
+    "pyannote_diarization": {
+      "model_id": "pyannote_diarization",
+      "version": "3.1.0",
+      "model_type": "pyannote_diarization",
+      "status": "production",
+      "devices_supported": [
+        "cpu",
+        "cuda"
+      ],
+      "declared_capabilities": [
+        "diarization"
+      ],
+      "tasks": {
+        "diarization": {
+          "declared": true,
+          "has_evidence": false,
+          "best_grade": null,
+          "run_count": 0,
+          "last_run": null,
+          "metrics_summary": {}
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u274c missing: ['asr']",
+        "real_time_assistant": "\u274c missing: ['vad', 'v2v']",
+        "meeting_analysis": "\u274c missing: ['asr']"
+      }
+    },
+    "distil_whisper": {
+      "model_id": "distil_whisper",
+      "version": "3.0.0",
+      "model_type": "distil_whisper",
+      "status": "experimental",
+      "devices_supported": [
+        "cpu",
+        "mps",
+        "cuda"
+      ],
+      "declared_capabilities": [
+        "asr"
+      ],
+      "tasks": {
+        "asr": {
+          "declared": true,
+          "has_evidence": true,
+          "best_grade": "smoke",
+          "run_count": 1,
+          "last_run": null,
+          "metrics_summary": {
+            "latency_ms_p50": 1464.8470410029404,
+            "rtf": 0.008976950749177587
+          }
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u26a0\ufe0f not selected",
+        "real_time_assistant": "\u274c missing: ['vad', 'v2v']",
+        "meeting_analysis": "\u274c missing: ['diarization']"
+      }
+    },
+    "whisper": {
+      "model_id": "whisper",
+      "version": "3.0.0",
+      "model_type": "whisper",
+      "status": "production",
+      "devices_supported": [
+        "cpu",
+        "mps",
+        "cuda"
+      ],
+      "declared_capabilities": [
+        "asr"
+      ],
+      "tasks": {
+        "asr": {
+          "declared": true,
+          "has_evidence": true,
+          "best_grade": "golden_batch",
+          "run_count": 3,
+          "last_run": null,
+          "metrics_summary": {
+            "latency_ms_p50": 146444.90691700048,
+            "rtf": 0.8974511877784315,
+            "wer": 0.33436532507739936,
+            "cer": 0.11776447105788423
+          }
+        }
+      },
+      "use_case_eligibility": {
+        "offline_transcription": "\u26a0\ufe0f not selected",
+        "real_time_assistant": "\u274c missing: ['vad', 'v2v']",
+        "meeting_analysis": "\u274c missing: ['diarization']"
+      }
+    }
+  }
+}

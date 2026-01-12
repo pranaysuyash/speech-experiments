@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "run_id": "asr_golden_v1_1767940815",
+    "timestamp": "2026-01-09T12:10:15.060781",
+    "model_id": "whisper",
+    "task": "alignment"
+  },
+  "input": {
+    "dataset_id": "asr_golden_v1",
+    "count": 1
+  },
+  "system": {
+    "device": "cpu"
+  },
+  "metrics": {},
+  "gates": {
+    "has_failure": true
+  },
+  "evidence": {
+    "grade": "smoke",
+    "dataset_id": "asr_golden_v1",
+    "sanity_gates": {},
+    "wer_valid": true
+  },
+  "results": [
+    {
+      "id": "llm_primary",
+      "error": "Error opening '/Users/pranay/Projects/speech_experiments/model-lab/data/audio/PRIMARY/llm_recording_pranay.m4a': Format not recognised.",
+      "metrics": null
+    }
+  ]
+}

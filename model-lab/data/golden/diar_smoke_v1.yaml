@@ -1,0 +1,27 @@
+# Diarization Smoke Test Dataset v1
+# Purpose: Structural verification of the diarization pipeline.
+# Checks: Pipeline runs, produces segments, and roughly counts speakers.
+
+metadata:
+  version: "1.0"
+  created: "2026-01-09"
+  description: "Basic smoke test for diarization using single-speaker clean speech."
+
+cases:
+  - id: "clean_speech_1spk"
+    audio_file: "data/audio/clean_speech_10s.wav"
+    expected:
+      num_speakers: 1
+      min_speakers: 1
+      max_speakers: 1
+      # Simple ground truth for smoke testing
+      segments:
+        - {start: 0.0, end: 10.0, speaker: "SPEAKER_00"}
+
+  - id: "silence_0spk"
+    audio_file: "data/audio/silence_5s.wav"
+    expected:
+      num_speakers: 0
+      min_speakers: 0
+      max_speakers: 0
+      segments: []

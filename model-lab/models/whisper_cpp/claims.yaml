@@ -1,0 +1,22 @@
+# whisper_cpp Claims Manifest
+
+claims:
+  - id: whisper_cpp_asr_structural
+    task: asr
+    type: structural
+    description: "ASR runs and produces valid artifact with provenance"
+    enforcement: optional  # No evidence yet - whisper.cpp binary not installed
+    test_ref: claims.asr.smoke_structural_v1
+    thresholds:
+      has_provenance: true
+      has_run_context: true
+
+  - id: whisper_cpp_edge_friendly
+    task: asr
+    type: constraint
+    description: "Runs on CPU without Python dependencies"
+    enforcement: optional
+    test_ref: claims.asr.device_cpu_v1
+    thresholds:
+      device: cpu
+    source: "whisper.cpp designed for edge/embedded deployment"

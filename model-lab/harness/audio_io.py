@@ -68,6 +68,9 @@ class AudioLoader:
             else:
                 audio = audio.T  # (channels, samples)
 
+        # Capture original sample rate BEFORE resampling
+        original_sample_rate = sample_rate
+
         # Resample if needed
         target_sr = self.target_sample_rate or self.SAMPLE_RATES.get(model_type, 16000)
         if sample_rate != target_sr:
@@ -75,9 +78,10 @@ class AudioLoader:
             sample_rate = target_sr
             logger.info(f"Resampled to {target_sr}Hz: {audio_path.name}")
 
-        # Metadata
+        # Metadata - use original_sample_rate, not post-resample value
         metadata = {
-            'original_sample_rate': sample_rate,
+            'original_sample_rate': original_sample_rate,
+            'sample_rate': sample_rate,
             'duration_seconds': len(audio) / sample_rate,
             'num_samples': len(audio),
             'channels': 1 if audio.ndim == 1 else audio.shape[0],

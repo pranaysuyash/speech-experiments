@@ -1,0 +1,53 @@
+# Heuristic Diarization Configuration
+# Baseline implementation using VAD + 1-Speaker assumption.
+
+model_type: heuristic_diarization
+
+metadata:
+  model_name: "Silero-VAD-Baseline"
+  provider: "Silero-Based (Local)"
+  version: "1.0.0"
+  license: "MIT"
+  description: "Heuristic diarizer extending Silero VAD with single-speaker assumption."
+  repo_url: "internal"
+
+official_sources:
+  - kind: "repo"
+    url: "https://github.com/snakers4/silero-vad"
+    note: "Underlying VAD engine"
+
+claims:
+  claimed_strengths:
+    - "fast"
+    - "zero_dependency"
+  recommended_usage:
+    - "Smoke testing"
+    - "Single speaker verification"
+
+declared_capabilities:
+  - task: "diarization"
+    role: "primary"
+    notes: "Baseline for pipeline verification. Assumes 1 speaker max."
+
+evaluation:
+  primary_tasks: ["diarization"]
+  default_datasets:
+    diarization: "diar_smoke_v1"
+
+deployment:
+  runtimes: ["local"]
+  offline_capable: true
+  targets: ["server", "edge"]
+  notes: "No auth required"
+
+hardware:
+  accelerators_supported: ["cpu", "cuda", "mps"]
+  min_vram_gb: 0.1
+  ram_gb_recommended: 1
+  notes:
+    - "Lightweight baseline"
+
+install:
+  method: "pip"
+  deps_pain: "low"
+  known_issues: []

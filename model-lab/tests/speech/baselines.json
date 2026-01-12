@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "policy": {
+    "audio_integrity": {
+      "true_peak_fail_dbTP": -0.5,
+      "snr_warn_db": 20.0,
+      "speech_coverage_min_ratio": 0.4,
+      "lufs_range_for_normalization": [
+        -27.0,
+        -16.0
+      ],
+      "target_lufs": -20.0,
+      "true_peak_limit_dbTP": -1.0
+    },
+    "asr_quality": {
+      "wer_pass_delta_pp": 2.0,
+      "wer_warn_delta_pp": 5.0,
+      "glossary_warn_missing": 2,
+      "glossary_fail_missing": 4,
+      "numbers_warn_missing": 1,
+      "numbers_fail_missing": 2
+    }
+  },
+  "glossary_terms": [
+    "gpt",
+    "gpt-4",
+    "gpt 4",
+    "gpt four",
+    "rlhf",
+    "asr",
+    "tts",
+    "vad",
+    "lufs",
+    "dbfs",
+    "d b f s",
+    "dbtp",
+    "d b t p",
+    "snr",
+    "wer",
+    "cer",
+    "json",
+    "self-supervised",
+    "self supervised",
+    "few-shot",
+    "few shot",
+    "zero-shot",
+    "zero shot",
+    "open-source",
+    "open source",
+    "real-time",
+    "real time"
+  ],
+  "number_anchors": [
+    "2026",
+    "twenty twenty six",
+    "01",
+    "09",
+    "16000",
+    "sixteen thousand",
+    "29.9",
+    "twenty nine point nine",
+    "twenty-nine point nine",
+    "-36.1",
+    "minus thirty six point one",
+    "negative thirty six point one",
+    "-15.9",
+    "minus fifteen point nine",
+    "negative fifteen point nine"
+  ],
+  "fixtures": {
+    "fixtures/tts_voice1_clean.wav": {
+      "kind": "single_speaker",
+      "reference_text_file": "golden.txt",
+      "expected": {
+        "wer_norm_baseline": 0.351,
+        "cer_norm_baseline": 0.1113,
+        "glossary_hits_baseline": 17,
+        "numbers_hits_baseline": 2
+      },
+      "fingerprint": {
+        "sha256": "1961505c44834d477ffc0609fc304948b061e86a16d33c9fd53e659e88f77d12",
+        "duration_sec": 72.12,
+        "sample_rate": 16000
+      }
+    },
+    "fixtures/tts_voice2_clean.wav": {
+      "kind": "single_speaker",
+      "reference_text_file": "golden.txt",
+      "expected": {
+        "wer_norm_baseline": 0.1722,
+        "cer_norm_baseline": 0.0979,
+        "glossary_hits_baseline": 21,
+        "numbers_hits_baseline": 3
+      },
+      "fingerprint": {
+        "sha256": "a2eabc28a43b6a7d3e4a8370a2200903144d4d36f7977ab0399aea557de3c86e",
+        "duration_sec": 77.91,
+        "sample_rate": 16000
+      }
+    },
+    "fixtures/dialogue_2spk_clean.wav": {
+      "kind": "multi_speaker",
+      "reference_text_file": "dialogue_2spk.txt",
+      "expected": {
+        "wer_norm_baseline": 0.1111,
+        "cer_norm_baseline": 0.0499,
+        "glossary_hits_baseline": 7,
+        "numbers_hits_baseline": 2
+      },
+      "fingerprint": {
+        "sha256": "6d293e4b29e1c5dd74e15c19ab5e1646acf32d983ab643e3a1899feedc20e6c7",
+        "duration_sec": 34.61,
+        "sample_rate": 16000
+      }
+    }
+  },
+  "asr": {
+    "engine": "faster-whisper",
+    "model": "base",
+    "compute_type": "int8",
+    "language": "en",
+    "beam_size": 5,
+    "vad_filter": true
+  }
+}

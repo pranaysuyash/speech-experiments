@@ -1,0 +1,15 @@
+# V2V Smoke Test Dataset v1
+# Purpose: Verify Audio-to-Audio pipeline structure.
+
+metadata:
+  version: "1.0"
+  created: "2026-01-09"
+  description: "Basic smoke test for V2V using audio prompt."
+
+cases:
+  - id: "v2v_turn_1"
+    input_audio: "data/audio/clean_speech_10s.wav"
+    input_text_transcript: "Hello, this is a test." # Optional ground truth of input
+    expected:
+      min_duration_s: 0.1
+      max_latency_ms: 5000 # Loose gate for smoke

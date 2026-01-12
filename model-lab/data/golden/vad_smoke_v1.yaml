@@ -1,0 +1,14 @@
+id: vad_smoke_v1
+description: "Basic VAD smoke test with speech and silence"
+cases:
+  - id: "clean_speech"
+    audio_file: "data/audio/clean_speech_10s.wav"
+    expected_speech_ratio_min: 0.5
+    expected_segments_min: 1
+    notes: "Continuous speech should be detected"
+
+  - id: "silence"
+    audio_file: "data/audio/silence_5s.wav"
+    expected_speech_ratio_max: 0.1
+    expected_segments_max: 1
+    notes: "Silence should yield near-zero segments"

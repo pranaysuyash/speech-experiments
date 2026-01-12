@@ -1,0 +1,29 @@
+# ASR Smoke Test Dataset
+# Minimal structural test for ASR capability
+# Uses existing audio from golden dataset
+
+name: asr_smoke
+version: "1.0"
+task_type: asr
+
+# Smoke thresholds are lenient - just needs to produce output
+thresholds:
+  wer_mean: 0.50           # Max 50% WER for smoke
+  success_rate: 0.80       # 80% must not error
+  min_completeness: 0.30   # Must produce some output
+
+metadata:
+  description: "Smoke test for ASR - verifies model can transcribe"
+  created: "2026-01-11"
+  grade: smoke
+
+cases:
+  # Single clean speech test
+  - id: smoke_clean
+    audio_path: ../audio/llm_primary_163s.wav  # Reuse existing
+    ground_truth_path: ../truth/llm_primary.txt
+    metadata:
+      category: clean
+      duration_s: 163
+      expected_language: en
+      notes: "Smoke test - basic transcription capability"

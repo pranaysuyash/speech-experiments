@@ -1,0 +1,380 @@
+{
+  "provider_id": "whisper",
+  "capability": "asr",
+  "input": {
+    "audio_file": "ux_psychology_30s.wav",
+    "audio_sha256": "8ed4a87babd2c99e",
+    "duration_s": 30.0,
+    "sr": 16000
+  },
+  "output": {
+    "text": "Welcome to the Deep Dive. Today we're undertaking, well, what feels like a massive mission. It really is, isn't it? We have this stack of sources that on the surface seem totally disparate. I mean, we're talking 1950s psychology, predictive AI, augmented reality. Right. But they're all connected by this single sort of invisible thread. The architecture of user experience design. It truly is the invisible architecture of our digital lives. Yeah. And for you, the one.",
+    "text_length": 470,
+    "normalized_text": "welcome to the deep dive. today we are undertaking, well, what feels like a massive mission. it really is, is not it we have this stack of sources that on the surface seem totally disparate. i mean, we are talking 1950s psychology, predictive ai, augmented reality. right. but they are all connected by this single sort of invisible thread. the architecture of user experience design. it truly is the invisible architecture of our digital lives. yeah. and for you, the one.",
+    "segments": [
+      {
+        "id": 0,
+        "seek": 0,
+        "start": 0.0,
+        "end": 1.32,
+        "text": " Welcome to the Deep Dive.",
+        "tokens": [
+          50365,
+          4027,
+          281,
+          264,
+          14895,
+          413,
+          488,
+          13,
+          50431
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 1,
+        "seek": 0,
+        "start": 1.92,
+        "end": 5.4,
+        "text": " Today we're undertaking, well, what feels like a massive mission.",
+        "tokens": [
+          50461,
+          2692,
+          321,
+          434,
+          39250,
+          11,
+          731,
+          11,
+          437,
+          3417,
+          411,
+          257,
+          5994,
+          4447,
+          13,
+          50635
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 2,
+        "seek": 0,
+        "start": 5.7,
+        "end": 6.46,
+        "text": " It really is, isn't it?",
+        "tokens": [
+          50650,
+          467,
+          534,
+          307,
+          11,
+          1943,
+          380,
+          309,
+          30,
+          50688
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 3,
+        "seek": 0,
+        "start": 6.5600000000000005,
+        "end": 11.200000000000001,
+        "text": " We have this stack of sources that on the surface seem totally disparate.",
+        "tokens": [
+          50693,
+          492,
+          362,
+          341,
+          8630,
+          295,
+          7139,
+          300,
+          322,
+          264,
+          3753,
+          1643,
+          3879,
+          14548,
+          473,
+          13,
+          50925
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 4,
+        "seek": 0,
+        "start": 11.26,
+        "end": 16.96,
+        "text": " I mean, we're talking 1950s psychology, predictive AI, augmented reality.",
+        "tokens": [
+          50928,
+          286,
+          914,
+          11,
+          321,
+          434,
+          1417,
+          18141,
+          82,
+          15105,
+          11,
+          35521,
+          7318,
+          11,
+          36155,
+          4103,
+          13,
+          51213
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 5,
+        "seek": 0,
+        "start": 17.32,
+        "end": 17.5,
+        "text": " Right.",
+        "tokens": [
+          51231,
+          1779,
+          13,
+          51240
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 6,
+        "seek": 0,
+        "start": 18.16,
+        "end": 22.42,
+        "text": " But they're all connected by this single sort of invisible thread.",
+        "tokens": [
+          51273,
+          583,
+          436,
+          434,
+          439,
+          4582,
+          538,
+          341,
+          2167,
+          1333,
+          295,
+          14603,
+          7207,
+          13,
+          51486
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 7,
+        "seek": 0,
+        "start": 22.900000000000002,
+        "end": 25.1,
+        "text": " The architecture of user experience design.",
+        "tokens": [
+          51510,
+          440,
+          9482,
+          295,
+          4195,
+          1752,
+          1715,
+          13,
+          51620
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 8,
+        "seek": 0,
+        "start": 25.32,
+        "end": 28.080000000000002,
+        "text": " It truly is the invisible architecture of our digital lives.",
+        "tokens": [
+          51631,
+          467,
+          4908,
+          307,
+          264,
+          14603,
+          9482,
+          295,
+          527,
+          4562,
+          2909,
+          13,
+          51769
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      },
+      {
+        "id": 9,
+        "seek": 0,
+        "start": 28.22,
+        "end": 28.48,
+        "text": " Yeah.",
+        "tokens": [
+          51776,
+          865,
+          13,
+          51789
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.13989285526112613,
+        "compression_ratio": 1.5501730103806228,
+        "no_speech_prob": NaN
+      }
+    ],
+    "ground_truth": "User experience psychology draws from cognitive science principles like Miller's Law, which states that humans can hold about seven items in working memory, plus or minus two. This fundamental constraint shapes how we design interfaces, menus, and information architecture. Modern AI systems must respect these cognitive limitations while providing intelligent assistance that augments rather than overwhelms human decision-making.",
+    "ground_truth_normalized": "user experience psychology draws from cognitive science principles like millers law, which states that humans can hold about seven items in working memory, plus or minus two. this fundamental constraint shapes how we design interfaces, menus, and information architecture. modern ai systems must respect these cognitive limitations while providing intelligent assistance that augments rather than overwhelms human decision-making.",
+    "ground_truth_length": 431
+  },
+  "metrics": {
+    "latency_ms_p50": 12292.519500006165,
+    "rtf": 0.4097506500002055,
+    "wer": 1.3620689655172413,
+    "cer": 0.8534883720930233
+  },
+  "system": {
+    "device": "mps",
+    "model": "large-v3",
+    "inference_type": "local",
+    "capabilities": [
+      "asr",
+      "alignment"
+    ]
+  },
+  "evidence": {
+    "grade": "golden_batch",
+    "dataset_id": "ux_primary",
+    "truth_sha256": "4aaa0a178d6981df",
+    "sanity_gates": {
+      "wer_valid": "\u2705 Pass",
+      "length_chk": "\u2139\ufe0f 1.40"
+    },
+    "wer_valid": true
+  },
+  "protocol": {
+    "normalization_version": "1.0",
+    "bundle_contract": "v1"
+  },
+  "manifest": {
+    "provider_id": "whisper",
+    "git_hash": "861fa73ab11b1c79565d46937447527ba211d478",
+    "timestamp": "2026-01-12T15:29:56.542891",
+    "provider_versions": {
+      "openai-whisper": "20250625",
+      "faster-whisper": "1.2.1",
+      "liquid-audio": "1.1.0",
+      "torch": "2.9.1",
+      "torchaudio": "2.9.1",
+      "transformers": "4.57.3"
+    },
+    "config_hash": "fc204d66a7e82a6b",
+    "config_path": "models/whisper/config.yaml",
+    "dataset_hash": "2af0498e5d785fb3",
+    "audio_file": "ux_psychology_30s.wav",
+    "text_file": "ux_psychology_30s.txt"
+  },
+  "timestamps": {
+    "started_at": "2026-01-12T15:30:09.683039",
+    "finished_at": "2026-01-12T15:30:09.683058"
+  },
+  "errors": [
+    "Output quality issue: {'ref_word_count': 59, 'hyp_word_count': 81, 'length_ratio': 1.3728813559322033, 'char_ratio': 1.1, 'unique_token_ratio': 0.7777777777777778, 'repeat_3gram_rate': 0.0, 'is_truncated': False, 'is_hallucinating': True, 'is_repetitive': False, 'has_failure': True}"
+  ],
+  "provenance": {
+    "schema_version": "1.0",
+    "created_at": "2026-01-12T15:29:56.424338",
+    "dataset_id": "ux_primary",
+    "has_ground_truth": true,
+    "metrics_valid": true,
+    "dataset_hash": null,
+    "audio_hash": "8ed4a87babd2c99e",
+    "ground_truth_hash": "d474f6d0172921ec"
+  },
+  "run_context": {
+    "device": "mps",
+    "audio_duration_s": 30.0,
+    "model_version": null,
+    "runner_git_hash": "861fa73"
+  },
+  "output_quality": {
+    "ref_word_count": 59,
+    "hyp_word_count": 81,
+    "length_ratio": 1.3728813559322033,
+    "char_ratio": 1.1,
+    "unique_token_ratio": 0.7777777777777778,
+    "repeat_3gram_rate": 0.0,
+    "is_truncated": false,
+    "is_hallucinating": true,
+    "is_repetitive": false,
+    "has_failure": true
+  },
+  "validation": {
+    "normalization": {
+      "protocol_version": "1.0",
+      "reference_normalized_length": 430,
+      "hypothesis_normalized_length": 473,
+      "parity_check": "passed",
+      "providers_compared": [
+        "whisper",
+        "protocol"
+      ]
+    },
+    "entity_protocol": {
+      "protocol_version": "1.0",
+      "rules": {
+        "version": "1.0",
+        "number_definition": "\\b\\d+(?:\\.\\d+)?\\b",
+        "date_formats": [
+          "\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b",
+          "\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \\d{1,2},? \\d{4}\\b"
+        ],
+        "currency_patterns": [
+          "\\$\\d+(?:\\.\\d{2})?\\b",
+          "\\$\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?\\b"
+        ],
+        "include_ordinals": false,
+        "include_ranges": false,
+        "include_decimals": true
+      },
+      "locked": true
+    },
+    "provider_id": "whisper",
+    "timestamp": "2026-01-12T15:30:09.980252"
+  }
+}

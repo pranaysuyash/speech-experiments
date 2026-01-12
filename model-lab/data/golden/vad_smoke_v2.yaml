@@ -1,0 +1,19 @@
+# VAD Smoke Test Dataset v2
+# Purpose: Different audio scenarios than v1 to catch regressions.
+# v1: clean_speech + silence
+# v2: noisy_speech (mixed) + speech_like (should trigger but limited)
+
+id: vad_smoke_v2
+description: "VAD smoke v2 - noisy and speech-like audio"
+cases:
+  - id: "noisy_speech"
+    audio_file: "data/audio/noisy_speech_10s_10pct.wav"
+    expected_speech_ratio_min: 0.3
+    expected_segments_min: 1
+    notes: "Noisy speech should still be detected"
+
+  - id: "speech_like"
+    audio_file: "data/audio/speech_like_4s.wav"
+    expected_speech_ratio_min: 0.05
+    expected_speech_ratio_max: 0.95
+    notes: "Speech-like audio should yield some detection"

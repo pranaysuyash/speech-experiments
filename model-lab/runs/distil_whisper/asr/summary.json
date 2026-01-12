@@ -1,0 +1,10 @@
+{
+  "model_id": "distil_whisper",
+  "dataset": "asr_smoke_v1",
+  "last_run": "2026-01-12T14:59:50.270028",
+  "wer": null,
+  "cer": null,
+  "rtf": 0.008976950749177587,
+  "latency_ms": 1464.8470410029404,
+  "has_output_quality_failure": false
+}

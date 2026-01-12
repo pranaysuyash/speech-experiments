@@ -1,0 +1,40 @@
+# Whisper.cpp Configuration
+# Model: ggerganov/whisper.cpp
+# Edge-friendly C++ inference backend for Whisper
+
+model_type: whisper_cpp
+model_name: whisper.cpp
+version: "1.0.0"
+status: experimental
+
+# Provider info
+provider: ggerganov
+license: MIT
+description: "whisper.cpp: edge-friendly C++ inference backend"
+
+# Audio settings
+audio:
+  sample_rate: 16000
+
+# Model settings
+model:
+  model_size: base
+  ggml_format: gguf
+
+# Deployment
+deployment:
+  runtimes:
+    - local
+    - cli
+  targets:
+    - desktop
+    - edge
+    - mobile
+
+# Hardware - whisper.cpp runs on CPU with SIMD acceleration
+hardware:
+  accelerators_supported:
+    - cpu
+  notes:
+    - "Uses AVX/NEON SIMD for fast CPU inference"
+    - "No GPU required"

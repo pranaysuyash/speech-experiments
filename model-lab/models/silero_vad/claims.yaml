@@ -1,0 +1,21 @@
+# silero_vad Claims Manifest
+
+claims:
+  - id: silero_vad_structural
+    task: vad
+    type: structural
+    description: "VAD runs and produces valid segments"
+    enforcement: required
+    test_ref: claims.vad.smoke_ratio_v1
+    thresholds:
+      speech_ratio_min: 0.05
+      speech_ratio_max: 0.95
+
+  - id: silero_vad_device
+    task: vad
+    type: constraint
+    description: "Runs on CPU without GPU requirement"
+    enforcement: required
+    test_ref: claims.vad.device_cpu_v1
+    thresholds:
+      device: cpu

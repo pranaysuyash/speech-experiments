@@ -1,0 +1,10 @@
+{
+  "model_id": "lfm2_5_audio",
+  "dataset": "asr_smoke_v1",
+  "last_run": "2026-01-12T14:57:34.049868",
+  "wer": null,
+  "cer": null,
+  "rtf": 0.19400920054589044,
+  "latency_ms": 31658.166708002682,
+  "has_output_quality_failure": false
+}

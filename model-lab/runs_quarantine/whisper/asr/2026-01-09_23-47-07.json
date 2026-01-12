@@ -1,0 +1,405 @@
+{
+  "provider_id": "whisper",
+  "capability": "asr",
+  "input": {
+    "audio_file": "llm_recording_pranay.wav",
+    "audio_sha256": "4c6a2507ee15cdc0",
+    "duration_s": 163.1786875,
+    "sr": 16000
+  },
+  "output": {
+    "text": "A large language model LLM is a language model trained with self-supervised machine learning on a vast amount of text designed for natural language processing tasks especially language generation the largest and most capable LLMs are generated pre-trained transformers GPTs and provide the core capabilities of modern chatbots LLMs can be fine-tuned for specific tasks or guided by prompt engineering these models require sorry acquire predictive power regarding syntax semantics and ontologies inherent in human language corpora but also inherent in accuracies and biases present in the data they are trained on they consist of billions to trillions of parameters and operate as general-purpose sequence models and rating summarizing translating and reasoning over text LLMs represent a significant new technology in their ability to generalize across tasks with minimal tasks specific supervision and performance and the ability to generate a comprehensive and comprehensive vision enabling capabilities like conversational agents code generation knowledge retrieval and automated reasoning that previously required bespoke systems LLMs evolved from earlier statistical and recurrent neural network approaches to language modeling the transformer architecture introduced in 2017 replaced recurrence with self-attention allowing efficient parallelization longer context handling and scalable training on unprecedented data volumes this innovation enabled models like GPT BERT and the successors which demonstrated emergent behaviors sicile such as spricht learning and compositional reasoning laz mort learning particularly policy gradient algorithms has been adapted to fine tune LLMs for desired behaviors beyond raw text raw text token prediction reinforcement learning from human feedback our budget supplies these models to optimize the policy the LLMs output distribution against reward signals derived from human or automated preference judgments this has been critical for aligning model outputs with user expectations improving factuality reducing harmful responses and enhancing task performance benchmark evaluations for LLMs have evolved from narrow linguistic assessments toward comprehensive multi task evaluations measuring reasoning factual accuracy alignment and safety hill climbing iteratively optimizing models against benchmarks has emerged as dominant strategy reducing rapid incremental performance gains but raising concerns of overfitting to benchmarks rather than achieving genuine generalization or robust capability improvements",
+    "text_length": 2557,
+    "normalized_text": "a large language model llm is a language model trained with self-supervised machine learning on a vast amount of text designed for natural language processing tasks especially language generation the largest and most capable llms are generated pre-trained transformers gpts and provide the core capabilities of modern chatbots llms can be fine-tuned for specific tasks or guided by prompt engineering these models require sorry acquire predictive power regarding syntax semantics and ontologies inherent in human language corpora but also inherent in accuracies and biases present in the data they are trained on they consist of billions to trillions of parameters and operate as general-purpose sequence models and rating summarizing translating and reasoning over text llms represent a significant new technology in their ability to generalize across tasks with minimal tasks specific supervision and performance and the ability to generate a comprehensive and comprehensive vision enabling capabilities like conversational agents code generation knowledge retrieval and automated reasoning that previously required bespoke systems llms evolved from earlier statistical and recurrent neural network approaches to language modeling the transformer architecture introduced in 2017 replaced recurrence with self-attention allowing efficient parallelization longer context handling and scalable training on unprecedented data volumes this innovation enabled models like gpt bert and the successors which demonstrated emergent behaviors sicile such as spricht learning and compositional reasoning laz mort learning particularly policy gradient algorithms has been adapted to fine tune llms for desired behaviors beyond raw text raw text token prediction reinforcement learning from human feedback our budget supplies these models to optimize the policy the llms output distribution against reward signals derived from human or automated preference judgments this has been critical for aligning model outputs with user expectations improving factuality reducing harmful responses and enhancing task performance benchmark evaluations for llms have evolved from narrow linguistic assessments toward comprehensive multi task evaluations measuring reasoning factual accuracy alignment and safety hill climbing iteratively optimizing models against benchmarks has emerged as dominant strategy reducing rapid incremental performance gains but raising concerns of overfitting to benchmarks rather than achieving genuine generalization or robust capability improvements",
+    "segments": [
+      {
+        "id": 0,
+        "seek": 0,
+        "start": 0.0,
+        "end": 5.64,
+        "text": " A large language model LLM is a language model trained with self-supervised",
+        "tokens": [
+          50365,
+          316,
+          2416,
+          2856,
+          2316,
+          441,
+          43,
+          44,
+          307,
+          257,
+          2856,
+          2316,
+          8895,
+          365,
+          2698,
+          12,
+          48172,
+          24420,
+          50647
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.17463198575106534,
+        "compression_ratio": 1.7153846153846153,
+        "no_speech_prob": 0.016893532127141953
+      },
+      {
+        "id": 1,
+        "seek": 0,
+        "start": 5.64,
+        "end": 9.24,
+        "text": " machine learning on a vast amount of text designed for natural language",
+        "tokens": [
+          50647,
+          3479,
+          2539,
+          322,
+          257,
+          8369,
+          2372,
+          295,
+          2487,
+          4761,
+          337,
+          3303,
+          2856,
+          50827
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.17463198575106534,
+        "compression_ratio": 1.7153846153846153,
+        "no_speech_prob": 0.016893532127141953
+      },
+      {
+        "id": 2,
+        "seek": 0,
+        "start": 9.24,
+        "end": 13.6,
+        "text": " processing tasks especially language generation the largest and most capable",
+        "tokens": [
+          50827,
+          9007,
+          9608,
+          2318,
+          2856,
+          5125,
+          264,
+          6443,
+          293,
+          881,
+          8189,
+          51045
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.17463198575106534,
+        "compression_ratio": 1.7153846153846153,
+        "no_speech_prob": 0.016893532127141953
+      },
+      {
+        "id": 3,
+        "seek": 0,
+        "start": 13.6,
+        "end": 17.46,
+        "text": " LLMs are generated pre-trained transformers GPTs and provide the core",
+        "tokens": [
+          51045,
+          441,
+          43,
+          26386,
+          366,
+          10833,
+          659,
+          12,
+          17227,
+          2001,
+          4088,
+          433,
+          26039,
+          33424,
+          293,
+          2893,
+          264,
+          4965,
+          51238
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.17463198575106534,
+        "compression_ratio": 1.7153846153846153,
+        "no_speech_prob": 0.016893532127141953
+      },
+      {
+        "id": 4,
+        "seek": 0,
+        "start": 17.46,
+        "end": 22.62,
+        "text": " capabilities of modern chatbots LLMs can be fine-tuned for specific tasks or",
+        "tokens": [
+          51238,
+          10862,
+          295,
+          4363,
+          5081,
+          65,
+          1971,
+          441,
+          43,
+          26386,
+          393,
+          312,
+          2489,
+          12,
+          83,
+          43703,
+          337,
+          2685,
+          9608,
+          420,
+          51496
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.17463198575106534,
+        "compression_ratio": 1.7153846153846153,
+        "no_speech_prob": 0.016893532127141953
+      },
+      {
+        "id": 5,
+        "seek": 0,
+        "start": 22.62,
+        "end": 28.2,
+        "text": " guided by prompt engineering these models require sorry acquire predictive",
+        "tokens": [
+          51496,
+          19663,
+          538,
+          12391,
+          7043,
+          613,
+          5245,
+          3651,
+          2597,
+          20001,
+          35521,
+          51775
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.17463198575106534,
+        "compression_ratio": 1.7153846153846153,
+        "no_speech_prob": 0.016893532127141953
+      },
+      {
+        "id": 6,
+        "seek": 2820,
+        "start": 28.2,
+        "end": 34.66,
+        "text": " power regarding syntax semantics and ontologies inherent in human language",
+        "tokens": [
+          50365,
+          1347,
+          8595,
+          28431,
+          4361,
+          45298,
+          293,
+          6592,
+          6204,
+          26387,
+          294,
+          1952,
+          2856,
+          50688
+        ],
+        "temperature": 0.4,
+        "avg_logprob": -0.4065451988807091,
+        "compression_ratio": 1.843205574912892,
+        "no_speech_prob": 0.0008679074817337096
+      },
+      {
+        "id": 7,
+        "seek": 2820,
+        "start": 34.66,
+        "end": 39.42,
+        "text": " corpora but also inherent in accuracies and biases present in the data they are",
+        "tokens": [
+          50688,
+          6804,
+          64,
+          457,
+          611,
+          26387,
+          294,
+          5771,
+          20330,
+          293,
+          32152,
+          1974,
+          294,
+          264,
+          1412,
+          436,
+          366,
+          50926
+        ],
+        "temperature": 0.4,
+        "avg_logprob": -0.4065451988807091,
+        "compression_ratio": 1.843205574912892,
+        "no_speech_prob": 0.0008679074817337096
+      },
+      {
+        "id": 8,
+        "seek": 2820,
+        "start": 39.42,
+        "end": 44.2,
+        "text": " trained on they consist of billions to trillions of parameters and operate as",
+        "tokens": [
+          50926,
+          8895,
+          322,
+          436,
+          4603,
+          295,
+          17375,
+          281,
+          504,
+          46279,
+          295,
+          9834,
+          293,
+          9651,
+          382,
+          51165
+        ],
+        "temperature": 0.4,
+        "avg_logprob": -0.4065451988807091,
+        "compression_ratio": 1.843205574912892,
+        "no_speech_prob": 0.0008679074817337096
+      },
+      {
+        "id": 9,
+        "seek": 2820,
+        "start": 44.2,
+        "end": 48.78,
+        "text": " general-purpose sequence models and rating summarizing translating and",
+        "tokens": [
+          51165,
+          2674,
+          12,
+          42601,
+          8310,
+          5245,
+          293,
+          10990,
+          14611,
+          3319,
+          35030,
+          293,
+          51394
+        ],
+        "temperature": 0.4,
+        "avg_logprob": -0.4065451988807091,
+        "compression_ratio": 1.843205574912892,
+        "no_speech_prob": 0.0008679074817337096
+      }
+    ],
+    "ground_truth": "A\u00a0large language model\u00a0(LLM) is a\u00a0language model\u00a0trained with\u00a0self-supervised\u00a0machine learning\u00a0on a vast amount of text, designed for\u00a0natural language processing\u00a0tasks, especially\u00a0language generation.The largest and most capable LLMs are\u00a0generative pre-trained transformers\u00a0(GPTs) and provide the core capabilities of modern\u00a0chatbots. LLMs can be\u00a0fine-tuned\u00a0for specific tasks or guided by\u00a0prompt engineering.These models acquire\u00a0predictive power\u00a0regarding\u00a0syntax,\u00a0semantics, and\u00a0ontologies\u00a0inherent in human\u00a0language corpora, but they also inherit inaccuracies and\u00a0biases\u00a0present in the\u00a0data\u00a0they are trained on.\nThey consist of billions to trillions of\u00a0parameters\u00a0and operate as general-purpose sequence models, generating, summarizing, translating, and reasoning over text. LLMs represent a significant new technology in their ability to generalize across tasks with minimal task-specific supervision, enabling capabilities like\u00a0conversational agents,\u00a0code generation,\u00a0knowledge retrieval, and\u00a0automated reasoning\u00a0that previously required bespoke systems.\nLLMs evolved from earlier\u00a0statistical\u00a0and\u00a0recurrent neural network\u00a0approaches to language modeling. The\u00a0transformer architecture, introduced in 2017, replaced recurrence with\u00a0self-attention, allowing efficient\u00a0parallelization, longer context handling, and scalable training on unprecedented data volumes. This innovation enabled models like\u00a0GPT,\u00a0BERT, and their successors, which demonstrated\u00a0emergent behaviors\u00a0at scale, such as\u00a0few-shot learning\u00a0and compositional reasoning.\nReinforcement learning, particularly\u00a0policy gradient algorithms, has been adapted to\u00a0fine-tune\u00a0LLMs for desired behaviors beyond raw next-token prediction.\u00a0Reinforcement learning from human feedback\u00a0(RLHF) applies these methods to optimize a policy, the LLM's output distribution, against reward signals derived from human or automated preference judgments. This has been critical for aligning model outputs with user expectations, improving factuality, reducing harmful responses, and enhancing task performance.\nBenchmark\u00a0evaluations for LLMs have evolved from narrow linguistic assessments toward comprehensive,\u00a0multi-task\u00a0evaluations measuring\u00a0reasoning,\u00a0factual accuracy,\u00a0alignment, and\u00a0safety.\u00a0Hill climbing, iteratively optimizing models against benchmarks, has emerged as a dominant strategy, producing rapid incremental performance gains but raising concerns of\u00a0overfitting\u00a0to benchmarks rather than achieving genuine\u00a0generalization\u00a0or robust capability improvements.",
+    "ground_truth_normalized": "a large language model llm is a language model trained with self-supervised machine learning on a vast amount of text, designed for natural language processing tasks, especially language generation.the largest and most capable llms are generative pre-trained transformers gpts and provide the core capabilities of modern chatbots. llms can be fine-tuned for specific tasks or guided by prompt engineering.these models acquire predictive power regarding syntax, semantics, and ontologies inherent in human language corpora, but they also inherit inaccuracies and biases present in the data they are trained on. they consist of billions to trillions of parameters and operate as general-purpose sequence models, generating, summarizing, translating, and reasoning over text. llms represent a significant new technology in their ability to generalize across tasks with minimal task-specific supervision, enabling capabilities like conversational agents, code generation, knowledge retrieval, and automated reasoning that previously required bespoke systems. llms evolved from earlier statistical and recurrent neural network approaches to language modeling. the transformer architecture, introduced in 2017, replaced recurrence with self-attention, allowing efficient parallelization, longer context handling, and scalable training on unprecedented data volumes. this innovation enabled models like gpt, bert, and their successors, which demonstrated emergent behaviors at scale, such as few-shot learning and compositional reasoning. reinforcement learning, particularly policy gradient algorithms, has been adapted to fine-tune llms for desired behaviors beyond raw next-token prediction. reinforcement learning from human feedback rlhf applies these methods to optimize a policy, the llms output distribution, against reward signals derived from human or automated preference judgments. this has been critical for aligning model outputs with user expectations, improving factuality, reducing harmful responses, and enhancing task performance. benchmark evaluations for llms have evolved from narrow linguistic assessments toward comprehensive, multi-task evaluations measuring reasoning, factual accuracy, alignment, and safety. hill climbing, iteratively optimizing models against benchmarks, has emerged as a dominant strategy, producing rapid incremental performance gains but raising concerns of overfitting to benchmarks rather than achieving genuine generalization or robust capability improvements.",
+    "ground_truth_length": 2512
+  },
+  "metrics": {
+    "latency_ms_p50": 308316.70816699625,
+    "rtf": 1.8894422604483583,
+    "wer": 0.29102167182662536,
+    "cer": 0.08942115768463074
+  },
+  "system": {
+    "device": "cpu",
+    "model": "large-v3",
+    "inference_type": "local",
+    "capabilities": [
+      "asr",
+      "alignment"
+    ]
+  },
+  "evidence": {
+    "grade": "golden_batch",
+    "dataset_id": "primary",
+    "truth_sha256": "d3f67ac6db0e10be",
+    "sanity_gates": {
+      "wer_valid": "\u2705 Pass",
+      "length_chk": "\u2139\ufe0f 1.07"
+    },
+    "wer_valid": true
+  },
+  "protocol": {
+    "normalization_version": "1.0",
+    "bundle_contract": "v1"
+  },
+  "manifest": {
+    "provider_id": "whisper",
+    "git_hash": "861fa73ab11b1c79565d46937447527ba211d478",
+    "timestamp": "2026-01-09T23:41:53.648427",
+    "provider_versions": {
+      "openai-whisper": "20250625",
+      "faster-whisper": "1.2.1",
+      "liquid-audio": "1.1.0",
+      "torch": "2.9.1",
+      "torchaudio": "2.9.1",
+      "transformers": "4.57.3"
+    },
+    "config_hash": "fc204d66a7e82a6b",
+    "config_path": "models/whisper/config.yaml",
+    "dataset_hash": "016a69898d9c6cc9",
+    "audio_file": "llm_recording_pranay.wav",
+    "text_file": "llm.txt"
+  },
+  "timestamps": {
+    "started_at": "2026-01-09T23:47:02.869382",
+    "finished_at": "2026-01-09T23:47:02.869431"
+  },
+  "errors": [],
+  "output_quality": {
+    "ref_word_count": 335,
+    "hyp_word_count": 351,
+    "length_ratio": 1.0477611940298508,
+    "char_ratio": 1.0207584830339322,
+    "unique_token_ratio": 0.6552706552706553,
+    "repeat_3gram_rate": 0.0,
+    "is_truncated": false,
+    "is_hallucinating": false,
+    "is_repetitive": false,
+    "has_failure": false
+  },
+  "validation": {
+    "normalization": {
+      "protocol_version": "1.0",
+      "reference_normalized_length": 2505,
+      "hypothesis_normalized_length": 2557,
+      "parity_check": "passed",
+      "providers_compared": [
+        "whisper",
+        "protocol"
+      ]
+    },
+    "entity_protocol": {
+      "protocol_version": "1.0",
+      "rules": {
+        "version": "1.0",
+        "number_definition": "\\b\\d+(?:\\.\\d+)?\\b",
+        "date_formats": [
+          "\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b",
+          "\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \\d{1,2},? \\d{4}\\b"
+        ],
+        "currency_patterns": [
+          "\\$\\d+(?:\\.\\d{2})?\\b",
+          "\\$\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?\\b"
+        ],
+        "include_ordinals": false,
+        "include_ranges": false,
+        "include_decimals": true
+      },
+      "locked": true
+    },
+    "provider_id": "whisper",
+    "timestamp": "2026-01-09T23:47:07.274840"
+  }
+}

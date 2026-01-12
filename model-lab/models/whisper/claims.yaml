@@ -1,0 +1,22 @@
+# whisper Claims Manifest
+
+claims:
+  - id: whisper_asr_structural
+    task: asr
+    type: structural
+    description: "ASR runs and produces valid artifact with provenance"
+    enforcement: required
+    test_ref: claims.asr.smoke_structural_v1
+    thresholds:
+      has_provenance: true
+      has_run_context: true
+
+  - id: whisper_wer_golden
+    task: asr
+    type: quality
+    description: "WER below threshold on golden datasets"
+    enforcement: optional
+    test_ref: claims.asr.wer_threshold_v1
+    thresholds:
+      wer_max: 0.12
+    source: "OpenAI Whisper paper"

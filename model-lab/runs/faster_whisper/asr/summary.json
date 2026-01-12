@@ -1,0 +1,10 @@
+{
+  "model_id": "faster_whisper",
+  "dataset": "ux_primary",
+  "last_run": "2026-01-12T15:29:10.142971",
+  "wer": 1.3448275862068966,
+  "cer": 0.8488372093023255,
+  "rtf": 0.10792426386688021,
+  "latency_ms": 3237.7279160064063,
+  "has_output_quality_failure": true
+}

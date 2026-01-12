@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "run_id": "v2v_smoke_v1_1767940574",
+    "timestamp": "2026-01-09T12:06:14.682612",
+    "model_id": "lfm2_5_audio",
+    "task": "v2v"
+  },
+  "input": {
+    "dataset_id": "v2v_smoke_v1",
+    "count": 1
+  },
+  "system": {
+    "device": "cpu"
+  },
+  "metrics": {
+    "latency_ms": 5286.984920501709,
+    "response_duration_s": 0.0
+  },
+  "gates": {
+    "has_failure": false
+  },
+  "evidence": {
+    "grade": "smoke",
+    "dataset_id": "v2v_smoke_v1",
+    "sanity_gates": {},
+    "wer_valid": true
+  },
+  "results": [
+    {
+      "id": "v2v_turn_1",
+      "input_audio": "data/audio/clean_speech_10s.wav",
+      "output": {
+        "text": "A large language model. LLM is a language model trained with self-supervised machine learning on a vast amount of text designed for natural language processing tasks.",
+        "has_audio": false,
+        "duration_s": 0.0
+      },
+      "metrics": {
+        "latency_ms": 5286.984920501709,
+        "response_duration_s": 0.0,
+        "rtf": 0
+      }
+    }
+  ]
+}

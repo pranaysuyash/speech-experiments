@@ -1,0 +1,16 @@
+# V2V Smoke Test Dataset v2
+# Purpose: Different duration and content than v1.
+# v1: 10s clean_speech
+# v2: 4s speech-like (shorter, tests latency overhead)
+
+metadata:
+  version: "1.0"
+  created: "2026-01-12"
+  description: "V2V smoke v2 - shorter audio for latency overhead testing"
+
+cases:
+  - id: "v2v_short_prompt"
+    input_audio: "data/audio/speech_like_4s.wav"
+    expected:
+      min_duration_s: 0.1
+      max_latency_ms: 10000  # Shorter input, generous latency

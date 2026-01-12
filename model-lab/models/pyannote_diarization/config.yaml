@@ -1,0 +1,53 @@
+# Pyannote Diarization Configuration
+
+model_type: pyannote_diarization
+
+metadata:
+  model_name: "pyannote/speaker-diarization-3.1"
+  provider: "Pyannote"
+  version: "3.1.0"
+  license: "MIT"
+  description: "State-of-the-art speaker diarization pipeline."
+  repo_url: "https://huggingface.co/pyannote/speaker-diarization-3.1"
+
+official_sources:
+  - kind: "hf"
+    url: "https://huggingface.co/pyannote/speaker-diarization-3.1"
+    note: "Official model card"
+
+claims:
+  claimed_strengths:
+    - "accurate_clustering"
+    - "overlap_detection"
+  recommended_usage:
+    - "Meeting transcription"
+    - "Podcast indexing"
+
+declared_capabilities:
+  - task: "diarization"
+    role: "primary"
+    notes: "Reference implementation for speaker diarization."
+
+evaluation:
+  primary_tasks: ["diarization"]
+  default_datasets:
+    diarization: "diar_smoke_v1"
+
+deployment:
+  runtimes: ["local", "api"]
+  offline_capable: false # Requires HF auth usually, though can be offline cached
+  targets: ["server"]
+  notes: "Requires HuggingFace authentication token"
+
+hardware:
+  accelerators_supported: ["cpu", "cuda", "mps"]
+  min_vram_gb: 2
+  ram_gb_recommended: 4
+  notes:
+    - "MPS support experimental via PyTorch"
+
+install:
+  method: "pip"
+  deps_pain: "low"
+  known_issues:
+    - "Requires pyannote.audio and HF_TOKEN"

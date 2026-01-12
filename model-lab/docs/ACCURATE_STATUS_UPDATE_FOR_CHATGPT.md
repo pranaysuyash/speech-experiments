@@ -1,77 +1,63 @@
-# ACCURATE Status Update - Model Lab Implementation
+# Accurate Status Update for ChatGPT (Jan 9, 2026)
 
-**Date**: 2026-01-08
-**Status**: ⚠️ **PARTIAL - Documentation vs Reality Mismatch**
+**Current Objective**: Harden Multi-Capability Arsenal (ASR + TTS + Generic)
 
-## CRITICAL ISSUE: Documentation Overstates Implementation
+## 🚀 Accomplishments
 
-### 🚨 Documentation Claims vs Reality
-**Other Agent Claims**: "✅ ALL IMPROVEMENTS COMPLETE - SYSTEM FULLY PRODUCTION READY!"
-**Actual Testing**: LFM2.5-Audio **STILL FAILS** on MPS due to liquid-audio CUDA bug
+### 1. Multi-Capability Evidence Pipelining
+We successfully transformed the Arsenal system from a single-task (ASR) leaderboard into a multi-capability evidence gathering engine.
 
-### What Actually Works ✅
-- **Whisper-Base**: 2088.6ms (UV venv + MPS) - PRODUCTION READY
-- **Faster-Whisper-Base**: 1614.5ms (UV venv + MPS) - PRODUCTION READY
-- **UV Environment**: Properly configured with Python 3.12.10
-- **MPS Device**: Working for Whisper models
-- **Infrastructure**: Registry, metrics, protocols all working
+- **Pipeline**: `scan` → `EvidenceEntry` → `ModelCard` → `Arsenal Docs`
+- **Supported Tasks**: ASR (legacy & new), TTS (new).
+- **Extensible**: Generic schema supports future tasks (MT, VAD).
 
-### What Still Fails ❌
-- **LFM2.5-Audio on MPS**: `AssertionError: Torch not compiled with CUDA enabled`
-- **Root Cause**: liquid-audio package hardcoded CUDA bug in processor.py:82
-- **Documentation Gap**: Other agent claimed MPS works, but testing proves otherwise
+### 2. TTS Level 0 Pipeline (Active)
+implemented a "Level 0" smoke test capability for TTS models.
+- **Runner**: `scripts/run_tts.py` runs standard prompt set (`data/golden/tts_smoke_v1.yaml`).
+- **Gates**: Captures `silence_ratio`, `clipping_ratio`, `dc_offset`, and latency.
+- **Evidence**: Normalized into `EvidenceEntry` with health checks (valid/invalid).
 
-## Evidence of Documentation vs Reality Gap
+### 3. Critical Fix: LFM2.5 on Apple Silicon (MPS)
+We resolved blocking issues preventing LiquidAI's `lfm2_5_audio` from running on Mac.
+- **ASR Fix**: Processor loaded on CPU, then moved to MPS (fixes `cuda` default).
+- **TTS Fix**: Manually initialized `audio_detokenizer` property in `registry.py` to bypass hardcoded `.cuda()` call in `liquid-audio` library.
+- **Status**: **Fully Working** for both ASR and TTS on MPS.
 
-### Other Agent Created These Files:
-- `REAL_INFERENCE_IMPLEMENTATION_COMPLETE.md` - claims "✅ FULLY PRODUCTION READY"
-- `COLAB_COMPATIBILITY_ADDENDUM.md` - claims "✅ Complete" MPS support
-- `PENDING_ITEMS_CHATGPT_UPDATE.md` - claims "✅ 100% of ChatGPT Plan"
+### 4. Arsenal Generator Refactor
+The documentation generator (`scripts/generate_arsenal.py`) was heavily refactored:
+- **Scans All Tasks**: Looks in `runs/<model_id>/*/*.json`.
+- **Normalization**: Converts raw run JSONs into `EvidenceEntry` objects.
+- **Schema**: Updated `ModelCard` to store `List[EvidenceEntry]` instead of just ASR summaries.
+- **Keys**: Standardized on `device`, `verified_at`, `gates`, `metrics`.
 
-### Actual Test Results Show:
-```bash
-uv run python scripts/run_asr.py --model lfm2_5_audio --dataset smoke
-# Result: RuntimeError: LFM2.5-Audio loading failed: Torch not compiled with CUDA enabled
+## 🛠️ Technical Details
+
+### EvidenceEntry Schema
+New unified dataclass for all evidence:
+```python
+@dataclass
+class EvidenceEntry:
+    task: str                  # "asr", "tts"
+    metrics: Dict          # e.g., {wer: 0.1} or {rtf: 2.1}
+    gates: Dict            # e.g., {has_failure: False}
+    valid: bool            # True if all gates pass
+    device: str            # "mps", "cuda", "cpu"
+    verified_at: str       # ISO date
+    # ... hashes & metadata
 ```
 
-## Technical Reality Check
+### Generator Logic
+- **ASR**: Auto-computes WER/CER if missing. Checks `wer_valid` flag.
+- **TTS**: Extracts audio health (`healthy_count` vs `failed_count`). Valid if `healthy_count > 0`.
 
-### ✅ What's Actually True
-1. **Whisper Models**: Fully working with MPS + UV environment
-2. **Infrastructure**: Registry, metrics, protocols all functional
-3. **Colab Notebooks**: Created and may work on CUDA systems
-4. **Documentation**: Extensive but contains overstated claims
+## 📉 Known Issues / Next Steps
+- **Promotion Logic**: `validate_for_promotion` in `model_card.py` needs to be updated to check `evidence` list instead of deprecated `observed` fields.
+- **UseCase Scoring**: `USE_CASES.md` generation logic needs to actively filter candidates based on the new `EvidenceEntry` validation flags.
+- **Model Support**: Only `lfm2_5_audio` has TTS evidence. Need to run `scripts/run_tts.py` for other models (e.g., `seamlessm4t` if supported).
 
-### ❌ What's Not True
-1. **"LFM works on MPS"**: Still fails with CUDA error
-2. **"System fully production ready"**: Only 2/3 models working
-3. **"All improvements complete"**: LFM still blocked by package bug
-
-## What I Need from ChatGPT
-
-### 🤔 Technical Questions
-1. **Documentation Accuracy**: How to reconcile overstated claims with reality?
-2. **LFM CUDA Bug**: Is there a known workaround or should we wait for vendor fix?
-3. **Testing Approach**: Should we focus on working models (Whisper) or fix LFM?
-
-### 📊 Current Status
-- **Working Models**: 2/3 (Whisper, Faster-Whisper)
-- **Blocked Models**: 1/3 (LFM2.5-Audio - vendor package bug)
-- **Infrastructure**: ✅ Production ready for working models
-- **Documentation**: ⚠️ Contains unverified claims
-
-## Recommendation
-
-**Honest Path Forward**:
-1. **Acknowledge Reality**: Update documentation to reflect actual working state
-2. **Focus on Working Models**: Deploy Whisper/Faster-Whisper to production
-3. **Document Blockers**: Clearly state LFM status as "blocked by vendor bug"
-4. **Plan Next Steps**: Either wait for vendor fix or implement workaround
-
-**Alternative**: If other agent has working solution, ask them to demonstrate actual LFM inference on MPS with specific command.
-
----
-
-**Current State**: Infrastructure works for 2/3 models, but documentation needs reality check
-**Blockers**: LFM CUDA bug (vendor issue)
-**Next Step**: Either fix documentation or get working LFM solution from other agent
+## 📄 File Manifest
+- `scripts/run_tts.py`: TTS runner.
+- `scripts/generate_arsenal.py`: Doc generator (refactored).
+- `harness/model_card.py`: Schema (EvidenceEntry + ModelCard updates).
+- `harness/registry.py`: Model loader (Patched for MPS).
+- `docs/TTS_MPS_WORKAROUND.md`: Tech deep dive on the fix.

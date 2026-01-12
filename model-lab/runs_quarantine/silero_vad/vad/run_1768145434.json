@@ -1,0 +1,90 @@
+{
+  "model_id": "silero_vad",
+  "job_id": "run_1768145434",
+  "capability": "vad",
+  "meta": {
+    "task": "vad",
+    "timestamp": "2026-01-11T21:00:34.902978"
+  },
+  "input": {
+    "dataset_id": "vad_smoke_v1",
+    "case_count": 2
+  },
+  "system": {
+    "device": "cpu",
+    "runtime": "python"
+  },
+  "manifest": {
+    "timestamp": "2026-01-11T21:00:34.902978",
+    "argv": [
+      "scripts/run_vad.py",
+      "--model",
+      "silero_vad",
+      "--dataset",
+      "vad_smoke_v1"
+    ]
+  },
+  "cases": [
+    {
+      "id": "clean_speech",
+      "metrics": {
+        "rtf": 0.013023018836975098,
+        "speech_ratio": 0.8746,
+        "num_segments": 2,
+        "duration_s": 10.0
+      },
+      "gates": {
+        "speech_ratio_min": true,
+        "segments_min": true,
+        "has_failure": false
+      },
+      "segments_count": 2
+    },
+    {
+      "id": "silence",
+      "metrics": {
+        "rtf": 0.00500340461730957,
+        "speech_ratio": 0.0,
+        "num_segments": 0,
+        "duration_s": 5.0
+      },
+      "gates": {
+        "speech_ratio_max": true,
+        "segments_max": true,
+        "has_failure": false
+      },
+      "segments_count": 0
+    }
+  ],
+  "metrics": {
+    "rtf": 0.009013211727142334,
+    "speech_ratio": 0.4373,
+    "num_segments": 1.0
+  },
+  "gates": {
+    "has_failure": false,
+    "failed_cases": 0,
+    "total_cases": 2
+  },
+  "provenance": {
+    "schema_version": "1.0",
+    "created_at": "2026-01-11T21:00:34.902998",
+    "dataset_id": "vad_smoke_v1",
+    "has_ground_truth": false,
+    "metrics_valid": true,
+    "dataset_hash": "810b8c1858fd7a9b",
+    "audio_hash": null,
+    "ground_truth_hash": null
+  },
+  "run_context": {
+    "device": "cpu",
+    "audio_duration_s": null,
+    "model_version": null,
+    "runner_git_hash": "861fa73"
+  },
+  "evidence": {
+    "grade": "smoke",
+    "dataset_id": "vad_smoke_v1",
+    "sanity_gates": {}
+  }
+}

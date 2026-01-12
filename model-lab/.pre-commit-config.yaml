@@ -1,0 +1,75 @@
+# Pre-commit configuration for Model Lab
+# Install: uv run pre-commit install
+# Run manually: uv run pre-commit run --all-files
+
+repos:
+  # Ruff - fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # Prevent large files
+      - id: check-added-large-files
+        args: ['--maxkb=2048']  # 2MB limit
+      
+      # Prevent secrets
+      - id: detect-private-key
+      
+      # File hygiene
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: mixed-line-ending
+      
+      # Python specific
+      - id: check-ast
+      - id: debug-statements
+
+  # Local hooks
+  - repo: local
+    hooks:
+      # Forbid pip install in docs/scripts
+      - id: no-pip-install
+        name: No pip install
+        entry: bash -c 'if grep -rn "pip install" docs/ scripts/ README.md 2>/dev/null | grep -v "uv run pip"; then echo "ERROR: Use uv add, not pip install"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        
+      # Forbid bare python commands (should use uv run python)
+      - id: no-bare-python
+        name: No bare python command
+        entry: bash -c 'if grep -rn "^python " docs/ scripts/ README.md 2>/dev/null | grep -v "uv run python"; then echo "ERROR: Use uv run python, not bare python"; exit 1; fi'
+        language: system
+        pass_filenames: false
+
+      # BUNDLE CONTRACT ENFORCEMENT: Forbid accessing bundle["raw"] in inference paths
+      - id: no-bundle-raw-in-scripts
+        name: No bundle raw access in scripts
+        entry: bash -c 'if grep -rn "bundle\[.raw.\]" scripts/ harness/runner.py 2>/dev/null | grep -v "# DEBUG" | grep -v "# debug"; then echo "ERROR: Use bundle[asr][transcribe] not raw model access"; exit 1; fi'
+        language: system
+        pass_filenames: false
+
+      # Forbid per-model branching patterns that bypass contract
+      - id: no-per-model-transcribe
+        name: No per-model transcribe functions
+        entry: bash -c 'if grep -rn "transcribe_whisper\|transcribe_faster_whisper\|transcribe_seamless\|transcribe_lfm" scripts/ 2>/dev/null; then echo "ERROR: Use bundle contract, not per-model functions"; exit 1; fi'
+        language: system
+        pass_filenames: false
+
+      # Arsenal doc freshness check
+      - id: arsenal-freshness
+        name: Arsenal docs up-to-date
+        entry: bash -c 'uv run python scripts/generate_arsenal.py >/dev/null 2>&1 && git diff --quiet docs/arsenal.json docs/ARSENAL.md || (echo "ERROR: Arsenal docs out of date. Run make arsenal"; exit 1)'
+        language: system
+        pass_filenames: false
+        stages: [commit]
+

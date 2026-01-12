@@ -1,0 +1,9 @@
+{
+  "task": "asr",
+  "model": "distil_whisper",
+  "text": " LLM is a language model trained with self-supervised machine learning on a vast amount of text designed for natural language processing tasks.",
+  "segments": [],
+  "duration_s": 10.0,
+  "latency_s": 1.699643850326538,
+  "rtf": 0.16996438503265382
+}

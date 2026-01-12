@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
 Headless ASR runner for production testing.
-Usage: python scripts/run_asr.py --model faster_whisper --dataset primary
+Uses Bundle Contract v1 - no per-model special casing.
+
+Usage: uv run python -m scripts.run_asr --model faster_whisper --dataset primary
 """
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -12,33 +15,112 @@ from datetime import datetime
 from pathlib import Path
 
 # Add harness to path
-harness_path = Path(__file__).parent.parent / 'harness'
-sys.path.insert(0, str(harness_path))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from audio_io import AudioLoader, GroundTruthLoader
-from registry import ModelRegistry
-from timers import PerformanceTimer
-from metrics_asr import ASRMetrics
-from protocol import RunContract, NormalizationValidator, SegmentationValidator, create_validation_report
+from harness.audio_io import AudioLoader, GroundTruthLoader
+from harness.registry import ModelRegistry
+from harness.timers import PerformanceTimer
+from harness.metrics_asr import ASRMetrics, diagnose_output_quality
+from harness.protocol import RunContract, NormalizationValidator, create_validation_report
+from harness.run_provenance import create_provenance, create_run_context, can_compute_quality_metrics, RUN_SCHEMA_VERSION
+from harness.adhoc_dataset import create_adhoc_dataset, create_adhoc_provenance, create_adhoc_run_context
 import yaml
+
+
+def compute_file_sha256(path: Path) -> str:
+    """Compute SHA256 hash of a file for pairing integrity."""
+    sha256 = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            sha256.update(chunk)
+    return sha256.hexdigest()[:16]  # First 16 chars for brevity
+
+
+def compute_text_sha256(text: str) -> str:
+    """Compute SHA256 hash of text content."""
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def determine_evidence_grade(dataset: str, has_ground_truth: bool) -> str:
+    """
+    Determine evidence grade for the run.
+    
+    golden_batch: from harness with ground truth, matched dataset
+    smoke: quick validation run (structural only, no quality metrics)
+    adhoc: manual/script run without proper pairing
+    """
+    # Golden datasets (with ground truth)
+    golden_datasets = {'llm_primary', 'primary', 'asr_golden_v1', 'ux_primary'}
+    if dataset in golden_datasets and has_ground_truth:
+        return 'golden_batch'
+    
+    # Smoke datasets (structural only - may still have ground truth file but we don't compute quality)
+    if dataset.startswith('smoke') or dataset.endswith('_smoke_v1') or dataset.startswith('asr_smoke'):
+        return 'smoke'
+    
+    return 'adhoc'
+
+
+def compute_sanity_gates(hyp_text: str, ref_text: str, duration_s: float) -> dict:
+    """
+    Compute sanity gates to flag potentially invalid WER.
+    
+    Returns dict with gate results and overall wer_valid.
+    """
+    gates = {
+        'wer_valid': True,
+        'invalid_reasons': []
+    }
+    
+    if not ref_text or not hyp_text:
+        gates['wer_valid'] = False
+        gates['invalid_reasons'].append('missing_text')
+        return gates
+    
+    hyp_words = len(hyp_text.split())
+    ref_words = len(ref_text.split())
+    
+    # Length ratio gate (flag if hyp is >3x or <0.33x ref)
+    if ref_words > 0:
+        length_ratio = hyp_words / ref_words
+        gates['length_ratio'] = length_ratio
+        if length_ratio > 3.0 or length_ratio < 0.33:
+            gates['wer_valid'] = False
+            gates['invalid_reasons'].append(f'extreme_length_ratio:{length_ratio:.2f}')
+    
+    # Words-per-second gate (flag if > 5 wps or < 0.5 wps for long audio)
+    if duration_s > 10:
+        ref_wps = ref_words / duration_s
+        hyp_wps = hyp_words / duration_s
+        gates['ref_wps'] = ref_wps
+        gates['hyp_wps'] = hyp_wps
+        if ref_wps > 5 or ref_wps < 0.5:
+            gates['wer_valid'] = False
+            gates['invalid_reasons'].append(f'absurd_ref_wps:{ref_wps:.2f}')
+        if hyp_wps > 5:
+            gates['wer_valid'] = False
+            gates['invalid_reasons'].append(f'absurd_hyp_wps:{hyp_wps:.2f}')
+    
+    return gates
 
 
 def load_model_config(model_id: str) -> dict:
     """Load model configuration."""
-    # Map model IDs to config paths
-    model_configs = {
-        'lfm2_5_audio': Path('models/lfm2_5_audio/config.yaml'),
-        'whisper': Path('models/whisper/config.yaml'),
-        'faster_whisper': Path('models/faster_whisper/config.yaml'),
-        'seamlessm4t': Path('models/seamlessm4t/config.yaml'),
+    # Check models directory for config
+    config_path = Path(f'models/{model_id}/config.yaml')
+    
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            config.setdefault('model_type', model_id)
+            return config
+    
+    # Fallback: minimal config for models without config files
+    return {
+        'model_type': model_id,
+        'model_name': model_id,
+        'audio': {'sample_rate': 16000}
     }
-
-    if model_id not in model_configs:
-        raise ValueError(f"Unknown model: {model_id}. Available: {list(model_configs.keys())}")
-
-    config_path = model_configs[model_id]
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
 
 
 def get_dataset_files(dataset: str) -> tuple:
@@ -46,15 +128,28 @@ def get_dataset_files(dataset: str) -> tuple:
     datasets = {
         'smoke': {
             'audio': Path('data/audio/SMOKE/conversation_2ppl_10s.wav'),
-            'text': Path('data/text/SMOKE/conversation_2ppl_10s.txt')
+            'text': None  # No ground truth - structural sanity only (provenance unclear)
+        },
+        'asr_smoke_v1': {
+            'audio': Path('data/audio/PRIMARY/llm_recording_pranay.wav'),
+            'text': Path('data/text/PRIMARY/llm.txt')
         },
         'primary': {
+            'audio': Path('data/audio/PRIMARY/llm_recording_pranay.wav'),
+            'text': Path('data/text/PRIMARY/llm.txt')
+        },
+        'llm_primary': {
             'audio': Path('data/audio/PRIMARY/llm_recording_pranay.wav'),
             'text': Path('data/text/PRIMARY/llm.txt')
         },
         'conversation': {
             'audio': Path('data/audio/PRIMARY/UX_Psychology_From_Miller_s_Law_to_AI.wav'),
             'text': None  # No ground truth for conversation
+        },
+        # Second golden dataset for min_runs=2
+        'ux_primary': {
+            'audio': Path('data/audio/PRIMARY/ux_psychology_30s.wav'),
+            'text': Path('data/text/PRIMARY/ux_psychology_30s.txt')
         }
     }
 
@@ -64,200 +159,18 @@ def get_dataset_files(dataset: str) -> tuple:
     return datasets[dataset]['audio'], datasets[dataset]['text']
 
 
-def transcribe_whisper(model_wrapper, audio, sr):
-    """Transcribe using Whisper model."""
-    model = model_wrapper['model']
-    import numpy as np
-    # Convert audio to float32 for Whisper compatibility
-    audio_float32 = audio.astype(np.float32)
-    result = model.transcribe(audio_float32, language='en')
-    return result['text'].strip()
-
-
-def transcribe_faster_whisper(model_wrapper, audio, sr):
-    """Transcribe using Faster-Whisper model."""
-    model = model_wrapper['model']
-    import numpy as np
-    # Convert audio to float32 for faster-whisper compatibility
-    audio_float32 = audio.astype(np.float32)
-    segments, info = model.transcribe(audio_float32, beam_size=5, language='en')
-
-    # Combine all segments
-    text_parts = []
-    for segment in segments:
-        text_parts.append(segment.text)
-
-    return ''.join(text_parts).strip()
-
-
-def transcribe_seamlessm4t(model_wrapper, audio, sr):
-    """Transcribe using SeamlessM4T model with chunking for long audio."""
-    model = model_wrapper['model']
-    processor = model_wrapper.get('processor')
-    import torch
-    import numpy as np
-    
-    # Check audio duration
-    duration = len(audio) / sr
-    max_chunk_duration = 120  # 2 minutes max per chunk
-    
-    if duration <= max_chunk_duration:
-        # Short audio - process normally
-        return _transcribe_seamlessm4t_chunk(model_wrapper, audio, sr)
-    else:
-        # Long audio - split into chunks
-        print(f"Audio too long ({duration:.1f}s), chunking into {max_chunk_duration}s segments...")
-        chunks = []
-        chunk_samples = int(max_chunk_duration * sr)
-        
-        for i in range(0, len(audio), chunk_samples):
-            chunk = audio[i:i + chunk_samples]
-            if len(chunk) < chunk_samples * 0.1:  # Skip very short final chunks
-                continue
-            chunks.append(chunk)
-        
-        print(f"Processing {len(chunks)} chunks...")
-        transcriptions = []
-        
-        for i, chunk in enumerate(chunks):
-            print(f"Processing chunk {i+1}/{len(chunks)}...")
-            try:
-                text = _transcribe_seamlessm4t_chunk(model_wrapper, chunk, sr)
-                transcriptions.append(text)
-            except Exception as e:
-                print(f"Warning: Failed to process chunk {i+1}: {e}")
-                transcriptions.append("[CHUNK_FAILED]")
-        
-        return ' '.join(transcriptions).strip()
-
-
-def _transcribe_seamlessm4t_chunk(model_wrapper, audio, sr):
-    """Transcribe a single chunk using SeamlessM4T model."""
-    model = model_wrapper['model']
-    processor = model_wrapper.get('processor')
-    import torch
-    import numpy as np
-    
-    # Convert audio to float32
-    audio_float32 = audio.astype(np.float32)
-    
-    # Process audio
-    if processor:
-        inputs = processor(audios=audio_float32, return_tensors='pt')
-        # Move to device
-        device = model_wrapper.get('device', 'cpu')
-        if device != 'cpu':
-            inputs = {k: v.to(device) for k, v in inputs.items()}
-        
-        with torch.no_grad():
-            gen_out = model.generate(**inputs, tgt_lang='eng')
-        
-        # Extract sequences from generate output
-        if hasattr(gen_out, "sequences"):       # GenerateOutput
-            sequences = gen_out.sequences
-        else:                                   # tensor
-            sequences = gen_out
-        
-        # Ensure shape [batch, seq]
-        if sequences.dim() == 1:
-            sequences = sequences.unsqueeze(0)
-        
-        # Force integer ids
-        sequences = sequences.detach().to("cpu").to(torch.int64)
-        
-        # Decode
-        translated_text = processor.batch_decode(sequences, skip_special_tokens=True)[0]
-    else:
-        # Fallback if no processor
-        translated_text = ""
-    
-    return translated_text.strip() if translated_text else ""
-
-
-def transcribe_lfm2_5_audio(model_wrapper, audio, sr):
-    """
-    Transcribe using LFM2.5-Audio model.
-    
-    Handles audio format conversions for liquid-audio compatibility:
-    - Converts numpy arrays to PyTorch tensors
-    - Reshapes 1D audio (samples,) to 2D (channels, samples)
-    - Manages device movement for processor and model
-    
-    Args:
-        model_wrapper: Dictionary with 'model' and 'processor' keys
-        audio: Audio data (numpy array or torch tensor)
-        sr: Sample rate in Hz
-    
-    Returns:
-        Transcribed text string
-        
-    Raises:
-        RuntimeError: If transcription fails for any reason
-        
-    Note:
-        liquid-audio's ChatState.add_audio() requires:
-        1. PyTorch tensors (not numpy arrays)
-        2. 2D shape with channels: (channels, samples)
-        See: LFM_MPS_FIX_SUMMARY.md for detailed explanation.
-    """
-    from liquid_audio import ChatState
-    import torch
-    import numpy as np
-
-    model = model_wrapper['model']
-    processor = model_wrapper['processor']
-
-    try:
-        # Create chat state for ASR
-        chat = ChatState(processor)
-        chat.new_turn("system")
-        chat.add_text("Perform ASR.")
-        chat.end_turn()
-
-        # Add audio - liquid-audio expects torch tensor (channels, samples)
-        # Convert numpy array to tensor
-        if isinstance(audio, np.ndarray):
-            audio_tensor = torch.from_numpy(audio).float()
-        else:
-            audio_tensor = audio.float()
-        
-        # Ensure 2D shape (channels, samples)
-        if len(audio_tensor.shape) == 1:
-            audio_tensor = audio_tensor.unsqueeze(0)  # Add channel dimension
-        
-        chat.new_turn("user")
-        chat.add_audio(audio_tensor, sr)
-        chat.end_turn()
-
-        chat.new_turn("assistant")
-
-        # Generate transcription
-        text_tokens = []
-
-        for token in model.generate_sequential(**chat, max_new_tokens=512):
-            if token.numel() == 1:  # Text token
-                text_tokens.append(token)
-
-        # Decode text
-        if text_tokens:
-            text_tensor = torch.stack(text_tokens, 1)
-            text = processor.text.decode(text_tensor[0])
-        else:
-            text = ""
-
-        return text.strip()
-
-    except Exception as e:
-        raise RuntimeError(f"LFM2.5-Audio transcription failed: {e}")
-
-
 def run_asr_test(model_id: str, dataset: str, device: str = None):
-    """Run ASR test and generate results."""
+    """
+    Run ASR test using Bundle Contract v1.
+    
+    No per-model transcription functions - all models accessed via bundle["asr"]["transcribe"]().
+    """
     print(f"=== ASR Test: {model_id} on {dataset} ===")
 
     # Load model config
     config = load_model_config(model_id)
-    print(f"Model: {config['model_name']}")
+    model_name = config.get('model_name', model_id)
+    print(f"Model: {model_name}")
 
     # Determine device
     if device is None:
@@ -265,16 +178,34 @@ def run_asr_test(model_id: str, dataset: str, device: str = None):
         device = 'mps' if torch.backends.mps.is_available() else 'cpu'
     print(f"Device: {device}")
 
-    # Load model
-    model_wrapper = ModelRegistry.load_model(config['model_type'], config, device)
-    print(f"✓ Model loaded")
+    # Load model via registry - returns Bundle Contract v1
+    bundle = ModelRegistry.load_model(model_id, config, device)
+    print(f"✓ Model loaded (capabilities: {bundle['capabilities']})")
+
+    # Verify ASR capability exists
+    if 'asr' not in bundle['capabilities']:
+        raise ValueError(f"Model {model_id} does not have ASR capability")
+    
+    # Get the transcribe function from bundle - this is the ONLY way to call the model
+    transcribe_fn = bundle['asr']['transcribe']
 
     # Load dataset
     audio_path, text_path = get_dataset_files(dataset)
     print(f"Audio: {audio_path}")
+    
+    # Create provenance EARLY - before any metric computation
+    provenance = create_provenance(
+        dataset_id=dataset,
+        dataset_path=None,  # TODO: Add dataset definition file
+        audio_path=audio_path,
+        ground_truth_path=text_path,
+        metrics_valid=True,
+    )
+    print(f"Provenance: has_ground_truth={provenance['has_ground_truth']}")
 
-    loader = AudioLoader(target_sample_rate=config['audio']['sample_rate'])
-    audio, sr, metadata = loader.load_audio(audio_path, config['model_type'])
+    sample_rate = config.get('audio', {}).get('sample_rate', 16000)
+    loader = AudioLoader(target_sample_rate=sample_rate)
+    audio, sr, metadata = loader.load_audio(audio_path, model_id)
 
     # Load ground truth if available
     ground_truth = None
@@ -288,61 +219,89 @@ def run_asr_test(model_id: str, dataset: str, device: str = None):
         audio_path, text_path
     )
 
-    # Transcribe
+    # Transcribe using bundle contract - single line, works for ALL models
     print("Transcribing...")
-
-    # Get timing context
     timer = PerformanceTimer()
 
     with timer.time_operation(f"{model_id}_transcribe") as timing_container:
-        # Choose transcription function
-        if model_id == 'whisper':
-            text = transcribe_whisper(model_wrapper, audio, sr)
-        elif model_id == 'faster_whisper':
-            text = transcribe_faster_whisper(model_wrapper, audio, sr)
-        elif model_id == 'seamlessm4t':
-            text = transcribe_seamlessm4t(model_wrapper, audio, sr)
-        elif model_id == 'lfm2_5_audio':
-            text = transcribe_lfm2_5_audio(model_wrapper, audio, sr)
-        else:
-            raise ValueError(f"Unknown model: {model_id}")
+        # THIS IS THE KEY: one call surface for all models
+        result = transcribe_fn(audio, sr=sr, language='en')
+        text = (result.get('text') or '').strip()
+        segments = result.get('segments', [])
 
     timing = timing_container['result']
     latency_ms = timing.elapsed_time_ms
     print(f"✓ Transcription: {len(text)} chars in {latency_ms:.1f}ms")
 
     # Apply normalization protocol
+    normalized_ref = None
+    normalized_hyp = None
     if ground_truth:
         normalized_ref = NormalizationValidator.normalize_text(ground_truth)
         normalized_hyp = NormalizationValidator.normalize_text(text)
         print(f"✓ Normalization applied (protocol v{NormalizationValidator.NORMALIZATION_PROTOCOL['version']})")
 
-    # Calculate metrics if ground truth available
-    result = {
+    # Compute evidence integrity fields
+    audio_sha256 = compute_file_sha256(audio_path)
+    truth_sha256 = compute_text_sha256(ground_truth) if ground_truth else None
+    evidence_grade = determine_evidence_grade(dataset, ground_truth is not None)
+    
+    # Compute sanity gates if we have ground truth
+    sanity_gates = None
+    if ground_truth and normalized_hyp:
+        sanity_gates = compute_sanity_gates(normalized_hyp, normalized_ref, metadata['duration_seconds'])
+        if not sanity_gates['wer_valid']:
+            print(f"⚠️  Sanity gates failed: {sanity_gates['invalid_reasons']}")
+
+    # Format gates for Schema 2.0 (String values only)
+    gates = {}
+    if sanity_gates:
+        if sanity_gates['wer_valid']:
+            gates['wer_valid'] = "✅ Pass"
+        else:
+            reasons = "; ".join(sanity_gates['invalid_reasons'])
+            gates['wer_valid'] = f"❌ {reasons}"
+            
+        # Add other metrics as info (optional, or just rely on wer_valid)
+        if 'length_ratio' in sanity_gates:
+            gates['length_chk'] = f"ℹ️ {sanity_gates['length_ratio']:.2f}"
+
+    # Build result object
+    result_obj = {
         'provider_id': model_id,
         'capability': 'asr',
         'input': {
             'audio_file': str(audio_path.name),
+            'audio_sha256': audio_sha256,
             'duration_s': metadata['duration_seconds'],
             'sr': sr
         },
         'output': {
             'text': text,
             'text_length': len(text),
-            'normalized_text': normalized_hyp if ground_truth else None
+            'normalized_text': normalized_hyp,
+            'segments': segments[:10] if segments else []  # First 10 segments only
         },
         'metrics': {
             'latency_ms_p50': latency_ms,
             'rtf': latency_ms / 1000 / metadata['duration_seconds']
         },
         'system': {
-            'device': device,
-            'model': config['model_name'],
-            'inference_type': 'local'  # All current models are local
+            'device': bundle['device'],
+            'model': model_name,
+            'inference_type': 'local',
+            'capabilities': bundle['capabilities']
+        },
+        'evidence': {
+            'grade': evidence_grade,
+            'dataset_id': dataset,
+            'truth_sha256': truth_sha256,
+            'sanity_gates': gates, # Use normalized gates
+            'wer_valid': sanity_gates['wer_valid'] if sanity_gates else None
         },
         'protocol': {
             'normalization_version': NormalizationValidator.NORMALIZATION_PROTOCOL['version'],
-            'entity_protocol_version': '1.0'  # From harness.protocol
+            'bundle_contract': 'v1'
         },
         'manifest': manifest,
         'timestamps': {
@@ -352,59 +311,250 @@ def run_asr_test(model_id: str, dataset: str, device: str = None):
         'errors': []
     }
 
-    if ground_truth:
-        # Use normalized text for metrics
-        asr_result = ASRMetrics.evaluate(
+    # Add provenance to result - REQUIRED for all runs
+    result_obj['provenance'] = provenance
+    
+    # Add run_context for interpretable latency metrics
+    result_obj['run_context'] = create_run_context(
+        device=bundle['device'],
+        audio_duration_s=metadata['duration_seconds'],
+    )
+    
+    # Calculate quality metrics ONLY if:
+    # 1. Ground truth exists
+    # 2. Provenance allows quality metrics
+    # 3. Grade is NOT smoke (smoke is structural only)
+    is_smoke = evidence_grade == 'smoke'
+    
+    if ground_truth and can_compute_quality_metrics(provenance) and not is_smoke:
+        # ASR metrics
+        asr_metrics = ASRMetrics.evaluate(
             transcription=normalized_hyp,
             ground_truth=normalized_ref,
             audio_duration_s=metadata['duration_seconds'],
             latency_s=latency_ms / 1000
         )
 
-        result['metrics']['wer'] = asr_result.wer
-        result['metrics']['cer'] = asr_result.cer
-        result['output']['ground_truth'] = ground_truth
-        result['output']['ground_truth_normalized'] = normalized_ref
-        result['output']['ground_truth_length'] = len(ground_truth)
+        result_obj['metrics']['wer'] = asr_metrics.wer
+        result_obj['metrics']['cer'] = asr_metrics.cer
+        result_obj['output']['ground_truth'] = ground_truth
+        result_obj['output']['ground_truth_normalized'] = normalized_ref
+        result_obj['output']['ground_truth_length'] = len(ground_truth)
 
-        # Create validation report
+        # Output quality diagnosis (truncation/hallucination/repetition)
+        diagnosis = diagnose_output_quality(normalized_ref, normalized_hyp)
+        result_obj['output_quality'] = diagnosis
+        
+        if diagnosis['has_failure']:
+            result_obj['errors'].append(f"Output quality issue: {diagnosis}")
+
+        # Validation report
         validation = create_validation_report(model_id, ground_truth, text)
-        result['validation'] = validation
+        result_obj['validation'] = validation
 
-        print(f"WER: {asr_result.wer:.3f} ({asr_result.wer*100:.1f}%)")
-        print(f"CER: {asr_result.cer:.3f} ({asr_result.cer*100:.1f}%)")
-        print(f"RTF: {asr_result.rtv:.3f}x")
+        print(f"WER: {asr_metrics.wer:.3f} ({asr_metrics.wer*100:.1f}%)")
+        print(f"CER: {asr_metrics.cer:.3f} ({asr_metrics.cer*100:.1f}%)")
+        print(f"RTF: {asr_metrics.rtv:.3f}x")
+        
+        # Show diagnosis warnings
+        if diagnosis['is_truncated']:
+            print(f"⚠️  TRUNCATED: length_ratio={diagnosis['length_ratio']:.2f}")
+        if diagnosis['is_hallucinating']:
+            print(f"⚠️  HALLUCINATING: length_ratio={diagnosis['length_ratio']:.2f}")
+        if diagnosis['is_repetitive']:
+            print(f"⚠️  REPETITIVE: unique={diagnosis['unique_token_ratio']:.2f}, 3gram={diagnosis['repeat_3gram_rate']:.2f}")
+    else:
+        # No ground truth = no quality metrics. This is intentional.
+        result_obj['metrics']['wer'] = None
+        result_obj['metrics']['cer'] = None
+        print("ℹ️  No ground truth - WER/CER set to None (structural run only)")
 
     # Save results
     results_dir = Path(f'runs/{model_id}/asr')
     results_dir.mkdir(parents=True, exist_ok=True)
 
+    # Timestamped file (local only)
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     result_file = results_dir / f'{timestamp}.json'
-
     with open(result_file, 'w') as f:
-        json.dump(result, f, indent=2)
+        json.dump(result_obj, f, indent=2)
+
+    # Summary file (tracked in git) - overwrite
+    summary_file = results_dir / 'summary.json'
+    summary = {
+        'model_id': model_id,
+        'dataset': dataset,
+        'last_run': datetime.now().isoformat(),
+        'wer': result_obj['metrics'].get('wer'),
+        'cer': result_obj['metrics'].get('cer'),
+        'rtf': result_obj['metrics']['rtf'],
+        'latency_ms': latency_ms,
+        'has_output_quality_failure': result_obj.get('output_quality', {}).get('has_failure', False)
+    }
+    with open(summary_file, 'w') as f:
+        json.dump(summary, f, indent=2)
 
     print(f"✓ Results saved to: {result_file}")
-    return result
+    print(f"✓ Summary updated: {summary_file}")
+    return result_obj
+
+
+def run_asr_adhoc(model_id: str, audio_path: str, device: str = None):
+    """
+    Run ASR on a single audio file (adhoc mode).
+    
+    Produces artifact with:
+    - grade = adhoc
+    - has_ground_truth = false
+    - structural metrics only (no WER)
+    """
+    from pathlib import Path
+    import time
+    
+    audio_path = Path(audio_path).resolve()
+    print(f"=== ASR Adhoc: {model_id} on {audio_path.name} ===")
+    
+    # Create adhoc dataset metadata
+    adhoc = create_adhoc_dataset(audio_path, task="asr")
+    print(f"Dataset ID: {adhoc.dataset_id}")
+    print(f"Audio hash: {adhoc.audio_hash[:12]}")
+    print(f"Duration: {adhoc.audio_duration_s:.2f}s")
+    
+    # Load model config
+    config = load_model_config(model_id)
+    model_name = config.get('model_name', model_id)
+    print(f"Model: {model_name}")
+    
+    # Determine device
+    if device is None:
+        import torch
+        device = 'mps' if torch.backends.mps.is_available() else 'cpu'
+    print(f"Device: {device}")
+    
+    # Load model via registry
+    bundle = ModelRegistry.load_model(model_id, config, device)
+    print(f"✓ Model loaded (capabilities: {bundle['capabilities']})")
+    
+    if 'asr' not in bundle['capabilities']:
+        raise ValueError(f"Model {model_id} does not have ASR capability")
+    
+    transcribe_fn = bundle['asr']['transcribe']
+    
+    # Create provenance (adhoc-specific)
+    provenance = create_adhoc_provenance(adhoc)
+    run_context = create_adhoc_run_context(adhoc, device, runner_version="1.0.0")
+    print(f"Provenance: has_ground_truth={provenance['has_ground_truth']}")
+    
+    # Load audio
+    sample_rate = config.get('audio', {}).get('sample_rate', 16000)
+    loader = AudioLoader(target_sample_rate=sample_rate)
+    audio, sr, metadata = loader.load_audio(audio_path, model_id)
+    
+    # Run transcription with timing
+    timer = PerformanceTimer()
+    timer.start('total')
+    timer.start('transcribe')
+    
+    result = transcribe_fn(audio, sr)
+    
+    timer.stop('transcribe')
+    timer.stop('total')
+    timings = timer.get_all()
+    
+    # Get transcript
+    if isinstance(result, dict):
+        transcript = result.get('text', '')
+        segments = result.get('segments', [])
+    else:
+        transcript = str(result)
+        segments = []
+    
+    print(f"\n--- Transcript ---")
+    print(transcript[:200] + "..." if len(transcript) > 200 else transcript)
+    
+    # Compute STRUCTURAL metrics only (no quality metrics for adhoc)
+    duration_s = adhoc.audio_duration_s or (len(audio) / sr)
+    rtf = timings.get('transcribe', 0) / duration_s if duration_s > 0 else 0
+    
+    structural_metrics = {
+        'latency_ms': timings.get('transcribe', 0) * 1000,
+        'duration_s': duration_s,
+        'rtf': rtf,
+        'word_count': len(transcript.split()) if transcript else 0,
+        'segment_count': len(segments),
+        # Quality metrics explicitly None for adhoc
+        'wer': None,
+        'cer': None,
+    }
+    
+    # Build result artifact
+    result_obj = {
+        'meta': {
+            'model_id': model_id,
+            'model_name': model_name,
+            'capability': 'asr',
+            'dataset_id': adhoc.dataset_id,
+            'grade': 'adhoc',
+            'timestamp': datetime.now().isoformat(),
+            'schema_version': RUN_SCHEMA_VERSION,
+        },
+        'input': {
+            'audio_file': str(audio_path),
+            'audio_hash': adhoc.audio_hash,
+            'duration_s': duration_s,
+            'sample_rate': sr,
+        },
+        'output': {
+            'text': transcript,
+            'segments': segments[:10] if segments else [],  # Limit stored segments
+        },
+        'metrics': structural_metrics,
+        'timings': timings,
+        'provenance': provenance,
+        'run_context': run_context,
+    }
+    
+    # Save artifact
+    runs_dir = Path(f'runs/{model_id}/asr')
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = int(time.time())
+    result_file = runs_dir / f'adhoc_{timestamp}.json'
+    
+    with open(result_file, 'w') as f:
+        json.dump(result_obj, f, indent=2, default=str)
+    
+    print(f"\n✓ Adhoc run saved to: {result_file}")
+    return result_obj, str(result_file)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Run ASR tests headless')
+    parser = argparse.ArgumentParser(description='Run ASR tests using Bundle Contract v1')
     parser.add_argument('--model', type=str, required=True,
-                       choices=['lfm2_5_audio', 'whisper', 'faster_whisper', 'seamlessm4t'],
-                       help='Model ID to test')
-    parser.add_argument('--dataset', type=str, required=True,
-                       choices=['smoke', 'primary', 'conversation'],
-                       help='Dataset to test on')
+                       help='Model ID (registered in harness.registry)')
+    
+    # Mutually exclusive: --dataset or --audio
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument('--dataset', type=str,
+                       help='Dataset ID (smoke, primary, llm_primary, conversation)')
+    input_group.add_argument('--audio', type=str,
+                       help='Single audio file path (adhoc mode)')
+    
     parser.add_argument('--device', type=str, default=None,
                        help='Override device (e.g., cpu, mps, cuda)')
 
     args = parser.parse_args()
 
     try:
-        result = run_asr_test(args.model, args.dataset, device=args.device)
-        print(f"\n🎉 Test completed successfully!")
+        if args.audio:
+            # Adhoc mode: single file
+            result, artifact_path = run_asr_adhoc(args.model, args.audio, device=args.device)
+            print(f"\n🎉 Adhoc run completed!")
+            print(f"Artifact: {artifact_path}")
+        else:
+            # Dataset mode: existing behavior
+            result = run_asr_test(args.model, args.dataset, device=args.device)
+            print(f"\n🎉 Test completed successfully!")
         return 0
     except Exception as e:
         print(f"\n❌ Test failed: {e}")

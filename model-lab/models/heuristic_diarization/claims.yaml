@@ -1,0 +1,20 @@
+# heuristic_diarization Claims Manifest
+
+claims:
+  - id: heuristic_diar_structural
+    task: diarization
+    type: structural
+    description: "Diarization runs and produces speaker segments"
+    enforcement: required
+    test_ref: claims.diarization.smoke_structural_v1
+    thresholds:
+      has_speakers: true
+
+  - id: heuristic_diar_speaker_count
+    task: diarization
+    type: quality
+    description: "Speaker count within tolerance"
+    enforcement: optional
+    test_ref: claims.diarization.speaker_count_v1
+    thresholds:
+      speaker_count_error_max: 1
