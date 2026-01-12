@@ -1,0 +1,97 @@
+{
+  "ts": "2026-01-09 23:03:04",
+  "version": 1,
+  "results": {
+    "fixtures/tts_voice1_clean.wav": {
+      "status": "PASS",
+      "reasons": [],
+      "integrity": {
+        "sr": 16000,
+        "duration_s": 72.1195625,
+        "speech_ratio": 0.4000554861978083,
+        "snr_db": 66.67881754231837,
+        "input_lufs": -16.91,
+        "input_tp": -1.27,
+        "normalized_used": false,
+        "normalized_path": "/Users/pranay/Projects/speech_experiments/model-lab/tests/speech/fixtures/tts_voice1_clean.wav"
+      },
+      "metrics": {
+        "wer_norm": 0.3509933774834437,
+        "cer_norm": 0.11127596439169139,
+        "wer_delta_pp": -0.0006622516556253899,
+        "cer_delta_pp": -0.0024035608308603518,
+        "glossary_hits": 17,
+        "glossary_baseline": 17,
+        "numbers_hits": 2,
+        "numbers_baseline": 2
+      },
+      "fingerprint": {
+        "sha256": "1961505c44834d477ffc0609fc304948b061e86a16d33c9fd53e659e88f77d12",
+        "duration_sec": 72.12,
+        "sample_rate": 16000
+      },
+      "hypothesis_preview": "This is a speech quality and regression test for STT and TTS.  Today's date is January 9th, 2026.  The sample rate is 16,000 hertz and the file is mono.  Numbers matter, 29.9 decibels SNR, minus 36.1 luffs,  and true peak at minus 15.9 dBTP.  If you hear 29.9, that is acceptable too,  but the digits should appear in the transcript.  acronyms matter, say these clearly, G-P-T, G-P-T-4, R-L-H-F, A-S-R, T-T-S, VAD,  Luffs, D-B-F-S, D-B-T-P, SNR, Wear, Ser, and J-S-O-N.  Hiphons matter, these words s"
+    },
+    "fixtures/tts_voice2_clean.wav": {
+      "status": "PASS",
+      "reasons": [],
+      "integrity": {
+        "sr": 16000,
+        "duration_s": 77.912125,
+        "speech_ratio": 0.40005135447425855,
+        "snr_db": 62.14148860556813,
+        "input_lufs": -18.13,
+        "input_tp": -0.71,
+        "normalized_used": false,
+        "normalized_path": "/Users/pranay/Projects/speech_experiments/model-lab/tests/speech/fixtures/tts_voice2_clean.wav"
+      },
+      "metrics": {
+        "wer_norm": 0.17218543046357615,
+        "cer_norm": 0.09792284866468842,
+        "wer_delta_pp": -0.0014569536423841845,
+        "cer_delta_pp": 0.0022848664688421283,
+        "glossary_hits": 21,
+        "glossary_baseline": 21,
+        "numbers_hits": 3,
+        "numbers_baseline": 3
+      },
+      "fingerprint": {
+        "sha256": "a2eabc28a43b6a7d3e4a8370a2200903144d4d36f7977ab0399aea557de3c86e",
+        "duration_sec": 77.91,
+        "sample_rate": 16000
+      },
+      "hypothesis_preview": "This is a speech quality and regression test for STT and TTS.  Today's date is 2000 and 26-0109.  The sample rate is 16,000 Hz and the file is mono.  Numbers matter, 29.9 dB SNR, minus 36.1 LUFs, and true peak at minus 15.9 dBTP.  If you hear 29.9, that is acceptable too, but the digits should appear in the transcript.  Pronames matter, say these clearly, GPT, GPT4, RLHF, ASR, TTS, VAD, LUFs, DBFS, DBTP, SNR, WER,  SAY, and JSON, hyphens matter.  These words should stay intact, self-supervised, "
+    },
+    "fixtures/dialogue_2spk_clean.wav": {
+      "status": "PASS",
+      "reasons": [],
+      "integrity": {
+        "sr": 16000,
+        "duration_s": 34.6114375,
+        "speech_ratio": 0.4001156403584851,
+        "snr_db": 65.93185247999588,
+        "input_lufs": -16.92,
+        "input_tp": -1.94,
+        "normalized_used": false,
+        "normalized_path": "/Users/pranay/Projects/speech_experiments/model-lab/tests/speech/fixtures/dialogue_2spk_clean.wav"
+      },
+      "metrics": {
+        "wer_norm": 0.1111111111111111,
+        "cer_norm": 0.04985337243401759,
+        "wer_delta_pp": 0.0011111111111100636,
+        "cer_delta_pp": -0.004662756598240725,
+        "glossary_hits": 7,
+        "glossary_baseline": 7,
+        "numbers_hits": 2,
+        "numbers_baseline": 2
+      },
+      "fingerprint": {
+        "sha256": "6d293e4b29e1c5dd74e15c19ab5e1646acf32d983ab643e3a1899feedc20e6c7",
+        "duration_sec": 34.61,
+        "sample_rate": 16000
+      },
+      "hypothesis_preview": "Speaker A. Hi, this is Speaker A. The date is January 9, 2026.  We are testing diorization and turntaking.  Speaker B. This is Speaker B acronyms, GPT, RLHF, and ASR, numbers, 16,029.9.  Speaker A. I will say a hyphenated phrase, self-supervised and few-shot learning.  Speaker B. I will say a confusing pair, context and contact, also acquire and require.  Speaker A. We should have at least two speaker switches.  Speaker B. End of dialogue test."
+    }
+  },
+  "run_id": "20260109_230304"
+}
