@@ -33,6 +33,7 @@ from harness.runner_schema import (
     validate_artifact, compute_pcm_hash,
 )
 from harness.media_ingest import ingest_media, IngestError, FFmpegNotFoundError
+from harness.preprocess_ops import run_preprocessing_chain, results_to_artifact_section
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(name)s - %(levelname)s - %(message)s')
@@ -47,12 +48,15 @@ def load_dataset(dataset_id: str) -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def run_v2v_adhoc(model_id: str, input_path: str, prompt: str = None, device: str = "cpu"):
+def run_v2v_adhoc(model_id: str, input_path: str, prompt: str = None, device: str = "cpu", pre: str = None):
     """
     Run V2V on a single media file (adhoc mode).
     
     Supports both audio and video files (mp4, mkv, etc).
     Produces artifact with grade=adhoc and structural metrics only.
+    
+    Args:
+        pre: Comma-separated list of operators (e.g., "trim_silence,normalize_loudness")
     """
     input_path = Path(input_path).resolve()
     logger.info(f"=== V2V Adhoc: {model_id} on {input_path.name} ===")
@@ -75,6 +79,24 @@ def run_v2v_adhoc(model_id: str, input_path: str, prompt: str = None, device: st
     if ingest.is_extracted:
         logger.info(f"Extracted via: {ingest.ingest_tool} {ingest.ingest_version}")
     
+    # Run preprocessing chain if specified
+    preprocessing_results = []
+    audio_for_model = ingest.audio
+    sr_for_model = ingest.sample_rate
+    processed_duration_s = ingest.audio_duration_s
+    
+    if pre:
+        operators = [op.strip() for op in pre.split(',') if op.strip()]
+        if operators:
+            logger.info(f"Preprocessing: {' → '.join(operators)}")
+            preprocessing_results = run_preprocessing_chain(audio_for_model, sr_for_model, operators)
+            if preprocessing_results:
+                final_result = preprocessing_results[-1]
+                audio_for_model = final_result.audio
+                sr_for_model = final_result.sample_rate
+                processed_duration_s = final_result.duration_out_s
+                logger.info(f"After preprocessing: {final_result.out_audio_hash[:12]} ({processed_duration_s:.2f}s)")
+    
     try:
         # Load model
         config_path = Path(f"models/{model_id}/config.yaml")
@@ -92,9 +114,9 @@ def run_v2v_adhoc(model_id: str, input_path: str, prompt: str = None, device: st
         v2v_fn = bundle["v2v"]["run_v2v_turn"]
         logger.info(f"✓ Model loaded")
         
-        # Run V2V
+        # Run V2V (on preprocessed audio)
         t0 = time.time()
-        output = v2v_fn(audio=ingest.audio, prompt=prompt) if prompt else v2v_fn(audio=ingest.audio)
+        output = v2v_fn(audio=audio_for_model, prompt=prompt) if prompt else v2v_fn(audio=audio_for_model)
         latency = time.time() - t0
         
         # Get output
@@ -109,7 +131,8 @@ def run_v2v_adhoc(model_id: str, input_path: str, prompt: str = None, device: st
             latency_s=latency
         )
         
-        rtf_like = latency / ingest.audio_duration_s if ingest.audio_duration_s > 0 else None
+        # CRITICAL: rtf_like uses processed duration (what model actually saw)
+        rtf_like = latency / processed_duration_s if processed_duration_s > 0 else None
         
         # Create schema-validated artifact
         schema_run_context = RunContext(
@@ -122,19 +145,23 @@ def run_v2v_adhoc(model_id: str, input_path: str, prompt: str = None, device: st
             device=device,
         )
         
+        final_audio_hash = (preprocessing_results[-1].out_audio_hash 
+                          if preprocessing_results else ingest.audio_hash)
+        
         schema_inputs = InputsSchema(
             audio_path=str(input_path),
-            audio_hash=ingest.audio_hash,
+            audio_hash=final_audio_hash,
             source_media_path=str(ingest.source_media_path) if ingest.is_extracted else None,
             source_media_hash=ingest.source_media_hash if ingest.is_extracted else None,
             dataset_id=f"adhoc_{ingest.audio_hash[:12]}",
-            audio_duration_s=ingest.audio_duration_s,
-            sample_rate=ingest.sample_rate,
+            audio_duration_s=processed_duration_s,
+            sample_rate=sr_for_model,
         )
         
         structural_metrics = {
             'latency_ms': eval_result.latency_ms,
-            'input_duration_s': ingest.audio_duration_s,
+            'input_duration_s': processed_duration_s,  # Duration of what model saw
+            'source_duration_s': ingest.audio_duration_s,  # Original for reference
             'response_duration_s': eval_result.response_duration_s,
             'rtf_like': rtf_like,
             'has_audio': eval_result.has_audio,
@@ -170,6 +197,11 @@ def run_v2v_adhoc(model_id: str, input_path: str, prompt: str = None, device: st
         # Validate before writing
         validate_artifact(schema_artifact)
         
+        # Convert to dict and add preprocessing section
+        result_obj = schema_artifact.to_dict()
+        if preprocessing_results:
+            result_obj['preprocessing'] = results_to_artifact_section(preprocessing_results)
+        
         # Save artifact
         runs_dir = Path(f'runs/{model_id}/v2v')
         runs_dir.mkdir(parents=True, exist_ok=True)
@@ -178,11 +210,11 @@ def run_v2v_adhoc(model_id: str, input_path: str, prompt: str = None, device: st
         run_file = runs_dir / f'adhoc_{timestamp}.json'
         
         with open(run_file, 'w') as f:
-            json.dump(schema_artifact.to_dict(), f, indent=2, default=str)
+            json.dump(result_obj, f, indent=2, default=str)
         
         logger.info(f"✓ Adhoc run completed: response {eval_result.response_duration_s:.1f}s")
         print(f"ARTIFACT_PATH:{run_file}")
-        return schema_artifact.to_dict(), str(run_file)
+        return result_obj, str(run_file)
         
     finally:
         ingest.cleanup()
@@ -267,6 +299,8 @@ def main():
     
     parser.add_argument("--prompt", help="Text prompt for V2V (adhoc mode only)")
     parser.add_argument("--device", default="cpu", help="Device (cpu, cuda, mps)")
+    parser.add_argument("--pre", type=str, default=None,
+                       help="Preprocessing operators (comma-separated, e.g., trim_silence,normalize_loudness)")
     
     args = parser.parse_args()
     
@@ -275,7 +309,7 @@ def main():
         try:
             result, artifact_path = run_v2v_adhoc(
                 args.model, str(args.audio), 
-                prompt=args.prompt, device=args.device
+                prompt=args.prompt, device=args.device, pre=args.pre
             )
             logger.info(f"🎉 Adhoc run completed! Artifact: {artifact_path}")
             sys.exit(0)
