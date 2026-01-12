@@ -29,6 +29,7 @@ from harness.runner_schema import (
     validate_artifact, compute_pcm_hash,
 )
 from harness.media_ingest import ingest_media, IngestResult, IngestError, FFmpegNotFoundError
+from harness.preprocess_ops import run_preprocessing_chain, results_to_artifact_section
 import yaml
 
 
@@ -404,7 +405,7 @@ def run_asr_test(model_id: str, dataset: str, device: str = None):
     return result_obj
 
 
-def run_asr_adhoc(model_id: str, input_path: str, device: str = None):
+def run_asr_adhoc(model_id: str, input_path: str, device: str = None, pre: str = None):
     """
     Run ASR on a single media file (adhoc mode).
     
@@ -414,6 +415,10 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None):
     - has_ground_truth = false
     - structural metrics only (no WER)
     - source_media_hash for video containers
+    - preprocessing chain if --pre specified
+    
+    Args:
+        pre: Comma-separated list of operators (e.g., "trim_silence,normalize_loudness")
     """
     input_path = Path(input_path).resolve()
     print(f"=== ASR Adhoc: {model_id} on {input_path.name} ===")
@@ -433,6 +438,22 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None):
     print(f"Audio: {ingest.audio_hash[:12]} ({ingest.audio_duration_s:.2f}s)")
     if ingest.is_extracted:
         print(f"Extracted via: {ingest.ingest_tool} {ingest.ingest_version}")
+    
+    # Run preprocessing chain if specified
+    preprocessing_results = []
+    audio_for_model = ingest.audio
+    sr_for_model = ingest.sample_rate
+    
+    if pre:
+        operators = [op.strip() for op in pre.split(',') if op.strip()]
+        if operators:
+            print(f"Preprocessing: {' → '.join(operators)}")
+            preprocessing_results = run_preprocessing_chain(audio_for_model, sr_for_model, operators)
+            if preprocessing_results:
+                final_result = preprocessing_results[-1]
+                audio_for_model = final_result.audio
+                sr_for_model = final_result.sample_rate
+                print(f"After preprocessing: {final_result.out_audio_hash[:12]} ({final_result.duration_out_s:.2f}s)")
     
     try:
         # Load model config
@@ -455,9 +476,9 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None):
         
         transcribe_fn = bundle['asr']['transcribe']
         
-        # Run transcription with timing
+        # Run transcription with timing (on preprocessed audio)
         start_time = time.time()
-        result = transcribe_fn(ingest.audio, ingest.sample_rate)
+        result = transcribe_fn(audio_for_model, sr_for_model)
         elapsed_s = time.time() - start_time
         
         # Get transcript
@@ -543,6 +564,10 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None):
         # Convert to dict for JSON serialization
         result_obj = schema_artifact.to_dict()
         
+        # Add preprocessing section if operators were run
+        if preprocessing_results:
+            result_obj['preprocessing'] = results_to_artifact_section(preprocessing_results)
+        
         # Save artifact
         runs_dir = Path(f'runs/{model_id}/asr')
         runs_dir.mkdir(parents=True, exist_ok=True)
@@ -579,13 +604,17 @@ def main():
     
     parser.add_argument('--device', type=str, default=None,
                        help='Override device (e.g., cpu, mps, cuda)')
+    parser.add_argument('--pre', type=str, default=None,
+                       help='Preprocessing operators (comma-separated, e.g., trim_silence,normalize_loudness)')
 
     args = parser.parse_args()
 
     try:
         if args.audio:
             # Adhoc mode: single file (audio or video)
-            result, artifact_path = run_asr_adhoc(args.model, args.audio, device=args.device)
+            result, artifact_path = run_asr_adhoc(
+                args.model, args.audio, device=args.device, pre=args.pre
+            )
             print(f"\n🎉 Adhoc run completed!")
             print(f"Artifact: {artifact_path}")
         else:
