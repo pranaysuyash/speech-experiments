@@ -1,0 +1,168 @@
+{
+  "run_context": {
+    "task": "vad",
+    "model_id": "silero_vad",
+    "grade": "adhoc",
+    "timestamp": "2026-01-12T22:15:44.498296",
+    "git_hash": null,
+    "command": [
+      "scripts/run_vad.py",
+      "--model",
+      "silero_vad",
+      "--audio",
+      "data/audio/PRIMARY/llm_recording_pranay.wav"
+    ],
+    "device": "cpu",
+    "model_version": null
+  },
+  "inputs": {
+    "audio_path": "/Users/pranay/Projects/speech_experiments/model-lab/data/audio/PRIMARY/llm_recording_pranay.wav",
+    "audio_hash": "7d0a5379b32c8361",
+    "source_media_path": null,
+    "source_media_hash": null,
+    "dataset_id": "adhoc_4c6a2507ee15",
+    "dataset_hash": null,
+    "audio_duration_s": 163.1786875,
+    "sample_rate": 16000
+  },
+  "metrics_quality": {
+    "wer": null,
+    "cer": null,
+    "mer": null,
+    "wil": null,
+    "der": null,
+    "der_proxy": null,
+    "speaker_accuracy": null,
+    "jaccard_error": null,
+    "bleu": null
+  },
+  "metrics_structural": {
+    "rtf": 0.0064566397873775695,
+    "speech_ratio": 0.8882532530481347,
+    "num_segments": 36,
+    "latency_ms": 1053.5860061645508,
+    "duration_s": 163.1786875
+  },
+  "output": {
+    "segments_count": 36,
+    "segments": [
+      {
+        "start": 17952,
+        "end": 40928
+      },
+      {
+        "start": 43040,
+        "end": 165344
+      },
+      {
+        "start": 170528,
+        "end": 190944
+      },
+      {
+        "start": 194592,
+        "end": 309728
+      },
+      {
+        "start": 316448,
+        "end": 391648
+      },
+      {
+        "start": 397344,
+        "end": 422368
+      },
+      {
+        "start": 426016,
+        "end": 474592
+      },
+      {
+        "start": 483872,
+        "end": 564704
+      },
+      {
+        "start": 569888,
+        "end": 641504
+      },
+      {
+        "start": 658464,
+        "end": 771040
+      },
+      {
+        "start": 785440,
+        "end": 808416
+      },
+      {
+        "start": 816672,
+        "end": 936928
+      },
+      {
+        "start": 946208,
+        "end": 1007584
+      },
+      {
+        "start": 1015840,
+        "end": 1054176
+      },
+      {
+        "start": 1066528,
+        "end": 1193952
+      },
+      {
+        "start": 1213472,
+        "end": 1273312
+      },
+      {
+        "start": 1277984,
+        "end": 1339872
+      },
+      {
+        "start": 1364000,
+        "end": 1486816
+      },
+      {
+        "start": 1492000,
+        "end": 1547744
+      },
+      {
+        "start": 1553440,
+        "end": 1595872
+      }
+    ]
+  },
+  "artifacts": {},
+  "provenance": {
+    "has_ground_truth": false,
+    "metrics_valid": true
+  },
+  "gates": {
+    "has_failure": false
+  },
+  "errors": [],
+  "meta": {
+    "task": "vad",
+    "model_id": "silero_vad",
+    "timestamp": "2026-01-12T22:15:44.498296"
+  },
+  "evidence": {
+    "grade": "adhoc",
+    "dataset_id": "adhoc_4c6a2507ee15"
+  },
+  "system": {
+    "device": "cpu"
+  },
+  "metrics": {
+    "rtf": 0.0064566397873775695,
+    "speech_ratio": 0.8882532530481347,
+    "num_segments": 36,
+    "latency_ms": 1053.5860061645508,
+    "duration_s": 163.1786875,
+    "wer": null,
+    "cer": null,
+    "mer": null,
+    "wil": null,
+    "der": null,
+    "der_proxy": null,
+    "speaker_accuracy": null,
+    "jaccard_error": null,
+    "bleu": null
+  }
+}

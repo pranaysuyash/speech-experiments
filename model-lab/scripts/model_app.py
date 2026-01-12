@@ -122,6 +122,11 @@ def cmd_recommend(args):
                 print(f"\n❌ Audio file not found: {audio_path}")
                 sys.exit(EXIT_ERROR)
             
+            # Validate --prompt usage (v2v only)
+            if getattr(args, 'prompt', None) and args.task != "v2v":
+                print(f"\n❌ --prompt is only valid for 'v2v' task, not '{args.task}'")
+                sys.exit(EXIT_ERROR)
+            
             print(f"\n🎵 Running {best} on {audio_path.name}...")
             script_map = {
                 "asr": "scripts/run_asr.py",
@@ -133,12 +138,29 @@ def cmd_recommend(args):
             if script:
                 # Run with adhoc dataset (user-provided audio)
                 cmd = [sys.executable, str(Path(__file__).parent.parent / script),
-                       "--model", best, "--audio", str(audio_path)]
+                       "--model", best, "--audio", str(audio_path.resolve())]
+                
+                # Add --prompt for v2v only
+                if args.task == "v2v" and getattr(args, 'prompt', None):
+                    cmd.extend(["--prompt", args.prompt])
+                
                 result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                # Parse ARTIFACT_PATH from runner output
+                artifact_path = None
+                for line in (result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
                 if result.returncode == 0:
                     print(f"✅ Run completed")
+                    if artifact_path:
+                        print(f"📄 Artifact: {artifact_path}")
                 else:
-                    print(f"❌ Run failed: {result.stderr[-200:]}")
+                    print(f"❌ Run failed")
+                    if result.stderr:
+                        print(f"   Error: {result.stderr[-200:]}")
             else:
                 print(f"❌ Cannot run task '{args.task}' with audio directly.")
         
@@ -652,6 +674,7 @@ Examples:
     p_recommend.add_argument("--use-case", "-u", help="Use case ID")
     p_recommend.add_argument("--task", "-t", help="Task: asr, vad, diarization, v2v")
     p_recommend.add_argument("--audio", "-a", type=Path, help="Audio file to run on")
+    p_recommend.add_argument("--prompt", "-p", help="Text prompt for V2V (only valid with --task v2v)")
     p_recommend.add_argument("--device", help="Filter by device: cpu, mps, cuda")
     p_recommend.add_argument("--json", action="store_true", help="Output JSON")
     p_recommend.set_defaults(func=cmd_recommend)

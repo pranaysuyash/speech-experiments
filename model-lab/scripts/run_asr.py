@@ -24,6 +24,10 @@ from harness.metrics_asr import ASRMetrics, diagnose_output_quality
 from harness.protocol import RunContract, NormalizationValidator, create_validation_report
 from harness.run_provenance import create_provenance, create_run_context, can_compute_quality_metrics, RUN_SCHEMA_VERSION
 from harness.adhoc_dataset import create_adhoc_dataset, create_adhoc_provenance, create_adhoc_run_context
+from harness.runner_schema import (
+    RunnerArtifact, RunContext, InputsSchema, QualityMetrics,
+    validate_artifact, compute_pcm_hash,
+)
 import yaml
 
 
@@ -452,14 +456,12 @@ def run_asr_adhoc(model_id: str, audio_path: str, device: str = None):
     
     # Run transcription with timing
     timer = PerformanceTimer()
-    timer.start('total')
-    timer.start('transcribe')
+    start_time = time.time()
     
     result = transcribe_fn(audio, sr)
     
-    timer.stop('transcribe')
-    timer.stop('total')
-    timings = timer.get_all()
+    elapsed_s = time.time() - start_time
+    timings = {'transcribe': elapsed_s}
     
     # Get transcript
     if isinstance(result, dict):
@@ -476,43 +478,60 @@ def run_asr_adhoc(model_id: str, audio_path: str, device: str = None):
     duration_s = adhoc.audio_duration_s or (len(audio) / sr)
     rtf = timings.get('transcribe', 0) / duration_s if duration_s > 0 else 0
     
+    # Create schema-validated artifact
+    schema_run_context = RunContext(
+        task="asr",
+        model_id=model_id,
+        grade="adhoc",
+        timestamp=datetime.now().isoformat(),
+        git_hash=run_context.get("git_hash"),
+        command=sys.argv,
+        device=device,
+        model_version=config.get('model_version'),
+    )
+    
+    schema_inputs = InputsSchema(
+        audio_path=str(audio_path),
+        audio_hash=compute_pcm_hash(audio),  # Hash of decoded PCM, not file bytes
+        source_media_path=None,  # Will be set for video containers
+        source_media_hash=None,
+        dataset_id=adhoc.dataset_id,
+        dataset_hash=None,
+        audio_duration_s=duration_s,
+        sample_rate=sr,
+    )
+    
+    # Quality metrics MUST be None for adhoc - schema enforces this
+    schema_quality = QualityMetrics()  # All None
+    
     structural_metrics = {
         'latency_ms': timings.get('transcribe', 0) * 1000,
         'duration_s': duration_s,
         'rtf': rtf,
         'word_count': len(transcript.split()) if transcript else 0,
         'segment_count': len(segments),
-        # Quality metrics explicitly None for adhoc
-        'wer': None,
-        'cer': None,
     }
     
-    # Build result artifact
-    result_obj = {
-        'meta': {
-            'model_id': model_id,
-            'model_name': model_name,
-            'capability': 'asr',
-            'dataset_id': adhoc.dataset_id,
-            'grade': 'adhoc',
-            'timestamp': datetime.now().isoformat(),
-            'schema_version': RUN_SCHEMA_VERSION,
-        },
-        'input': {
-            'audio_file': str(audio_path),
-            'audio_hash': adhoc.audio_hash,
-            'duration_s': duration_s,
-            'sample_rate': sr,
-        },
-        'output': {
+    schema_artifact = RunnerArtifact(
+        run_context=schema_run_context,
+        inputs=schema_inputs,
+        metrics_quality=schema_quality,
+        metrics_structural=structural_metrics,
+        output={
             'text': transcript,
             'segments': segments[:10] if segments else [],  # Limit stored segments
         },
-        'metrics': structural_metrics,
-        'timings': timings,
-        'provenance': provenance,
-        'run_context': run_context,
-    }
+        artifacts={},
+        provenance=provenance,
+        gates={},
+        errors=[],
+    )
+    
+    # Validate artifact before writing - raises if contract violated
+    validate_artifact(schema_artifact)
+    
+    # Convert to dict for JSON serialization
+    result_obj = schema_artifact.to_dict()
     
     # Save artifact
     runs_dir = Path(f'runs/{model_id}/asr')
@@ -524,7 +543,9 @@ def run_asr_adhoc(model_id: str, audio_path: str, device: str = None):
     with open(result_file, 'w') as f:
         json.dump(result_obj, f, indent=2, default=str)
     
-    print(f"\n✓ Adhoc run saved to: {result_file}")
+    # Print artifact path as LAST LINE for model_app parsing
+    print(f"\n✓ Adhoc run completed successfully")
+    print(f"ARTIFACT_PATH:{result_file}")
     return result_obj, str(result_file)
 
 

@@ -4,6 +4,7 @@ Run V2V evaluation for a specific model and dataset.
 
 Usage:
     uv run scripts/run_v2v.py --model lfm2_5_audio --dataset v2v_smoke_v1
+    uv run scripts/run_v2v.py --model lfm2_5_audio --audio file.wav --prompt "Hello"  # Adhoc
 """
 
 import argparse
@@ -13,6 +14,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, Any, List
+from datetime import datetime
 
 import yaml
 import soundfile as sf
@@ -25,6 +27,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from harness.registry import ModelRegistry
 from harness.metrics_v2v import V2VMetrics
 from harness.run_provenance import create_provenance, create_run_context, RUN_SCHEMA_VERSION
+from harness.adhoc_dataset import create_adhoc_dataset
+from harness.runner_schema import (
+    RunnerArtifact, RunContext, InputsSchema, QualityMetrics,
+    validate_artifact, compute_pcm_hash,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(name)s - %(levelname)s - %(message)s')
@@ -37,6 +44,125 @@ def load_dataset(dataset_id: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Dataset not found: {dataset_path}")
     with open(dataset_path) as f:
         return yaml.safe_load(f)
+
+
+def run_v2v_adhoc(model_id: str, audio_path: str, prompt: str = None, device: str = "cpu"):
+    """
+    Run V2V on a single audio file (adhoc mode).
+    
+    Produces artifact with grade=adhoc and structural metrics only.
+    """
+    audio_path = Path(audio_path).resolve()
+    logger.info(f"=== V2V Adhoc: {model_id} on {audio_path.name} ===")
+    if prompt:
+        logger.info(f"Prompt: {prompt[:50]}...")
+    
+    # Create adhoc dataset metadata
+    adhoc = create_adhoc_dataset(audio_path, task="v2v", prompt=prompt)
+    logger.info(f"Dataset ID: {adhoc.dataset_id}")
+    
+    # Load model
+    config_path = Path(f"models/{model_id}/config.yaml")
+    if not config_path.exists():
+        raise ValueError(f"Config not found: {config_path}")
+    
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    
+    bundle = ModelRegistry.load_model(config['model_type'], config, device=device)
+    
+    if "v2v" not in bundle:
+        raise ValueError(f"Model {model_id} does not support 'v2v'")
+    
+    v2v_fn = bundle["v2v"]["run_v2v_turn"]
+    logger.info(f"✓ Model loaded")
+    
+    # Load audio
+    audio, sr = sf.read(str(audio_path))
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    audio = audio.astype(np.float32)
+    
+    input_duration_s = len(audio) / sr
+    
+    # Run V2V
+    t0 = time.time()
+    output = v2v_fn(audio=audio, prompt=prompt) if prompt else v2v_fn(audio=audio)
+    latency = time.time() - t0
+    
+    # Get output
+    response_audio = output.get("audio")
+    response_text = output.get("response_text", "")
+    sr_out = output.get("sample_rate", 24000)
+    
+    # Compute metrics
+    eval_result = V2VMetrics.evaluate(
+        response_audio=response_audio,
+        sr=sr_out,
+        latency_s=latency
+    )
+    
+    rtf_like = latency / input_duration_s if input_duration_s > 0 else None
+    
+    # Create schema-validated artifact
+    schema_run_context = RunContext(
+        task="v2v",
+        model_id=model_id,
+        grade="adhoc",
+        timestamp=datetime.now().isoformat(),
+        git_hash=None,
+        command=sys.argv,
+        device=device,
+    )
+    
+    schema_inputs = InputsSchema(
+        audio_path=str(audio_path),
+        audio_hash=compute_pcm_hash(audio),
+        dataset_id=adhoc.dataset_id,
+        audio_duration_s=input_duration_s,
+        sample_rate=sr,
+    )
+    
+    structural_metrics = {
+        'latency_ms': eval_result.latency_ms,
+        'input_duration_s': input_duration_s,
+        'response_duration_s': eval_result.response_duration_s,
+        'rtf_like': rtf_like,
+        'has_audio': eval_result.has_audio,
+    }
+    
+    schema_artifact = RunnerArtifact(
+        run_context=schema_run_context,
+        inputs=schema_inputs,
+        metrics_quality=QualityMetrics(),  # All None
+        metrics_structural=structural_metrics,
+        output={
+            'text': response_text,
+            'has_audio': eval_result.has_audio,
+            'duration_s': eval_result.response_duration_s,
+            'prompt': prompt,
+        },
+        provenance={'has_ground_truth': False, 'metrics_valid': True},
+        gates={'has_failure': not eval_result.has_audio},
+    )
+    
+    # Validate before writing
+    validate_artifact(schema_artifact)
+    
+    # Save artifact
+    runs_dir = Path(f'runs/{model_id}/v2v')
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = int(time.time())
+    run_file = runs_dir / f'adhoc_{timestamp}.json'
+    
+    with open(run_file, 'w') as f:
+        json.dump(schema_artifact.to_dict(), f, indent=2, default=str)
+    
+    logger.info(f"✓ Adhoc run completed: response {eval_result.response_duration_s:.1f}s")
+    print(f"ARTIFACT_PATH:{run_file}")
+    return schema_artifact.to_dict(), str(run_file)
+
 
 def save_run_artifact(model_id: str,
                       dataset_id: str,
@@ -104,15 +230,37 @@ def save_run_artifact(model_id: str,
     
     logger.info(f"Saved run artifact: {outfile}")
 
-from datetime import datetime
 
 def main():
     parser = argparse.ArgumentParser(description="Run V2V evaluation")
     parser.add_argument("--model", required=True, help="Model ID")
-    parser.add_argument("--dataset", required=True, help="Dataset ID")
+    
+    # Mutually exclusive: --dataset or --audio
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--dataset", help="Dataset ID")
+    input_group.add_argument("--audio", type=Path, help="Single audio file (adhoc mode)")
+    
+    parser.add_argument("--prompt", help="Text prompt for V2V (adhoc mode only)")
     parser.add_argument("--device", default="cpu", help="Device (cpu, cuda, mps)")
     
     args = parser.parse_args()
+    
+    # Adhoc mode
+    if args.audio:
+        try:
+            result, artifact_path = run_v2v_adhoc(
+                args.model, str(args.audio), 
+                prompt=args.prompt, device=args.device
+            )
+            logger.info(f"🎉 Adhoc run completed! Artifact: {artifact_path}")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"Adhoc run failed: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+
+    # Dataset mode (original code path)
     
     # 1. Load Model
     try:

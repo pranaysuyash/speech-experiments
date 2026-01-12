@@ -188,7 +188,13 @@ def evaluate_gate(gate_name: str, evidence: Any, use_case: Dict[str, Any]) -> Ga
 
 
 def get_best_evidence_grade(card: ModelCard, task: str) -> EvidenceGrade:
-    """Get best valid evidence grade for a task."""
+    """
+    Get best valid evidence grade for a task.
+    
+    IMPORTANT: Adhoc runs are EXCLUDED from decision evidence.
+    They produce artifacts for debugging/output but don't affect recommendations.
+    This is per the adhoc contract: grade=adhoc means "execution only, no evidence".
+    """
     ev_list = [e for e in card.evidence if e.task == task]
     if not ev_list:
         return None
@@ -197,12 +203,18 @@ def get_best_evidence_grade(card: ModelCard, task: str) -> EvidenceGrade:
     valid_ev = [e for e in ev_list if e.valid]
     if not valid_ev:
         return None
+    
+    # EXPLICITLY EXCLUDE ADHOC from decision evidence
+    # Adhoc runs are for execution output, not for model evaluation/ranking
+    non_adhoc_ev = [e for e in valid_ev if e.evidence_grade != EvidenceGrade.ADHOC]
+    if not non_adhoc_ev:
+        return None  # No non-adhoc evidence = no evidence for decisions
         
-    # Rank: Golden > Smoke > Adhoc
-    grades = [e.evidence_grade for e in valid_ev]
+    # Rank: Golden > Smoke (adhoc excluded above)
+    grades = [e.evidence_grade for e in non_adhoc_ev]
     if EvidenceGrade.GOLDEN_BATCH in grades: return EvidenceGrade.GOLDEN_BATCH
     if EvidenceGrade.SMOKE in grades: return EvidenceGrade.SMOKE
-    return EvidenceGrade.ADHOC
+    return None  # Should not reach here after filtering
 
 
 def evaluate_model_for_use_case(card: ModelCard, use_case: Dict[str, Any]) -> DecisionResult:

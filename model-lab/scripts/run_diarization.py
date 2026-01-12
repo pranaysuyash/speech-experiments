@@ -4,6 +4,7 @@ Run Diarization evaluation for a specific model and dataset.
 
 Usage:
     uv run scripts/run_diarization.py --model pyannote_diarization --dataset diar_smoke_v1
+    uv run scripts/run_diarization.py --model pyannote_diarization --audio file.wav  # Adhoc
 """
 
 import argparse
@@ -13,6 +14,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, Any, List
+from datetime import datetime
 
 import yaml
 import soundfile as sf
@@ -26,6 +28,11 @@ from harness.registry import ModelRegistry
 from harness.metrics_diarization import DiarizationMetrics
 from harness.taxonomy import TaskType, EvidenceGrade
 from harness.run_provenance import create_provenance, create_run_context, RUN_SCHEMA_VERSION
+from harness.adhoc_dataset import create_adhoc_dataset
+from harness.runner_schema import (
+    RunnerArtifact, RunContext, InputsSchema, QualityMetrics,
+    validate_artifact, compute_pcm_hash,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(name)s - %(levelname)s - %(message)s')
@@ -42,6 +49,117 @@ def load_dataset(dataset_id: str) -> Dict[str, Any]:
     
     with open(path) as f:
         return yaml.safe_load(f)
+
+
+def run_diarization_adhoc(model_id: str, audio_path: str, device: str = "cpu"):
+    """
+    Run diarization on a single audio file (adhoc mode).
+    
+    Produces artifact with grade=adhoc and structural metrics only.
+    No DER (requires reference RTTM).
+    """
+    audio_path = Path(audio_path).resolve()
+    logger.info(f"=== Diarization Adhoc: {model_id} on {audio_path.name} ===")
+    
+    # Create adhoc dataset metadata
+    adhoc = create_adhoc_dataset(audio_path, task="diarization")
+    logger.info(f"Dataset ID: {adhoc.dataset_id}")
+    
+    # Load model
+    config_path = Path(f"models/{model_id}/config.yaml")
+    if not config_path.exists():
+        raise ValueError(f"Config not found: {config_path}")
+    
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    
+    bundle = ModelRegistry.load_model(config['model_type'], config, device=device)
+    
+    if "diarization" not in bundle:
+        raise ValueError(f"Model {model_id} does not support 'diarization'")
+    
+    diarize_fn = bundle["diarization"]["diarize"]
+    logger.info(f"✓ Model loaded")
+    
+    # Load audio
+    audio, sr = sf.read(str(audio_path))
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    audio = audio.astype(np.float32)
+    
+    duration_s = len(audio) / sr
+    
+    # Run diarization
+    t0 = time.time()
+    output = diarize_fn(audio, sr=sr)
+    latency = time.time() - t0
+    
+    rtf = latency / duration_s if duration_s > 0 else 0
+    segments = output.get("segments", [])
+    
+    # Count speakers
+    speakers = set()
+    for seg in segments:
+        if isinstance(seg, dict) and "speaker" in seg:
+            speakers.add(seg["speaker"])
+    num_speakers = len(speakers)
+    
+    # Create schema-validated artifact
+    schema_run_context = RunContext(
+        task="diarization",
+        model_id=model_id,
+        grade="adhoc",
+        timestamp=datetime.now().isoformat(),
+        git_hash=None,
+        command=sys.argv,
+        device=device,
+    )
+    
+    schema_inputs = InputsSchema(
+        audio_path=str(audio_path),
+        audio_hash=compute_pcm_hash(audio),
+        dataset_id=adhoc.dataset_id,
+        audio_duration_s=duration_s,
+        sample_rate=sr,
+    )
+    
+    structural_metrics = {
+        'rtf': rtf,
+        'num_speakers_pred': num_speakers,
+        'segment_count': len(segments),
+        'latency_s': latency,
+        'duration_s': duration_s,
+    }
+    
+    schema_artifact = RunnerArtifact(
+        run_context=schema_run_context,
+        inputs=schema_inputs,
+        metrics_quality=QualityMetrics(),  # All None - no reference RTTM
+        metrics_structural=structural_metrics,
+        output={
+            'num_speakers': num_speakers,
+            'segments': segments[:30],  # Limit stored segments
+        },
+        provenance={'has_ground_truth': False, 'metrics_valid': True},
+        gates={'has_failure': False},
+    )
+    
+    # Validate before writing
+    validate_artifact(schema_artifact)
+    
+    # Save artifact
+    runs_dir = Path(f'runs/{model_id}/diarization')
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = int(time.time())
+    run_file = runs_dir / f'adhoc_{timestamp}.json'
+    
+    with open(run_file, 'w') as f:
+        json.dump(schema_artifact.to_dict(), f, indent=2, default=str)
+    
+    logger.info(f"✓ Adhoc run completed: {num_speakers} speakers detected")
+    print(f"ARTIFACT_PATH:{run_file}")
+    return schema_artifact.to_dict(), str(run_file)
 
 
 def save_run_artifact(model_id: str,
@@ -107,15 +225,32 @@ def save_run_artifact(model_id: str,
     logger.info(f"Saved run artifact: {outfile}")
 
 
-from datetime import datetime
-
 def main():
     parser = argparse.ArgumentParser(description="Run Diarization evaluation")
     parser.add_argument("--model", required=True, help="Model ID (e.g., pyannote_diarization)")
-    parser.add_argument("--dataset", required=True, help="Dataset ID (e.g., diar_smoke_v1)")
+    
+    # Mutually exclusive: --dataset or --audio
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--dataset", help="Dataset ID (e.g., diar_smoke_v1)")
+    input_group.add_argument("--audio", type=Path, help="Single audio file (adhoc mode)")
+    
     parser.add_argument("--device", default="cpu", help="Device (cpu, cuda, mps)")
     
     args = parser.parse_args()
+    
+    # Adhoc mode
+    if args.audio:
+        try:
+            result, artifact_path = run_diarization_adhoc(args.model, str(args.audio), args.device)
+            logger.info(f"🎉 Adhoc run completed! Artifact: {artifact_path}")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"Adhoc run failed: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+
+    # Dataset mode (original code path)
     
     # 1. Load Model
     try:
