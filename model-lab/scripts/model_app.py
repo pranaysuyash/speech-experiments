@@ -281,6 +281,63 @@ def cmd_recommend(args):
                 
                 return
             
+            # Alignment (Speaker Attribution)
+            if args.task == "alignment_from_asr":
+                print(f"  Step 1: Running Alignment Pipeline...")
+                align_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_alignment.py"),
+                          "--input", str(audio_path.resolve())]
+                if getattr(args, 'pre', None):
+                    align_cmd.extend(["--pre", args.pre])
+                
+                align_result = subprocess.run(align_cmd, capture_output=True, text=True)
+                
+                align_artifact_path = None
+                for line in (align_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        align_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if align_result.returncode == 0 and align_artifact_path:
+                    print(f"\n✅ Pipeline completed")
+                    print(f"📄 Alignment Artifact: {align_artifact_path}")
+                else:
+                    print(f"  ❌ Alignment failed")
+                    if align_result.stderr:
+                        print(f"     Error: {align_result.stderr[-500:]}")
+                    sys.exit(EXIT_ERROR)
+                
+                return
+            
+            # Speaker-Aware Summarization
+            if args.task == "summarize_by_speaker_from_asr":
+                print(f"  Step 1: Running Alignment Pipeline...")
+                # Note: run_summarize_by_speaker handles alignment dependency internally
+                # but we call it wrapper-style here for consistency
+                
+                sum_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_summarize_by_speaker.py"),
+                          "--input", str(audio_path.resolve())]
+                if getattr(args, 'pre', None):
+                    sum_cmd.extend(["--pre", args.pre])
+                
+                sum_result = subprocess.run(sum_cmd, capture_output=True, text=True)
+                
+                sum_artifact_path = None
+                for line in (sum_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        sum_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if sum_result.returncode == 0 and sum_artifact_path:
+                    print(f"\n✅ Pipeline completed")
+                    print(f"📄 Speaker Summary Artifact: {sum_artifact_path}")
+                else:
+                    print(f"  ❌ Summarization failed")
+                    if sum_result.stderr:
+                        print(f"     Error: {sum_result.stderr[-500:]}")
+                    sys.exit(EXIT_ERROR)
+                
+                return
+            
             # Standard single-runner tasks
             script_map = {
                 "asr": "scripts/run_asr.py",

@@ -181,7 +181,7 @@ def run_diarization_adhoc(model_id: str, input_path: str, device: str = "cpu", p
             metrics_structural=structural_metrics,
             output={
                 'num_speakers': num_speakers,
-                'segments': segments[:30],
+                'segments': segments,
             },
             provenance={
                 'has_ground_truth': False,
