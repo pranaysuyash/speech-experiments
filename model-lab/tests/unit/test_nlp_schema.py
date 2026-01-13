@@ -59,14 +59,15 @@ class TestNLPSchemaDataclasses:
         entity = Entity(
             text="Acme Corp",
             type="ORG",
-            start_char=10,
-            end_char=19,
+            count=3,
+            source_chunk_ids=[0, 1],
             confidence=0.85,
         )
         d = entity.to_dict()
         
         assert d['text'] == "Acme Corp"
         assert d['type'] == "ORG"
+        assert d['count'] == 3
         assert d['confidence'] == 0.85
 
 

@@ -105,23 +105,63 @@ class ActionItemsOutput:
             'source_word_count': self.source_word_count,
         }
 
+# Fixed entity type set
+ENTITY_TYPES = {'PERSON', 'ORG', 'LOC', 'DATE', 'TIME', 'MONEY', 'EMAIL', 'PHONE', 'URL', 'PRODUCT', 'OTHER'}
+
 
 @dataclass
 class Entity:
     """Named entity from transcript."""
-    text: str                          # Entity text
-    type: str                          # PERSON, ORG, DATE, etc.
-    start_char: Optional[int] = None   # Start position in transcript
-    end_char: Optional[int] = None     # End position
-    confidence: float = 0.0
+    text: str                          # Entity text (normalized)
+    type: str                          # Must be in ENTITY_TYPES
+    count: int = 1                     # Occurrences across transcript
+    source_chunk_ids: List[int] = field(default_factory=list)
+    confidence: float = 1.0            # 1.0 for regex, < 1 for LLM
     
     def to_dict(self) -> Dict[str, Any]:
         return {
             'text': self.text,
             'type': self.type,
-            'start_char': self.start_char,
-            'end_char': self.end_char,
+            'count': self.count,
+            'source_chunk_ids': self.source_chunk_ids,
             'confidence': round(self.confidence, 2),
+        }
+
+
+@dataclass
+class NEROutput:
+    """Constrained NER output with operability thresholds."""
+    entities: List[Entity]
+    total_entities: int
+    source_word_count: int
+    entity_type_counts: Dict[str, int] = field(default_factory=dict)
+    
+    # Operability thresholds
+    MAX_ENTITIES = 200
+    
+    def validate(self) -> List[str]:
+        """Validate operability thresholds."""
+        violations = []
+        
+        if len(self.entities) > self.MAX_ENTITIES:
+            violations.append(f"Too many entities: {len(self.entities)} > {self.MAX_ENTITIES}")
+        
+        for i, entity in enumerate(self.entities):
+            if entity.type not in ENTITY_TYPES:
+                violations.append(f"Entity {i}: invalid type '{entity.type}'")
+            if not entity.text or len(entity.text.strip()) < 1:
+                violations.append(f"Entity {i}: empty text")
+            if len(entity.text) > 200:
+                violations.append(f"Entity {i}: text too long ({len(entity.text)} chars)")
+        
+        return violations
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'entities': [e.to_dict() for e in self.entities],
+            'total_entities': self.total_entities,
+            'source_word_count': self.source_word_count,
+            'entity_type_counts': self.entity_type_counts,
         }
 
 
@@ -291,3 +331,23 @@ Transcript:
 
 JSON response:"""
 
+NER_PROMPT_TEMPLATE = """Extract named entities from the following transcript.
+Return ONLY valid JSON in this exact format:
+{
+  "entities": [
+    {"text": "Entity text", "type": "PERSON|ORG|LOC|PRODUCT"}
+  ]
+}
+
+Valid types: PERSON (people names), ORG (companies/organizations), LOC (locations), PRODUCT (products/services)
+
+Rules:
+- Only extract explicitly mentioned entities
+- Normalize names (e.g., "John" and "John Smith" referring to same person)
+- Maximum 50 entities per section
+- Skip common words, pronouns, generic terms
+
+Transcript:
+{transcript}
+
+JSON response:"""

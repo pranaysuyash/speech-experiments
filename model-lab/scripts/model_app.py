@@ -233,6 +233,54 @@ def cmd_recommend(args):
                 
                 return
             
+            # NER extraction
+            if args.task == "ner_from_asr":
+                print(f"  Step 1: Running ASR...")
+                asr_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_asr.py"),
+                          "--model", best, "--input", str(audio_path.resolve())]
+                if getattr(args, 'pre', None):
+                    asr_cmd.extend(["--pre", args.pre])
+                
+                asr_result = subprocess.run(asr_cmd, capture_output=True, text=True)
+                
+                asr_artifact_path = None
+                for line in (asr_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        asr_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if asr_result.returncode != 0 or not asr_artifact_path:
+                    print(f"  ❌ ASR failed")
+                    if asr_result.stderr:
+                        print(f"     Error: {asr_result.stderr[-200:]}")
+                    sys.exit(EXIT_ERROR)
+                
+                print(f"  ✅ ASR: {asr_artifact_path}")
+                
+                print(f"  Step 2: Extracting entities...")
+                ner_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_ner.py"),
+                          "--from-artifact", asr_artifact_path]
+                
+                ner_result = subprocess.run(ner_cmd, capture_output=True, text=True)
+                
+                ner_artifact_path = None
+                for line in (ner_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        ner_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if ner_result.returncode == 0:
+                    print(f"\n✅ Pipeline completed")
+                    print(f"📄 ASR Artifact: {asr_artifact_path}")
+                    if ner_artifact_path:
+                        print(f"📄 NER Artifact: {ner_artifact_path}")
+                else:
+                    print(f"  ⚠️ NER extraction failed")
+                    if ner_result.stderr:
+                        print(f"     Error: {ner_result.stderr[-200:]}")
+                
+                return
+            
             # Standard single-runner tasks
             script_map = {
                 "asr": "scripts/run_asr.py",
