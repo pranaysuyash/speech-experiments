@@ -1,0 +1,23 @@
+# Model Template Configuration
+# Copy to models/<your_model_id>/config.yaml
+
+model_type: template_model
+model_name: "org/model-name"
+version: "1.0.0"
+
+# Inference settings
+inference:
+  compute_type: float16
+  dtype: float16
+  max_tokens: 256
+  num_beams: 1
+
+# Hardware preferences
+hardware:
+  prefer_device: mps  # or cuda, cpu
+  fallback_device: cpu
+
+# For CLI-based models (optional)
+# whisper_cpp:
+#   bin_path: /path/to/whisper-cli
+#   model_path: /path/to/ggml-large-v3.bin

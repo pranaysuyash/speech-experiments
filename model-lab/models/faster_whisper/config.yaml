@@ -29,6 +29,12 @@ inference:
   best_of: 5            # Number of independent samples
   patience: 1.0         # Beam search patience
 
+# Declared capabilities
+declared_capabilities:
+  - task: "asr"
+    role: "primary"
+    notes: "Optimized Whisper implementation for faster inference with minimal accuracy loss."
+
 # Testing parameters
 testing:
   batch_size: 1         # Batch size for inference

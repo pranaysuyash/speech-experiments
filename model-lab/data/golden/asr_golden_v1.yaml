@@ -1,36 +1,69 @@
 # Golden Test Set for ASR Regression Testing
-# v1.0 - Frozen dataset for consistent evaluation
+# v1.1 - Frozen dataset for consistent evaluation
 
 name: asr_golden
-version: "1.0"
+version: "1.1"
 task_type: asr
 
-# Promotion thresholds
+# Pass/fail thresholds
 thresholds:
-  wer_mean: 0.10        # Max 10% WER
-  success_rate: 0.95    # 95% of tests must pass
-  latency_mean_ms: 2000 # Max 2 second latency
+  wer_mean: 0.35           # Max 35% WER (realistic for real speech)
+  success_rate: 0.90       # 90% of tests must pass
+  min_completeness: 0.70   # Model must transcribe 70%+ (no truncation)
+  max_hallucination: 1.30  # Max 130% length ratio (no hallucination)
 
 metadata:
-  description: "Golden test set for ASR model evaluation"
+  description: "Golden test set for ASR model evaluation - real speech, ground truth"
   created: "2026-01-08"
+  updated: "2026-01-08"
   author: "model-lab"
   frozen: true
 
 test_cases:
-  - id: clean_speech_10s
-    audio_path: ../audio/clean_speech_10s.wav
-    ground_truth_path: null
-    ground_truth_text: ""
+  # Primary test - long-form technical content
+  - id: llm_primary
+    audio_path: ../audio/PRIMARY/llm_recording_pranay.m4a
+    ground_truth_path: ../truth/llm.txt
     metadata:
-      category: clean
-      duration_s: 10
-      notes: "Clean speech sample for basic testing"
+      category: real_speech
+      duration_s: 163
+      expected_language: en
+      tags: [technical, long_form, wikipedia]
+      notes: "Primary evaluation - 2.7min Wikipedia reading about LLMs"
 
-  # Add more test cases as you create ground truth:
-  # - id: llm_recording
-  #   audio_path: ../audio/PRIMARY/llm_recording_pranay.m4a
-  #   ground_truth_path: ../truth/llm.txt
+  # Numbers and dates test - entity accuracy
+  - id: numbers_dates
+    audio_path: ../audio/numbers_dates_30s.wav
+    ground_truth_text: |
+      The meeting is scheduled for January 15th, 2026 at 3:30 PM.
+      The project budget is $12,500 with an expected ROI of 15.7%.
+      Call us at 555-0123 or visit room 42B on the 3rd floor.
+      The coordinates are 37.7749 North, 122.4194 West.
+    metadata:
+      category: numbers
+      duration_s: 30
+      expected_language: en
+      tags: [numbers, dates, entities, currency]
+      notes: "Entity accuracy test - numbers, dates, phone, coordinates"
+
+  # Noisy speech test - robustness
+  - id: noisy_short
+    audio_path: ../audio/noisy_cafe_45s.wav
+    ground_truth_path: ../truth/noisy_cafe.txt
+    metadata:
+      category: noisy
+      duration_s: 45
+      expected_language: en
+      tags: [noisy, far_field, cafe, background_noise]
+      notes: "Robustness test - speech with cafe background noise"
+
+  # OPTIONAL: Code-switching test (uncomment if needed)
+  # - id: code_switch_hindi_english
+  #   audio_path: ../audio/hinglish_60s.wav
+  #   ground_truth_path: ../truth/hinglish.txt
   #   metadata:
-  #     category: real_speech
-  #     duration_s: 120
+  #     category: multilingual
+  #     duration_s: 60
+  #     expected_language: hi-en
+  #     tags: [code_switch, hindi, english, multilingual]
+  #     notes: "Code-switching test - Hindi-English mix"

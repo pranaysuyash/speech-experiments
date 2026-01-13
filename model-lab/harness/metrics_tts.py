@@ -176,6 +176,101 @@ class VoiceQualityMetrics:
         }
 
 
+# =============================================================================
+# TTS Failure Detection - Production gates
+# =============================================================================
+
+def detect_audio_issues(audio: np.ndarray, sr: int) -> Dict[str, Any]:
+    """
+    Detect TTS failure modes for production gating.
+    
+    Detects:
+        - Clipping: audio exceeds safe amplitude
+        - Silence: too much of the audio is silent
+        - DC offset: broken pipeline producing offset audio
+    
+    Args:
+        audio: Audio waveform (numpy array)
+        sr: Sample rate
+    
+    Returns:
+        Dict with failure metrics and flags
+    """
+    # Ensure float32 and proper scaling
+    if audio.dtype == np.int16:
+        audio = audio.astype(np.float32) / 32768.0
+    elif audio.dtype == np.int32:
+        audio = audio.astype(np.float32) / 2147483648.0
+    
+    audio = np.asarray(audio, dtype=np.float32)
+    
+    # Basic amplitude metrics
+    peak_amplitude = float(np.abs(audio).max()) if len(audio) > 0 else 0.0
+    rms_loudness = float(np.sqrt(np.mean(audio**2))) if len(audio) > 0 else 0.0
+    dc_offset = float(np.mean(audio)) if len(audio) > 0 else 0.0
+    
+    # Clipping detection (vectorized)
+    clipping_ratio = float(np.mean(np.abs(audio) > 0.99)) if len(audio) > 0 else 0.0
+    
+    # Silence detection (vectorized with frame stride)
+    # Use 25ms frames with 10ms hop
+    frame_size = int(0.025 * sr)
+    hop_size = int(0.010 * sr)
+    
+    if len(audio) >= frame_size:
+        # Vectorized frame energy calculation using stride tricks
+        n_frames = (len(audio) - frame_size) // hop_size + 1
+        
+        # Compute frame energies efficiently
+        frame_energies = np.array([
+            np.sqrt(np.mean(audio[i * hop_size:i * hop_size + frame_size]**2))
+            for i in range(min(n_frames, 1000))  # Cap at 1000 frames for speed
+        ])
+        
+        silence_threshold = 0.01
+        silence_ratio = float(np.mean(frame_energies < silence_threshold))
+    else:
+        silence_ratio = 1.0 if rms_loudness < 0.01 else 0.0
+    
+    # Duration
+    duration_s = len(audio) / sr if sr > 0 else 0.0
+    
+    # Failure flags
+    is_mostly_silent = silence_ratio > 0.5
+    has_clipping = clipping_ratio > 0.01
+    has_dc_offset = abs(dc_offset) > 0.1
+    is_empty = len(audio) == 0 or duration_s < 0.1
+    
+    issues = {
+        'peak_amplitude': peak_amplitude,
+        'rms_loudness': rms_loudness,
+        'dc_offset': dc_offset,
+        'clipping_ratio': clipping_ratio,
+        'silence_ratio': silence_ratio,
+        'duration_s': duration_s,
+        'is_mostly_silent': is_mostly_silent,
+        'has_clipping': has_clipping,
+        'has_dc_offset': has_dc_offset,
+        'is_empty': is_empty,
+        'has_failure': is_mostly_silent or has_clipping or has_dc_offset or is_empty,
+    }
+    
+    # Log if failure detected
+    if issues['has_failure']:
+        failures = []
+        if is_empty:
+            failures.append("EMPTY")
+        if is_mostly_silent:
+            failures.append(f"SILENT ({silence_ratio:.1%})")
+        if has_clipping:
+            failures.append(f"CLIPPING ({clipping_ratio:.1%})")
+        if has_dc_offset:
+            failures.append(f"DC_OFFSET ({dc_offset:.3f})")
+        logger.warning(f"TTS audio issues: {', '.join(failures)}")
+    
+    return issues
+
+
 def format_tts_result(result: TTSResult) -> str:
     """Format TTS result for logging."""
     return (

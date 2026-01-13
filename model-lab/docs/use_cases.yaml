@@ -1,0 +1,157 @@
+# Arsenal Use Case Definitions
+# Version: 2.1 (Evidence Grade Requirements)
+# Purpose: Define requirements, gate severity, AND minimum evidence quality.
+
+use_cases:
+  # 1. Offline Transcription (Verbatim)
+  # Goal: Clean, accurate transcription of pre-recorded audio
+  - id: "offline_transcription"
+    name: "Offline Transcription"
+    description: "High-accuracy verbatim transcription of pre-recorded audio files (podcasts, lectures, interviews)."
+    evaluation_mode: "single_model"  # Single model must have ASR capability
+    
+    requirements:
+      primary:
+        - task: "asr"
+          min_grade: "golden_batch"  # SMOKE cannot yield RECOMMENDED
+          
+      secondary:
+        - task: "diarization"
+          min_grade: "smoke"
+        - task: "alignment"
+          min_grade: "smoke"
+        
+    constraints:
+      offline_capable: true
+      target_device: ["desktop", "server"]
+    
+    # Gate severity (Decision Semantics v2.0)
+    fatal_gates:
+      - "wer_valid"           # Lexical accuracy required
+      - "is_hallucinating"    # Never acceptable
+      - "is_truncated"        # Must be complete
+      - "coverage_low"        # Must cover full audio
+      
+    warning_gates:
+      - "latency_high"        # Offline, so latency is informational
+    
+    # Operability thresholds for smoke-grade evidence (empty for golden-only)
+    operability: {}
+    
+    # Minimum runs per task for RECOMMENDED status
+    # Insufficient evidence = ACCEPTABLE at best, never RECOMMENDED
+    min_runs:
+      required:
+        asr: 2  # Need 2+ golden runs for deployable recommendation
+    
+    # Minimum distinct datasets per task (prevents same-dataset gaming)
+    min_distinct_datasets:
+      required:
+        asr: 2  # Must have runs across 2+ different datasets
+
+  # 2. Real-Time Assistant
+  # Goal: Interactive voice with low latency
+  - id: "real_time_assistant"
+    name: "Real-Time Voice Assistant"
+    description: "Interactive voice agent for commands and conversation."
+    evaluation_mode: "pipeline"  # Best model per task, assembled as stack
+    
+    requirements:
+      primary:
+        - task: "vad"
+          min_grade: "smoke"  # Functional test sufficient
+        - task: "v2v"
+          min_grade: "smoke"
+      secondary:
+        - task: "asr"
+          min_grade: "smoke"
+        
+    constraints:
+      max_latency_ms: 1000
+      target_device: ["desktop", "edge"]
+    
+    # Gate severity
+    fatal_gates:
+      - "latency_high"        # Real-time requirement
+      - "is_hallucinating"    # Never acceptable
+      - "audio_empty"         # Must generate audio
+      
+    warning_gates:
+      - "wer_valid"           # Conversational, not verbatim
+      - "is_truncated"        # Short responses OK
+    
+    # Operability thresholds for smoke-grade evidence
+    operability:
+      vad:
+        speech_ratio_min: 0.05   # Catch "always silent" failures
+        speech_ratio_max: 0.95   # Catch "always speaking" failures  
+      v2v:
+        rtf_like_max: 1.2        # Must be faster than ~1.2x real-time
+    
+    # Minimum runs per task for RECOMMENDED status
+    min_runs:
+      required:
+        vad: 2
+        v2v: 2
+      secondary:
+        asr: 1
+    
+    # Minimum distinct datasets per task
+    min_distinct_datasets:
+      required:
+        vad: 2
+        v2v: 2
+
+  # 3. Meeting Intelligence
+  # Goal: Multi-speaker transcription and analysis
+  - id: "meeting_analysis"
+    name: "Meeting Intelligence"
+    description: "Transcription and analysis of multi-speaker meetings."
+    evaluation_mode: "pipeline"  # Best model per task, assembled as stack
+    
+    requirements:
+      primary:
+        - task: "asr"
+          min_grade: "smoke"  # Conversational tolerance
+        - task: "diarization"
+          min_grade: "smoke"
+      secondary:
+        - task: "vad"
+          min_grade: "smoke"
+        
+    constraints:
+      offline_capable: false
+      target_device: ["server"]
+    
+    # Gate severity
+    fatal_gates:
+      - "is_hallucinating"    # Never acceptable
+      - "coverage_low"        # Must capture full meeting
+      - "speaker_error_high"  # Diarization must work
+      
+    warning_gates:
+      - "wer_valid"           # Conversational tolerance
+      - "is_truncated"        # Some compression OK
+      - "latency_high"        # Batch processing OK
+    
+    # Operability thresholds for smoke-grade evidence
+    operability:
+      diarization:
+        speaker_count_error_max: 1  # At most 1 speaker off from expected
+      vad:
+        speech_ratio_min: 0.05
+        speech_ratio_max: 0.95
+    
+    # Minimum runs per task for RECOMMENDED status
+    min_runs:
+      required:
+        asr: 2
+        diarization: 2
+      secondary:
+        vad: 1
+    
+    # Minimum distinct datasets per task
+    min_distinct_datasets:
+      required:
+        asr: 2
+        diarization: 2

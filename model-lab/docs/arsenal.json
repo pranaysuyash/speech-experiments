@@ -1,0 +1,1127 @@
+{
+  "arsenal_schema_version": 1,
+  "generated_from_commit": "861fa73",
+  "generated_from_tree": "c965ec75304f",
+  "generator_version": "1.0",
+  "models_count": 9,
+  "models": [
+    {
+      "model_id": "distil_whisper",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "llm_primary",
+          "evidence_grade": "golden_batch",
+          "metrics": {
+            "wer": 0.8328173374613003,
+            "rtf": 0.019881024597640573,
+            "latency_ms": 3244.1594999982044
+          },
+          "valid": false,
+          "invalid_reasons": [
+            "output_quality_failure",
+            "wer_invalid"
+          ],
+          "device": "mps",
+          "run_date": null,
+          "verified_at": "2026-01-09",
+          "gates": {
+            "wer_valid": false,
+            "is_truncated": true
+          }
+        }
+      ],
+      "model_name": "distil-whisper/distil-large-v3",
+      "provider": "",
+      "version": "3.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "25de9289",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop",
+          "server"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "faster_whisper",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "llm_primary",
+          "evidence_grade": "golden_batch",
+          "metrics": {
+            "wer": 0.24148606811145512,
+            "rtf": 0.12134864706516542,
+            "latency_ms": 19801.51295799442
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "mps",
+          "run_date": null,
+          "verified_at": "2026-01-09",
+          "gates": {
+            "wer_valid": true,
+            "is_truncated": false
+          }
+        }
+      ],
+      "model_name": "base",
+      "provider": "guillaumekln",
+      "version": "1.0.0",
+      "license": "MIT",
+      "description": "Faster-Whisper is an optimized reimplementation of OpenAI Whisper.\nUses CTranslate2 for faster inference with lower memory usage.\nThis serves as a production-optimized baseline for ASR comparison.\n",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "unknown",
+          "notes": "Optimized Whisper implementation for faster inference with minimal accuracy loss.",
+          "source": "config"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "production",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch",
+        "streaming"
+      ],
+      "hash": "a70218fd",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": "https://github.com/guillaumekln/faster-whisper"
+      }
+    },
+    {
+      "model_id": "heuristic_diarization",
+      "evidence": [
+        {
+          "task": "diarization",
+          "dataset_id": "diar_smoke_v1",
+          "evidence_grade": "smoke",
+          "metrics": {
+            "num_speakers": 0.5,
+            "rtf": 0.008575427532196044
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "",
+          "gates": {
+            "has_failure": false,
+            "speaker_gate_passed": true,
+            "num_speakers_max": 1
+          }
+        }
+      ],
+      "model_name": "heuristic_diarization",
+      "provider": "Silero-Based (Local)",
+      "version": "1.0.0",
+      "license": "MIT",
+      "description": "Heuristic diarizer extending Silero VAD with single-speaker assumption.",
+      "official_sources": [
+        {
+          "kind": "repo",
+          "url": "https://github.com/snakers4/silero-vad",
+          "note": "Underlying VAD engine"
+        }
+      ],
+      "claims": {
+        "claimed_strengths": [
+          "fast",
+          "zero_dependency"
+        ],
+        "claimed_limitations": [],
+        "recommended_usage": [
+          "Smoke testing",
+          "Single speaker verification"
+        ]
+      },
+      "declared_capabilities": [
+        {
+          "task": "diarization",
+          "role": "primary",
+          "confidence": "unknown",
+          "notes": "Baseline for pipeline verification. Assumes 1 speaker max.",
+          "source": "config"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [
+          "diarization"
+        ],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {
+          "diarization": "diar_smoke_v1"
+        }
+      },
+      "status": "experimental",
+      "capabilities": [
+        "diarization"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "52767a49",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "server",
+          "edge"
+        ],
+        "notes": "No auth required"
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda",
+          "mps"
+        ],
+        "min_vram_gb": 0.1,
+        "ram_gb_recommended": 1,
+        "disk_gb_model": null,
+        "notes": [
+          "Lightweight baseline"
+        ]
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": "internal"
+      }
+    },
+    {
+      "model_id": "lfm2_5_audio",
+      "evidence": [
+        {
+          "task": "v2v",
+          "dataset_id": "v2v_smoke_v1",
+          "evidence_grade": "smoke",
+          "metrics": {
+            "latency_ms": 5286.984920501709,
+            "turn_latency_ms": null
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "",
+          "gates": {
+            "has_failure": false
+          }
+        },
+        {
+          "task": "asr",
+          "dataset_id": "unknown",
+          "evidence_grade": "adhoc",
+          "metrics": {
+            "wer": 1.3777089783281733,
+            "rtf": 0.17930816393172888,
+            "latency_ms": 29259.274584001105
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "mps",
+          "run_date": null,
+          "verified_at": "2026-01-09",
+          "gates": {
+            "wer_valid": true,
+            "is_truncated": false
+          }
+        },
+        {
+          "task": "tts",
+          "dataset_id": "tts_smoke_v1",
+          "evidence_grade": "smoke",
+          "metrics": {
+            "latency_ms": 7052.5662916673655,
+            "rtf": 2.132832547883276
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "mps",
+          "run_date": null,
+          "verified_at": "2026-01-09",
+          "gates": {}
+        }
+      ],
+      "model_name": "lfm2_5_audio",
+      "provider": "Liquid AI",
+      "version": "2.5.0",
+      "license": "Unknown",
+      "description": "LFM-2.5-Audio is a multi-modal model for audio understanding and generation.",
+      "official_sources": [
+        {
+          "kind": "hf",
+          "url": "https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B",
+          "note": "Primary model card"
+        },
+        {
+          "kind": "paper",
+          "url": "https://www.liquid.ai/",
+          "note": "Project page / docs"
+        }
+      ],
+      "claims": {
+        "claimed_strengths": [
+          "real_time_speech_to_speech",
+          "conversational_audio",
+          "interleaved_generation"
+        ],
+        "claimed_limitations": [],
+        "recommended_usage": [
+          "For V2V: use interleaved generation (real-time mode)",
+          "For ASR/TTS: use sequential generation"
+        ]
+      },
+      "declared_capabilities": [
+        {
+          "task": "v2v",
+          "role": "primary",
+          "confidence": "unknown",
+          "notes": "Hero use-case: real-time speech-to-speech interaction (Conversational).",
+          "source": "config"
+        },
+        {
+          "task": "asr",
+          "role": "secondary",
+          "confidence": "unknown",
+          "notes": "Designed for dialogue understanding, not verbatim transcription.",
+          "source": "config"
+        },
+        {
+          "task": "tts",
+          "role": "secondary",
+          "confidence": "unknown",
+          "notes": "Functional text-to-speech, but optimized for stability over expressivity.",
+          "source": "config"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [
+          "v2v"
+        ],
+        "secondary_tasks": [
+          "asr",
+          "tts"
+        ],
+        "skip_tasks": [],
+        "default_datasets": {
+          "asr": "llm_primary",
+          "tts": "tts_smoke_v1",
+          "v2v": "v2v_smoke_v1"
+        }
+      },
+      "status": "candidate",
+      "capabilities": [
+        "asr",
+        "tts",
+        "chat"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "8bfd1cd8",
+      "deployment": {
+        "runtimes": [
+          "local",
+          "api"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop",
+          "server"
+        ],
+        "notes": "Desktop/Server only. Mobile not supported natively at 1.5B params."
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps"
+        ],
+        "min_vram_gb": 4,
+        "ram_gb_recommended": 8,
+        "disk_gb_model": 2.5,
+        "notes": [
+          "MPS works well on Apple Silicon (via workaround)",
+          "CPU inference is possible but slow"
+        ]
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": [
+          "Requires patched harness for MPS support (detokenizer fix)"
+        ]
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [
+          "voice_assistant",
+          "interactive_kiosk"
+        ],
+        "poor_app_types": [
+          "verbatim_transcription",
+          "subtitle_generation"
+        ],
+        "interaction_style": "conversational"
+      },
+      "links": {
+        "paper_url": "https://www.liquid.ai/",
+        "repo_url": "https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B"
+      }
+    },
+    {
+      "model_id": "pyannote_diarization",
+      "evidence": [],
+      "model_name": "pyannote_diarization",
+      "provider": "Pyannote",
+      "version": "3.1.0",
+      "license": "MIT",
+      "description": "State-of-the-art speaker diarization pipeline.",
+      "official_sources": [
+        {
+          "kind": "hf",
+          "url": "https://huggingface.co/pyannote/speaker-diarization-3.1",
+          "note": "Official model card"
+        }
+      ],
+      "claims": {
+        "claimed_strengths": [
+          "accurate_clustering",
+          "overlap_detection"
+        ],
+        "claimed_limitations": [],
+        "recommended_usage": [
+          "Meeting transcription",
+          "Podcast indexing"
+        ]
+      },
+      "declared_capabilities": [
+        {
+          "task": "diarization",
+          "role": "primary",
+          "confidence": "unknown",
+          "notes": "Reference implementation for speaker diarization.",
+          "source": "config"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [
+          "diarization"
+        ],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {
+          "diarization": "diar_smoke_v1"
+        }
+      },
+      "status": "production",
+      "capabilities": [
+        "diarization"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "9bfdc3f2",
+      "deployment": {
+        "runtimes": [
+          "local",
+          "api"
+        ],
+        "offline_capable": false,
+        "targets": [
+          "server"
+        ],
+        "notes": "Requires HuggingFace authentication token"
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda"
+        ],
+        "min_vram_gb": 2,
+        "ram_gb_recommended": 4,
+        "disk_gb_model": null,
+        "notes": [
+          "MPS support experimental via PyTorch"
+        ]
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": [
+          "Requires pyannote.audio and HF_TOKEN"
+        ]
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": "https://huggingface.co/pyannote/speaker-diarization-3.1"
+      }
+    },
+    {
+      "model_id": "seamlessm4t",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "unknown",
+          "evidence_grade": "adhoc",
+          "metrics": {
+            "wer": 0.9628482972136223,
+            "rtf": 0.10763252732988927,
+            "latency_ms": 17563.33454199921
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "mps",
+          "run_date": null,
+          "verified_at": "2026-01-09",
+          "gates": {
+            "wer_valid": true,
+            "is_truncated": true
+          }
+        }
+      ],
+      "model_name": "facebook/seamless-m4t-v2-large",
+      "provider": "",
+      "version": "2.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr",
+        "mt"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "3b94efbb",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "silero_vad",
+      "evidence": [
+        {
+          "task": "vad",
+          "dataset_id": "vad_smoke_v1",
+          "evidence_grade": "adhoc",
+          "metrics": {
+            "speech_ratio": 0.4373,
+            "num_segments": 1.0,
+            "rtf": 0.008903694152832032
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "2026-01-09",
+          "gates": {
+            "has_failure": false,
+            "failed_cases": 0,
+            "total_cases": 2
+          }
+        }
+      ],
+      "model_name": "silero_vad",
+      "provider": "Silero",
+      "version": "4.0.0",
+      "license": "MIT",
+      "description": "Pre-trained enterprise-grade Voice Activity Detection (VAD) model.",
+      "official_sources": [
+        {
+          "kind": "repo",
+          "url": "https://github.com/snakers4/silero-vad",
+          "note": "Official repository"
+        }
+      ],
+      "claims": {
+        "claimed_strengths": [
+          "lightweight",
+          "robust",
+          "fast"
+        ],
+        "claimed_limitations": [],
+        "recommended_usage": [
+          "Preprocessing for ASR",
+          "Voice triggering"
+        ]
+      },
+      "declared_capabilities": [
+        {
+          "task": "vad",
+          "role": "primary",
+          "confidence": "unknown",
+          "notes": "Production standard for open-source VAD.",
+          "source": "config"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [
+          "vad"
+        ],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {
+          "vad": "vad_smoke_v1"
+        }
+      },
+      "status": "production",
+      "capabilities": [
+        "vad"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "01e83e7e",
+      "deployment": {
+        "runtimes": [
+          "local",
+          "mobile",
+          "browser"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "server",
+          "edge"
+        ],
+        "notes": "ONNX support available (not used here)"
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps",
+          "cuda"
+        ],
+        "min_vram_gb": 0.1,
+        "ram_gb_recommended": 1,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": "https://github.com/snakers4/silero-vad"
+      }
+    },
+    {
+      "model_id": "whisper",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "primary",
+          "evidence_grade": "golden_batch",
+          "metrics": {
+            "wer": 0.29102167182662536,
+            "rtf": 1.8894422604483583,
+            "latency_ms": 308316.70816699625
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "2026-01-09",
+          "gates": {
+            "wer_valid": true,
+            "is_truncated": false
+          }
+        },
+        {
+          "task": "alignment",
+          "dataset_id": "v2v_smoke_v1",
+          "evidence_grade": "smoke",
+          "metrics": {
+            "violations_mean": 0.0,
+            "coverage_mean": 1.0
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "",
+          "gates": {}
+        }
+      ],
+      "model_name": "large-v3",
+      "provider": "OpenAI",
+      "version": "3.0.0",
+      "license": "MIT",
+      "description": "Whisper is a general-purpose speech recognition model.\nTrained on 680,000 hours of multilingual data.\nProduction-grade baseline for ASR comparison.\n",
+      "official_sources": [
+        {
+          "kind": "repo",
+          "url": "https://github.com/openai/whisper",
+          "note": "Official repository"
+        },
+        {
+          "kind": "paper",
+          "url": "https://arxiv.org/abs/2212.04356",
+          "note": "Whisper paper"
+        }
+      ],
+      "claims": {
+        "claimed_strengths": [
+          "robustness",
+          "multilingual"
+        ],
+        "claimed_limitations": [],
+        "recommended_usage": [
+          "Transcription",
+          "Subtitle generation"
+        ]
+      },
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "unknown",
+          "notes": "Production-grade general purpose ASR.",
+          "source": "config"
+        },
+        {
+          "task": "alignment",
+          "role": "primary",
+          "confidence": "unknown",
+          "notes": "Implicit alignment via high-quality timestamp generation.",
+          "source": "config"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "production",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "cbb878e0",
+      "deployment": {
+        "runtimes": [
+          "local",
+          "api"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop",
+          "server"
+        ],
+        "notes": "Mobile only via server API; local mobile not feasible due to model size."
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps",
+          "cuda"
+        ],
+        "min_vram_gb": 4,
+        "ram_gb_recommended": 8,
+        "disk_gb_model": 2.5,
+        "notes": [
+          "MPS works well on Apple Silicon",
+          "CPU is slow but functional"
+        ]
+      },
+      "artifacts": [
+        {
+          "type": "pytorch",
+          "precision": [
+            "fp32",
+            "fp16"
+          ],
+          "notes": ""
+        },
+        {
+          "type": "gguf",
+          "precision": [
+            "q4",
+            "q5",
+            "q8",
+            "fp16"
+          ],
+          "notes": "via whisper.cpp"
+        }
+      ],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": [
+          "Requires ffmpeg for some audio formats"
+        ]
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [
+          "batch_transcription",
+          "desktop_productivity",
+          "call_analytics"
+        ],
+        "poor_app_types": [
+          "real_time_voice_assistant",
+          "mobile_voice_notes"
+        ],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": "https://arxiv.org/abs/2212.04356",
+        "repo_url": "https://github.com/openai/whisper"
+      }
+    },
+    {
+      "model_id": "whisper_cpp",
+      "evidence": [],
+      "model_name": "whisper.cpp",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "cli"
+      ],
+      "hash": "4380699b",
+      "deployment": {
+        "runtimes": [
+          "local",
+          "cli"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop",
+          "edge",
+          "mobile"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": [
+          "Uses AVX/NEON SIMD for fast CPU inference",
+          "No GPU required"
+        ]
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    }
+  ]
+}

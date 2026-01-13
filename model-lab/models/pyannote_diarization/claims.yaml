@@ -1,0 +1,21 @@
+# pyannote_diarization Claims Manifest
+
+claims:
+  - id: pyannote_diar_structural
+    task: diarization
+    type: structural
+    description: "Diarization runs and produces speaker segments"
+    enforcement: optional  # Blocked by HF_TOKEN requirement
+    test_ref: claims.diarization.smoke_structural_v1
+    thresholds:
+      has_speakers: true
+
+  - id: pyannote_env_requirement
+    task: diarization
+    type: constraint
+    description: "Requires HF_TOKEN environment variable"
+    enforcement: optional  # Env check - blocks onboarding, not CI tests
+    test_ref: claims.diarization.env_hf_token_v1
+    thresholds:
+      env_var: HF_TOKEN
+    source: "pyannote requires HuggingFace auth for model download"

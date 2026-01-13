@@ -1,0 +1,22 @@
+# distil_whisper Claims Manifest
+
+claims:
+  - id: distil_whisper_asr_structural
+    task: asr
+    type: structural
+    description: "ASR runs and produces valid artifact with provenance"
+    enforcement: required
+    test_ref: claims.asr.smoke_structural_v1
+    thresholds:
+      has_provenance: true
+      has_run_context: true
+
+  - id: distil_whisper_speed_claim
+    task: asr
+    type: performance
+    description: "6x faster than base Whisper (distillation claim)"
+    enforcement: optional
+    test_ref: claims.asr.speed_v1
+    thresholds:
+      rtf_max: 0.5
+    source: "Distil-Whisper paper - 6x speedup claim"

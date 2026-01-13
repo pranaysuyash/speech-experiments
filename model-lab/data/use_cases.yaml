@@ -1,0 +1,118 @@
+# Use Case Definitions for Model Arsenal
+# Each use case defines product constraints that models must satisfy
+
+- id: desktop_offline_asr
+  title: Desktop Offline Transcription
+  description: "Privacy-focused batch transcription on desktop with no network"
+  requires:
+    capability: asr
+    offline_capable: true
+    targets_any: ["desktop"]
+  prefers:
+    evidence_grade: ["golden_batch", "smoke"]
+    accelerator_any: ["mps", "cuda", "cpu"]
+    wer_max: 0.30
+  scoring:
+    wer_weight: 0.6
+    rtf_weight: 0.3
+    install_pain_weight: 0.1
+  reject_if:
+    evidence_invalid: true
+
+- id: server_batch_asr
+  title: Server-Side Batch Transcription
+  description: "High-volume transcription on server infrastructure"
+  requires:
+    capability: asr
+    targets_any: ["server", "desktop"]
+  prefers:
+    evidence_grade: ["golden_batch"]
+    accelerator_any: ["cuda", "cpu"]
+    wer_max: 0.25
+    rtf_max: 0.2
+  scoring:
+    wer_weight: 0.5
+    rtf_weight: 0.4
+    install_pain_weight: 0.1
+  reject_if:
+    evidence_invalid: true
+    wer_above: 0.50
+
+- id: realtime_voice_assistant
+  title: Real-Time Voice Assistant
+  description: "Low-latency ASR for conversational agents"
+  requires:
+    capability: asr
+    modes_any: ["streaming", "batch"]
+    targets_any: ["desktop", "server"]
+  prefers:
+    rtf_max: 0.3
+    latency_ms_max: 500
+    accelerator_any: ["mps", "cuda"]
+  scoring:
+    rtf_weight: 0.5
+    latency_weight: 0.3
+    wer_weight: 0.2
+  reject_if:
+    rtf_above: 0.5
+
+- id: mobile_voice_notes
+  title: Mobile Voice Notes
+  description: "On-device ASR for mobile apps with battery/size constraints"
+  requires:
+    capability: asr
+    targets_any: ["mobile", "edge"]
+    offline_capable: true
+  prefers:
+    model_size_max_mb: 200
+    accelerator_any: ["cpu"]
+  notes: "Requires small model size and CPU-only operation"
+
+- id: browser_demo
+  title: Browser-Only Demo
+  description: "WebGPU/WebAssembly models for browser without backend"
+  requires:
+    capability: asr
+    targets_any: ["browser"]
+  prefers:
+    model_size_max_mb: 100
+  notes: "Currently no browser-compatible ASR models registered"
+
+- id: speech_translation
+  title: Multi-Lingual Speech Translation
+  description: "Translate spoken audio across languages"
+  requires:
+    capability_any: ["mt", "asr"]
+  prefers:
+    multilingual: true
+    evidence_grade: ["golden_batch", "smoke"]
+
+- id: narration_tts
+  title: TTS for Narration
+  description: "High-quality TTS for audiobook/podcast narration"
+  requires:
+    capability: tts
+  prefers:
+    evidence_grade: ["golden_batch", "smoke"]
+    audio_quality_min: "good"
+  notes: "TTS quality currently assessed via health gates only (clipping, silence)"
+
+- id: conversational_tts
+  title: TTS for Conversational Agent
+  description: "Low-latency TTS for voice assistants"
+  requires:
+    capability: tts
+    targets_any: ["desktop", "server"]
+  prefers:
+    latency_ms_max: 500
+    rtf_max: 0.1
+
+- id: edge_deployment
+  title: Edge Device Deployment
+  description: "Raspberry Pi class edge devices"
+  requires:
+    offline_capable: true
+    targets_any: ["edge", "mobile"]
+  prefers:
+    accelerator_any: ["cpu"]
+    model_size_max_mb: 500

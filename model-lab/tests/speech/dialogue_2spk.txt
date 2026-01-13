@@ -1,0 +1,6 @@
+Speaker A: Hi, this is Speaker A. The date is 2026-01-09. We are testing diarization and turn-taking.
+Speaker B: This is Speaker B. Acronyms: GPT, RLHF, and ASR. Numbers: 16000 and 29.9.
+Speaker A: I will say a hyphenated phrase: self-supervised and few-shot learning.
+Speaker B: I will say a confusing pair: context and contact. Also acquire and require.
+Speaker A: We should have at least two speaker switches.
+Speaker B: End of dialogue test.

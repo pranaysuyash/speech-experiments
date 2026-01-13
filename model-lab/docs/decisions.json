@@ -1,0 +1,254 @@
+{
+  "generated_at": "2026-01-12T16:53:39.411751",
+  "schema_version": "1.0",
+  "use_cases": {
+    "Offline Transcription": {
+      "evaluation_mode": "single_model",
+      "recommended": [
+        "faster_whisper"
+      ],
+      "acceptable": [
+        "whisper"
+      ],
+      "rejected": [
+        "seamlessm4t",
+        "silero_vad",
+        "whisper_cpp",
+        "lfm2_5_audio",
+        "heuristic_diarization",
+        "pyannote_diarization",
+        "distil_whisper"
+      ],
+      "best_model": "faster_whisper",
+      "models": [
+        {
+          "model_id": "faster_whisper",
+          "outcome": "recommended",
+          "score": 1.5,
+          "fatal_reasons": []
+        },
+        {
+          "model_id": "whisper",
+          "outcome": "acceptable",
+          "score": 1.5,
+          "fatal_reasons": []
+        },
+        {
+          "model_id": "seamlessm4t",
+          "outcome": "rejected",
+          "score": 0.0,
+          "fatal_reasons": [
+            "asr: evidence grade smoke < required golden_batch"
+          ]
+        },
+        {
+          "model_id": "silero_vad",
+          "outcome": "rejected",
+          "score": 0.0,
+          "fatal_reasons": [
+            "Missing primary capability: asr"
+          ]
+        },
+        {
+          "model_id": "whisper_cpp",
+          "outcome": "rejected",
+          "score": 0.0,
+          "fatal_reasons": [
+            "No valid evidence for: asr"
+          ]
+        },
+        {
+          "model_id": "lfm2_5_audio",
+          "outcome": "rejected",
+          "score": 0.0,
+          "fatal_reasons": [
+            "asr: evidence grade smoke < required golden_batch"
+          ]
+        },
+        {
+          "model_id": "heuristic_diarization",
+          "outcome": "rejected",
+          "score": 0.0,
+          "fatal_reasons": [
+            "Missing primary capability: asr"
+          ]
+        },
+        {
+          "model_id": "pyannote_diarization",
+          "outcome": "rejected",
+          "score": 0.0,
+          "fatal_reasons": [
+            "Missing primary capability: asr",
+            "Requires offline capability"
+          ]
+        },
+        {
+          "model_id": "distil_whisper",
+          "outcome": "rejected",
+          "score": 0.0,
+          "fatal_reasons": [
+            "No valid evidence for: asr",
+            "WER outside acceptable bounds"
+          ]
+        }
+      ]
+    },
+    "Real-Time Voice Assistant": {
+      "evaluation_mode": "pipeline",
+      "outcome": "recommended",
+      "pipeline": {
+        "vad": "silero_vad",
+        "v2v": "lfm2_5_audio",
+        "asr": "faster_whisper"
+      },
+      "components": [
+        {
+          "task": "vad",
+          "model_id": "silero_vad",
+          "evidence_grade": "smoke",
+          "key_metric": 0.276525
+        },
+        {
+          "task": "v2v",
+          "model_id": "lfm2_5_audio",
+          "evidence_grade": "smoke",
+          "key_metric": 0.6425211130018205
+        },
+        {
+          "task": "asr",
+          "model_id": "faster_whisper",
+          "evidence_grade": "golden_batch",
+          "key_metric": 0.7585139318885449
+        }
+      ],
+      "fatal_reasons": [],
+      "warn_reasons": []
+    },
+    "Meeting Intelligence": {
+      "evaluation_mode": "pipeline",
+      "outcome": "recommended",
+      "pipeline": {
+        "asr": "faster_whisper",
+        "diarization": "heuristic_diarization",
+        "vad": "silero_vad"
+      },
+      "components": [
+        {
+          "task": "asr",
+          "model_id": "faster_whisper",
+          "evidence_grade": "golden_batch",
+          "key_metric": 0.7585139318885449
+        },
+        {
+          "task": "diarization",
+          "model_id": "heuristic_diarization",
+          "evidence_grade": "smoke",
+          "key_metric": 1.0
+        },
+        {
+          "task": "vad",
+          "model_id": "silero_vad",
+          "evidence_grade": "smoke",
+          "key_metric": 0.276525
+        }
+      ],
+      "fatal_reasons": [],
+      "warn_reasons": []
+    }
+  },
+  "tasks": {
+    "asr": {
+      "best_by_outcome": "faster_whisper",
+      "best_by_grade": "faster_whisper",
+      "models": [
+        {
+          "model_id": "faster_whisper",
+          "outcome": "recommended",
+          "evidence_grade": "golden_batch",
+          "key_metric": 1.3448275862068966,
+          "valid": true
+        },
+        {
+          "model_id": "whisper",
+          "outcome": "acceptable",
+          "evidence_grade": "golden_batch",
+          "key_metric": 1.3620689655172413,
+          "valid": true
+        },
+        {
+          "model_id": "seamlessm4t",
+          "outcome": "rejected",
+          "evidence_grade": "smoke",
+          "key_metric": null,
+          "valid": true
+        },
+        {
+          "model_id": "lfm2_5_audio",
+          "outcome": "rejected",
+          "evidence_grade": "smoke",
+          "key_metric": null,
+          "valid": true
+        },
+        {
+          "model_id": "distil_whisper",
+          "outcome": "rejected",
+          "evidence_grade": "smoke",
+          "key_metric": null,
+          "valid": false
+        }
+      ]
+    },
+    "vad": {
+      "best_by_outcome": "silero_vad",
+      "best_by_grade": "silero_vad",
+      "models": [
+        {
+          "model_id": "silero_vad",
+          "outcome": "rejected",
+          "evidence_grade": "smoke",
+          "key_metric": 0,
+          "valid": true
+        }
+      ]
+    },
+    "v2v": {
+      "best_by_outcome": "lfm2_5_audio",
+      "best_by_grade": "lfm2_5_audio",
+      "models": [
+        {
+          "model_id": "lfm2_5_audio",
+          "outcome": "rejected",
+          "evidence_grade": "smoke",
+          "key_metric": 0,
+          "valid": true
+        }
+      ]
+    },
+    "tts": {
+      "best_by_outcome": "lfm2_5_audio",
+      "best_by_grade": "lfm2_5_audio",
+      "models": [
+        {
+          "model_id": "lfm2_5_audio",
+          "outcome": "rejected",
+          "evidence_grade": "smoke",
+          "key_metric": 0,
+          "valid": true
+        }
+      ]
+    },
+    "diarization": {
+      "best_by_outcome": "heuristic_diarization",
+      "best_by_grade": "heuristic_diarization",
+      "models": [
+        {
+          "model_id": "heuristic_diarization",
+          "outcome": "rejected",
+          "evidence_grade": "smoke",
+          "key_metric": 0,
+          "valid": true
+        }
+      ]
+    }
+  }
+}

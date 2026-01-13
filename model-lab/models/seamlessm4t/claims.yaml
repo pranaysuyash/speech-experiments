@@ -1,0 +1,22 @@
+# seamlessm4t Claims Manifest
+
+claims:
+  - id: seamlessm4t_asr_structural
+    task: asr
+    type: structural
+    description: "ASR runs and produces valid artifact with provenance"
+    enforcement: required
+    test_ref: claims.asr.smoke_structural_v1
+    thresholds:
+      has_provenance: true
+      has_run_context: true
+
+  - id: seamlessm4t_multilingual
+    task: asr
+    type: feature
+    description: "Supports multilingual transcription"
+    enforcement: optional
+    test_ref: claims.asr.multilingual_v1
+    thresholds:
+      languages_supported: ["en", "hi", "es"]
+    source: "SeamlessM4T supports 100+ languages"

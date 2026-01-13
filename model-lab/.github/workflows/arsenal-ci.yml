@@ -1,0 +1,52 @@
+name: Arsenal CI
+
+on:
+  push:
+    branches: [main, gemini-*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        run: uv python install 3.12
+      
+      - name: Install dependencies
+        run: uv sync --dev
+      
+      - name: Run unit tests
+        run: uv run pytest tests/unit -v --tb=short
+      
+      - name: Regenerate Arsenal docs
+        run: uv run python scripts/generate_arsenal.py
+      
+      - name: Verify Arsenal docs are fresh
+        run: |
+          if ! git diff --exit-code docs/; then
+            echo "❌ Arsenal docs are stale! Run 'make arsenal' locally and commit."
+            git diff docs/
+            exit 1
+          fi
+          echo "✓ Arsenal docs are up-to-date"
+      
+      - name: Validate Arsenal schema
+        run: |
+          uv run python -c "
+          import json
+          with open('docs/arsenal.json') as f:
+              data = json.load(f)
+          assert 'models' in data, 'Missing models array'
+          assert 'arsenal_schema_version' in data, 'Missing schema version'
+          print(f'✓ Arsenal JSON valid: {len(data[\"models\"])} models')
+          "

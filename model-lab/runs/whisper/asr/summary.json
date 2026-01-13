@@ -1,0 +1,10 @@
+{
+  "model_id": "whisper",
+  "dataset": "ux_primary",
+  "last_run": "2026-01-12T15:30:09.982142",
+  "wer": 1.3620689655172413,
+  "cer": 0.8534883720930233,
+  "rtf": 0.4097506500002055,
+  "latency_ms": 12292.519500006165,
+  "has_output_quality_failure": true
+}

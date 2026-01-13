@@ -1,43 +1,100 @@
 # Whisper Model Configuration
 # OpenAI's Whisper model for ASR baseline comparison
 
-model_name: base
+model_name: large-v3
 model_type: whisper
-device: mps  # Use 'mps' for Apple Silicon, 'cuda' for NVIDIA GPUs, 'cpu' for CPU
-dtype: float16  # Data type: float16 or float32
-
-# Supported modes (Whisper is ASR-only)
-modes:
-  - asr  # Automatic Speech Recognition only
-
-# Model constraints
-constraints:
-  max_audio_length: 30  # Maximum audio length in seconds (Whisper constraint)
-  max_memory_mb: 2000   # Maximum memory usage in MB
-  target_latency: 500   # Target latency in milliseconds
 
 # Audio processing
 audio:
-  sample_rate: 16000    # Native sample rate (Whisper requirement)
-  channels: 1           # Mono audio
-  format: wav           # Preferred format
+  sample_rate: 16000
+  channels: 1
+  format: wav
 
-# Testing parameters
-testing:
-  batch_size: 1         # Batch size for inference
-  num_workers: 0        # Number of workers (0 for MPS/CPU)
-  precision: high       # Precision level
+# Inference settings
+inference:
+  dtype: float16
+  beam_size: 5
+  language: en
+
+
+official_sources:
+  - kind: "repo"
+    url: "https://github.com/openai/whisper"
+    note: "Official repository"
+  - kind: "paper"
+    url: "https://arxiv.org/abs/2212.04356"
+    note: "Whisper paper"
+
+declared_capabilities:
+  - task: "asr"
+    role: "primary"
+    notes: "Production-grade general purpose ASR."
+    
+  - task: "alignment"
+    role: "primary"
+    notes: "Implicit alignment via high-quality timestamp generation."
+
+claims:
+  claimed_strengths:
+    - "robustness"
+    - "multilingual"
+  recommended_usage:
+    - "Transcription"
+    - "Subtitle generation"
+
+# Constraints
+constraints:
+  max_audio_length: 30
+  max_memory_mb: 2000
+  target_latency: 500
 
 # Language settings
 language:
-  auto_detect: true     # Auto-detect language
-  fallback_language: en # Fallback if detection fails
+  auto_detect: true
+  fallback_language: en
+  supported: ["en", "es", "fr", "de", "it", "pt", "nl", "ja", "zh", "ko"]
 
-# Paths (relative to model directory)
-paths:
-  notebooks: ./notebooks
-  results: ../../runs/whisper
-  data: ../../data
+# =============================================================================
+# Extended ModelCard Fields (for Arsenal doc generation)
+# =============================================================================
+
+# Deployment scope
+deployment:
+  runtimes: ["local", "api"]  # where it can run
+  offline_capable: true
+  targets: ["desktop", "server"]  # where it realistically works
+  notes: "Mobile only via server API; local mobile not feasible due to model size."
+
+# Hardware requirements
+hardware:
+  accelerators_supported: ["cpu", "mps", "cuda"]
+  min_vram_gb: 4
+  ram_gb_recommended: 8
+  disk_gb_model: 2.5
+  notes:
+    - "MPS works well on Apple Silicon"
+    - "CPU is slow but functional"
+
+# Packaging artifacts
+artifacts:
+  - type: pytorch
+    precision: ["fp32", "fp16"]
+  - type: gguf
+    precision: ["q4", "q5", "q8", "fp16"]
+    notes: "via whisper.cpp"
+
+# Installation
+install:
+  method: pip
+  deps_pain: low
+  known_issues:
+    - "Requires ffmpeg for some audio formats"
+
+# Recommendation (decision guidance)
+recommendation:
+  best_app_types: ["batch_transcription", "desktop_productivity", "call_analytics"]
+  poor_app_types: ["real_time_voice_assistant", "mobile_voice_notes"]
+  interaction_style: batch
 
 # Metadata
 metadata:
@@ -46,8 +103,8 @@ metadata:
   released: 2023
   description: |
     Whisper is a general-purpose speech recognition model.
-    It is trained on 680,000 hours of multilingual data.
-    This is the baseline for ASR comparison.
+    Trained on 680,000 hours of multilingual data.
+    Production-grade baseline for ASR comparison.
   license: MIT
   paper_url: https://arxiv.org/abs/2212.04356
   repo_url: https://github.com/openai/whisper

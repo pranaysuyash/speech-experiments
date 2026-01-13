@@ -200,3 +200,137 @@ def format_asr_result(result: ASRResult) -> str:
         f"Latency: {result.latency_ms:.1f}ms, "
         f"RTF: {result.rtv:.3f}x"
     )
+
+
+# =============================================================================
+# Output Quality Diagnosis - Detect failure modes
+# =============================================================================
+
+import re
+from collections import Counter
+
+
+def _ngrams(tokens: List[str], n: int = 3) -> List[tuple]:
+    """Generate n-grams from token list."""
+    if len(tokens) < n:
+        return []
+    return list(zip(*[tokens[i:] for i in range(n)]))
+
+
+def repeat_3gram_rate(text: str) -> float:
+    """
+    Calculate repetition rate based on 3-gram frequency.
+    Higher values indicate more repetitive/stuck output.
+    """
+    tokens = re.findall(r"\w+", text.lower())
+    grams = _ngrams(tokens, 3)
+    if not grams:
+        return 0.0
+    
+    counts = Counter(grams)
+    repeats = sum(v - 1 for v in counts.values() if v > 1)
+    return repeats / max(len(grams), 1)
+
+
+def diagnose_output_quality(reference: str, hypothesis: str) -> Dict[str, Any]:
+    """
+    Diagnose ASR output quality to detect failure modes.
+    
+    Detects:
+        - Truncation: model dropped content (length_ratio < 0.7)
+        - Hallucination: model inserted content (length_ratio > 1.3)
+        - Repetition: model is stuck in loop (unique_ratio < 0.4 or repeat_3gram > 0.2)
+    
+    Args:
+        reference: Ground truth text
+        hypothesis: Model output text
+    
+    Returns:
+        Dict with diagnostic metrics and failure flags
+    """
+    ref_words = re.findall(r"\w+", reference)
+    hyp_words = re.findall(r"\w+", hypothesis)
+    
+    # Core ratios
+    length_ratio = len(hyp_words) / max(len(ref_words), 1)
+    char_ratio = len(hypothesis) / max(len(reference), 1)
+    
+    # Repetition detection
+    hyp_words_lower = [w.lower() for w in hyp_words]
+    unique_token_ratio = len(set(hyp_words_lower)) / max(len(hyp_words), 1)
+    rep3 = repeat_3gram_rate(hypothesis)
+    
+    # Failure flags with tightened thresholds
+    is_truncated = length_ratio < 0.7
+    is_hallucinating = length_ratio > 1.3
+    is_repetitive = (unique_token_ratio < 0.4) or (rep3 > 0.2)
+    
+    diagnosis = {
+        "ref_word_count": len(ref_words),
+        "hyp_word_count": len(hyp_words),
+        "length_ratio": float(length_ratio),
+        "char_ratio": float(char_ratio),
+        "unique_token_ratio": float(unique_token_ratio),
+        "repeat_3gram_rate": float(rep3),
+        "is_truncated": is_truncated,
+        "is_hallucinating": is_hallucinating,
+        "is_repetitive": is_repetitive,
+        "has_failure": is_truncated or is_hallucinating or is_repetitive,
+    }
+    
+    # Log if failure detected
+    if diagnosis["has_failure"]:
+        failures = []
+        if is_truncated:
+            failures.append(f"TRUNCATED (ratio={length_ratio:.2f})")
+        if is_hallucinating:
+            failures.append(f"HALLUCINATING (ratio={length_ratio:.2f})")
+        if is_repetitive:
+            failures.append(f"REPETITIVE (unique={unique_token_ratio:.2f}, 3gram={rep3:.2f})")
+        logger.warning(f"Output quality issues: {', '.join(failures)}")
+    
+    return diagnosis
+
+
+def diagnose_output_no_reference(hypothesis: str, expected_chars_per_sec: float = 15.0, 
+                                  audio_duration_s: float = 0.0) -> Dict[str, Any]:
+    """
+    Diagnose output quality when no ground truth is available.
+    Uses heuristics based on expected output density.
+    
+    Args:
+        hypothesis: Model output text
+        expected_chars_per_sec: Expected character rate (default ~15 for English speech)
+        audio_duration_s: Audio duration in seconds
+    
+    Returns:
+        Dict with diagnostic metrics
+    """
+    hyp_words = re.findall(r"\w+", hypothesis)
+    hyp_words_lower = [w.lower() for w in hyp_words]
+    
+    unique_token_ratio = len(set(hyp_words_lower)) / max(len(hyp_words), 1)
+    rep3 = repeat_3gram_rate(hypothesis)
+    
+    # Coverage proxy: chars per second of audio
+    if audio_duration_s > 0:
+        chars_per_sec = len(hypothesis) / audio_duration_s
+        coverage_ratio = chars_per_sec / expected_chars_per_sec
+    else:
+        chars_per_sec = 0.0
+        coverage_ratio = 0.0
+    
+    is_repetitive = (unique_token_ratio < 0.4) or (rep3 > 0.2)
+    is_sparse = coverage_ratio < 0.5 if audio_duration_s > 0 else False
+    
+    return {
+        "hyp_word_count": len(hyp_words),
+        "hyp_char_count": len(hypothesis),
+        "unique_token_ratio": float(unique_token_ratio),
+        "repeat_3gram_rate": float(rep3),
+        "chars_per_sec": float(chars_per_sec),
+        "coverage_ratio": float(coverage_ratio),
+        "is_repetitive": is_repetitive,
+        "is_sparse": is_sparse,
+        "has_failure": is_repetitive or is_sparse,
+    }

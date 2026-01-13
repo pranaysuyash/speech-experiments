@@ -1,0 +1,37 @@
+# Distil-Whisper Configuration
+# Model: distil-whisper/distil-large-v3 (HuggingFace)
+# 6x faster than Whisper with minimal accuracy loss
+
+model_type: distil_whisper
+model_name: distil-whisper/distil-large-v3
+version: "3.0.0"
+status: experimental
+
+# Provider info
+provider: OpenAI/HuggingFace
+license: MIT
+description: "Distil-Whisper: 6x faster Whisper with minimal accuracy loss"
+
+# Audio settings
+audio:
+  sample_rate: 16000
+
+# Inference settings
+inference:
+  dtype: float16
+  use_flash_attention_2: true
+
+# Deployment
+deployment:
+  runtimes:
+    - local
+  targets:
+    - desktop
+    - server
+
+# Hardware
+hardware:
+  accelerators_supported:
+    - cpu
+    - cuda
+    - mps

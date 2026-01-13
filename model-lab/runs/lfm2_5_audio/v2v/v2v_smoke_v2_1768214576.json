@@ -1,0 +1,65 @@
+{
+  "meta": {
+    "run_id": "v2v_smoke_v2_1768214576",
+    "timestamp": "2026-01-12T16:12:56.290025",
+    "model_id": "lfm2_5_audio",
+    "task": "v2v"
+  },
+  "capability": "v2v",
+  "input": {
+    "dataset_id": "v2v_smoke_v2",
+    "count": 1
+  },
+  "system": {
+    "device": "cpu"
+  },
+  "metrics": {
+    "latency_ms": 4446.698904037476,
+    "input_duration_s": 4.0,
+    "response_duration_s": 0.0,
+    "rtf_like": 1.111674726009369
+  },
+  "gates": {
+    "has_failure": false
+  },
+  "provenance": {
+    "schema_version": "1.0",
+    "created_at": "2026-01-12T16:12:56.290037",
+    "dataset_id": "v2v_smoke_v2",
+    "has_ground_truth": false,
+    "metrics_valid": true,
+    "dataset_hash": "24c6ac0aa6bb699e",
+    "audio_hash": null,
+    "ground_truth_hash": null
+  },
+  "run_context": {
+    "device": "cpu",
+    "audio_duration_s": 4.0,
+    "model_version": null,
+    "runner_git_hash": "861fa73"
+  },
+  "evidence": {
+    "grade": "smoke",
+    "dataset_id": "v2v_smoke_v2",
+    "sanity_gates": {}
+  },
+  "results": [
+    {
+      "id": "v2v_short_prompt",
+      "input_audio": "data/audio/speech_like_4s.wav",
+      "input_duration_s": 4.0,
+      "output": {
+        "text": "It looks like your message got cut off. Would you like me to continue the conversation or help with something else?",
+        "has_audio": false,
+        "duration_s": 0.0
+      },
+      "metrics": {
+        "latency_ms": 4446.698904037476,
+        "input_duration_s": 4.0,
+        "response_duration_s": 0.0,
+        "rtf_like": 1.111674726009369,
+        "rtf": 0
+      }
+    }
+  ]
+}

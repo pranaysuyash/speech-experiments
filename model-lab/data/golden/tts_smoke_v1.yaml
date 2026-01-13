@@ -1,0 +1,21 @@
+# TTS Smoke Test Dataset v1
+# Minimal coverage-oriented prompts for TTS health gates
+dataset_id: tts_smoke_v1
+version: "1.0"
+description: "3 prompts covering short, numbers, and punctuation for TTS validation"
+
+prompts:
+  - id: short
+    text: "Hello, this is a test."
+    language: en
+    expected_duration_range: [0.5, 3.0]
+    
+  - id: numbers
+    text: "The time is 7:45 PM and the code is 1042."
+    language: en
+    expected_duration_range: [1.5, 5.0]
+    
+  - id: punctuation
+    text: "Wait... what? Really!"
+    language: en
+    expected_duration_range: [0.5, 3.0]

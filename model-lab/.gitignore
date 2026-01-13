@@ -30,7 +30,7 @@ env/
 
 # UV Package Manager
 .uv-cache/
-uv.lock
+# NOTE: uv.lock is tracked (not ignored) for reproducibility
 
 # Jupyter Notebook
 .ipynb_checkpoints/
@@ -70,18 +70,22 @@ models/*/*.pth
 # But keep the data/audio directory structure
 !data/audio/.gitkeep
 !data/audio/**/.gitkeep
+!data/golden/**
 
 # Results and Outputs (keep structure but ignore large files)
 results/
 outputs/
 logs/
 *.log
-runs/**/*.json
 runs/**/*.png
 runs/**/*.jpg
-# But keep the runs directory structure
+runs/**/*.wav
+runs/**/*.mp3
+# But keep summary and model card files
 !runs/.gitkeep
 !runs/*/.gitkeep
+!runs/**/summary.json
+!runs/**/model_card.json
 
 # Environment files (keep structure but ignore sensitive data)
 env/

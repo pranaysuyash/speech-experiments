@@ -1,0 +1,46 @@
+# Silero VAD Configuration
+
+model_type: silero_vad
+
+metadata:
+  model_name: "snakers4/silero-vad"
+  provider: "Silero"
+  version: "4.0.0"
+  license: "MIT"
+  description: "Pre-trained enterprise-grade Voice Activity Detection (VAD) model."
+  repo_url: "https://github.com/snakers4/silero-vad"
+
+official_sources:
+  - kind: "repo"
+    url: "https://github.com/snakers4/silero-vad"
+    note: "Official repository"
+
+claims:
+  claimed_strengths:
+    - "lightweight"
+    - "robust"
+    - "fast"
+  recommended_usage:
+    - "Preprocessing for ASR"
+    - "Voice triggering"
+
+declared_capabilities:
+  - task: "vad"
+    role: "primary"
+    notes: "Production standard for open-source VAD."
+
+evaluation:
+  primary_tasks: ["vad"]
+  default_datasets:
+    vad: "vad_smoke_v1"
+
+deployment:
+  runtimes: ["local", "mobile", "browser"]
+  offline_capable: true
+  targets: ["server", "edge"]
+  notes: "ONNX support available (not used here)"
+
+hardware:
+  accelerators_supported: ["cpu", "mps", "cuda"]
+  min_vram_gb: 0.1
+  ram_gb_recommended: 1

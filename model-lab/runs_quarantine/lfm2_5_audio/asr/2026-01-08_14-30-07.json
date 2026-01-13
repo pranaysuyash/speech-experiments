@@ -1,0 +1,50 @@
+{
+  "provider_id": "lfm2_5_audio",
+  "capability": "asr",
+  "input": {
+    "audio_file": "UX_Psychology_From_Miller_s_Law_to_AI.wav",
+    "duration_s": 943.6125,
+    "sr": 24000
+  },
+  "output": {
+    "text": "So, you're seeing the science and the environmental impact floating in your life, and how important is it? Exactly! It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a search engine and becomes a system that just stores your data, like a living globe. It's about how the AI goes beyond just being a",
+    "text_length": 2389,
+    "normalized_text": null
+  },
+  "metrics": {
+    "latency_ms_p50": 92733.395375,
+    "rtf": 0.09827486958364794
+  },
+  "system": {
+    "device": "mps",
+    "model": "LiquidAI/LFM2.5-Audio-1.5B",
+    "inference_type": "local"
+  },
+  "protocol": {
+    "normalization_version": "1.0",
+    "entity_protocol_version": "1.0"
+  },
+  "manifest": {
+    "provider_id": "lfm2_5_audio",
+    "git_hash": "unknown",
+    "timestamp": "2026-01-08T14:28:34.539034",
+    "provider_versions": {
+      "openai-whisper": "20250625",
+      "faster-whisper": "1.2.1",
+      "liquid-audio": "1.1.0",
+      "torch": "2.9.1",
+      "torchaudio": "2.9.1",
+      "transformers": "4.57.3"
+    },
+    "config_hash": "900eda8c73765184",
+    "config_path": "models/lfm2_5_audio/config.yaml",
+    "dataset_hash": "86ad49a1622aad74",
+    "audio_file": "UX_Psychology_From_Miller_s_Law_to_AI.wav",
+    "text_file": null
+  },
+  "timestamps": {
+    "started_at": "2026-01-08T14:30:07.611699",
+    "finished_at": "2026-01-08T14:30:07.611753"
+  },
+  "errors": []
+}

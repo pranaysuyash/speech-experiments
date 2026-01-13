@@ -1,0 +1,49 @@
+# Claims manifest for LFM2.5-Audio
+# Version: 1.0
+# Source: https://github.com/LiquidAI-Audio/LFM-2.5
+
+# Each claim has:
+#   id: unique identifier for this claim
+#   task: which capability this claim relates to
+#   type: structural (from artifacts) | behavioral (needs probe) | quality (needs GT)
+#   description: what we're testing
+#   enforcement: required (CI must pass) | optional (informational)
+#   test_ref: stable identifier mapping to actual test function
+#   source: where this claim comes from (URL or doc name)
+
+claims:
+  # 1. V2V operability - REQUIRED/ENFORCED
+  - id: lfm2_v2v_realtime
+    task: v2v
+    type: structural
+    description: "V2V runs faster than real-time (rtf_like <= 1.2)"
+    enforcement: required
+    test_ref: claims.v2v.realtime_threshold_v1
+    source: "LFM2.5-Audio README - real-time inference claim"
+    thresholds:
+      rtf_like_max: 1.2
+      latency_finite: true
+
+  # 2. TTS produces audio - OPTIONAL
+  - id: lfm2_tts_audio_output
+    task: tts
+    type: structural
+    description: "TTS produces non-trivial audio output (duration >= 0.5s)"
+    enforcement: optional
+    test_ref: claims.tts.audio_output_v1
+    source: "LFM2.5-Audio README - TTS capability"
+    thresholds:
+      min_duration_s: 0.5
+      sample_rate_valid: true
+
+  # 3. Chat responds without error - OPTIONAL  
+  - id: lfm2_chat_responds
+    task: chat
+    type: structural
+    description: "Chat endpoint returns non-empty response within budget"
+    enforcement: optional
+    test_ref: claims.chat.responds_v1
+    source: "LFM2.5-Audio README - chat capability"
+    thresholds:
+      response_non_empty: true
+      max_latency_ms: 30000
