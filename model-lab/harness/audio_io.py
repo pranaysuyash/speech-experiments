@@ -3,6 +3,7 @@ Shared audio I/O module for all model testing.
 Ensures consistent audio loading, preprocessing, and format handling across models.
 """
 
+import hashlib
 import soundfile as sf
 import numpy as np
 import torch
@@ -13,6 +14,14 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def compute_input_hash(file_path: Path, length: int = 2 * 1024 * 1024) -> str:
+    """Compute hash of the first 2MB of a file (for identifying inputs)."""
+    sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        sha256.update(f.read(length))
+    return sha256.hexdigest()
 
 
 class AudioLoader:
