@@ -202,13 +202,17 @@ def collect_session_artifacts(input_path: Path) -> Dict[str, Path]:
                 
     return session_artifacts
 
-def create_bundle(input_path: Path, output_path: Path):
+def create_bundle(input_path: Path, output_path: Path, dry_run: bool = False):
     """Create zip bundle with manifest."""
     artifacts = collect_session_artifacts(input_path)
     
     if not artifacts:
-        logger.error("No artifacts found!")
-        sys.exit(1)
+        if dry_run:
+            print("No artifacts found.")
+        else:
+            logger.error("No artifacts found!")
+            sys.exit(1)
+        return
         
     manifest = {
         "export_date": datetime.now().isoformat(),
@@ -217,20 +221,31 @@ def create_bundle(input_path: Path, output_path: Path):
         "artifacts": {}
     }
     
+    # Pre-calculate manifest entries
+    for task, path in artifacts.items():
+        archive_name = f"artifacts/{task.replace('/', '_')}_{path.name}"
+        manifest["artifacts"][task] = {
+            "file": archive_name,
+            "original_path": str(path),
+            "hash": compute_file_hash(path)
+        }
+            
+    if dry_run:
+        print(f"Dry Run: Bundle Plan for {input_path.name}")
+        print(f"Input Hash: {manifest['input_hash']}")
+        print(f"Artifacts Found: {len(artifacts)}")
+        for task, meta in manifest["artifacts"].items():
+            print(f"  - {task}: {meta['original_path']}")
+        print(f"Will create: {output_path}")
+        return
+    
     logger.info(f"Creating bundle: {output_path}")
     
     with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         # Add Artifacts
         for task, path in artifacts.items():
-            archive_name = f"artifacts/{task.replace('/', '_')}_{path.name}"
+            archive_name = manifest["artifacts"][task]["file"]
             zf.write(path, archive_name)
-            
-            # Store metadata
-            manifest["artifacts"][task] = {
-                "file": archive_name,
-                "original_path": str(path),
-                "hash": compute_file_hash(path)
-            }
             logger.info(f"  + {task}: {path.name}")
             
         # Add Manifest
@@ -243,6 +258,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, required=True, help="Input media file")
     parser.add_argument("--output", type=Path, required=True, help="Output ZIP path")
+    parser.add_argument("--dry-run", action="store_true", help="Print bundle contents without creating")
     
     args = parser.parse_args()
     
@@ -251,7 +267,7 @@ def main():
         sys.exit(1)
         
     try:
-        create_bundle(args.input, args.output)
+        create_bundle(args.input, args.output, args.dry_run)
     except Exception as e:
         logger.error(f"Failed: {e}")
         import traceback
