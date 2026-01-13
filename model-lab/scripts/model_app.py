@@ -185,6 +185,54 @@ def cmd_recommend(args):
                 
                 return
             
+            # Action items extraction
+            if args.task == "action_items_from_asr":
+                print(f"  Step 1: Running ASR...")
+                asr_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_asr.py"),
+                          "--model", best, "--input", str(audio_path.resolve())]
+                if getattr(args, 'pre', None):
+                    asr_cmd.extend(["--pre", args.pre])
+                
+                asr_result = subprocess.run(asr_cmd, capture_output=True, text=True)
+                
+                asr_artifact_path = None
+                for line in (asr_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        asr_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if asr_result.returncode != 0 or not asr_artifact_path:
+                    print(f"  ❌ ASR failed")
+                    if asr_result.stderr:
+                        print(f"     Error: {asr_result.stderr[-200:]}")
+                    sys.exit(EXIT_ERROR)
+                
+                print(f"  ✅ ASR: {asr_artifact_path}")
+                
+                print(f"  Step 2: Extracting action items...")
+                ai_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_action_items.py"),
+                          "--from-artifact", asr_artifact_path]
+                
+                ai_result = subprocess.run(ai_cmd, capture_output=True, text=True)
+                
+                ai_artifact_path = None
+                for line in (ai_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        ai_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if ai_result.returncode == 0:
+                    print(f"\n✅ Pipeline completed")
+                    print(f"📄 ASR Artifact: {asr_artifact_path}")
+                    if ai_artifact_path:
+                        print(f"📄 Action Items Artifact: {ai_artifact_path}")
+                else:
+                    print(f"  ⚠️ Action items extraction failed")
+                    if ai_result.stderr:
+                        print(f"     Error: {ai_result.stderr[-200:]}")
+                
+                return
+            
             # Standard single-runner tasks
             script_map = {
                 "asr": "scripts/run_asr.py",

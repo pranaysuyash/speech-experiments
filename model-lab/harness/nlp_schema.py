@@ -39,21 +39,70 @@ class SummaryOutput:
 
 
 @dataclass
+class EvidenceSpan:
+    """Evidence span from transcript supporting an extraction."""
+    quote: str                         # Exact quote from transcript
+    start_word: Optional[int] = None   # Start word index
+    end_word: Optional[int] = None     # End word index
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'quote': self.quote,
+            'start_word': self.start_word,
+            'end_word': self.end_word,
+        }
+
+
+@dataclass
 class ActionItem:
     """Extracted action item from meeting."""
-    text: str                          # Action item text
+    text: str                          # Action item text (required, non-empty)
     assignee: Optional[str] = None     # Who should do it
-    deadline: Optional[str] = None     # When (ISO format or description)
-    confidence: float = 0.0            # Extraction confidence
-    source_span: Optional[str] = None  # Original text that triggered this
+    due: Optional[str] = None          # When (ISO format or description)
+    priority: Optional[str] = None     # high/medium/low
+    evidence: List[Dict] = field(default_factory=list)  # Source spans
     
     def to_dict(self) -> Dict[str, Any]:
         return {
             'text': self.text,
             'assignee': self.assignee,
-            'deadline': self.deadline,
-            'confidence': round(self.confidence, 2),
-            'source_span': self.source_span,
+            'due': self.due,
+            'priority': self.priority,
+            'evidence': self.evidence,
+        }
+
+
+@dataclass
+class ActionItemsOutput:
+    """Constrained action items output with operability thresholds."""
+    action_items: List[ActionItem]
+    total_items: int
+    source_word_count: int
+    
+    # Operability thresholds
+    MAX_ITEMS = 20
+    MIN_TEXT_LENGTH = 5
+    
+    def validate(self) -> List[str]:
+        """Validate operability thresholds. Returns list of violations."""
+        violations = []
+        
+        if len(self.action_items) > self.MAX_ITEMS:
+            violations.append(f"Too many items: {len(self.action_items)} > {self.MAX_ITEMS}")
+        
+        for i, item in enumerate(self.action_items):
+            if not item.text or len(item.text.strip()) < self.MIN_TEXT_LENGTH:
+                violations.append(f"Item {i}: text too short or empty")
+            if len(item.text) > 500:
+                violations.append(f"Item {i}: text too long ({len(item.text)} chars)")
+        
+        return violations
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'action_items': [item.to_dict() for item in self.action_items],
+            'total_items': self.total_items,
+            'source_word_count': self.source_word_count,
         }
 
 
@@ -219,14 +268,26 @@ Transcript:
 Summary (bullet points):"""
 
 ACTION_ITEMS_PROMPT_TEMPLATE = """Extract action items from the following meeting transcript.
-For each action item, identify:
-- The action to be taken
-- Who is responsible (if mentioned)
-- Any deadline (if mentioned)
+Return ONLY valid JSON in this exact format:
+{
+  "action_items": [
+    {
+      "text": "Brief description of what needs to be done",
+      "assignee": "Person name or null",
+      "due": "Date/deadline or null",
+      "priority": "high" | "medium" | "low" | null
+    }
+  ]
+}
 
-Only include explicit action items, not general discussion points.
+Rules:
+- Only include explicit action items, not general discussion
+- Maximum 20 items
+- Each item text must be 5-500 characters
+- If no action items found, return {"action_items": []}
 
 Transcript:
 {transcript}
 
-Action items:"""
+JSON response:"""
+

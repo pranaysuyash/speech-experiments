@@ -44,14 +44,15 @@ class TestNLPSchemaDataclasses:
         item = ActionItem(
             text="Review the PR",
             assignee="Alice",
-            deadline="2024-01-15",
-            confidence=0.9,
+            due="2024-01-15",
+            priority="high",
         )
         d = item.to_dict()
         
         assert d['text'] == "Review the PR"
         assert d['assignee'] == "Alice"
-        assert d['confidence'] == 0.9
+        assert d['due'] == "2024-01-15"
+        assert d['priority'] == "high"
     
     def test_entity_to_dict(self):
         """Entity serializes correctly."""
