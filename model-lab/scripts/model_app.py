@@ -55,13 +55,17 @@ def cmd_recommend(args):
     
     # Task-based recommendation (contract test path)
     if getattr(args, 'task', None):
-        task_data = tasks.get(args.task)
+        # NLP tasks derive from ASR
+        nlp_tasks = {'summarize_from_asr', 'action_items_from_asr', 'ner_from_asr'}
+        base_task = 'asr' if args.task in nlp_tasks else args.task
+        
+        task_data = tasks.get(base_task)
         if not task_data:
             if args.json:
-                print(json.dumps({"error": f"Unknown task: {args.task}", "available": list(tasks.keys())}))
+                print(json.dumps({"error": f"Unknown task: {args.task}", "available": list(tasks.keys()) + list(nlp_tasks)}))
             else:
                 print(f"❌ Unknown task: {args.task}")
-                print(f"Available tasks: {list(tasks.keys())}")
+                print(f"Available tasks: {list(tasks.keys()) + list(nlp_tasks)}")
             sys.exit(EXIT_ERROR)
         
         # Get best model for this task
@@ -128,6 +132,60 @@ def cmd_recommend(args):
                 sys.exit(EXIT_ERROR)
             
             print(f"\n🎵 Running {best} on {audio_path.name}...")
+            
+            # NLP tasks that chain on ASR (e.g., summarize_from_asr)
+            if args.task == "summarize_from_asr":
+                # Run ASR first, then summarize
+                print(f"  Step 1: Running ASR...")
+                asr_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_asr.py"),
+                          "--model", best, "--input", str(audio_path.resolve())]
+                if getattr(args, 'pre', None):
+                    asr_cmd.extend(["--pre", args.pre])
+                
+                asr_result = subprocess.run(asr_cmd, capture_output=True, text=True)
+                
+                # Parse ASR artifact path
+                asr_artifact_path = None
+                for line in (asr_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        asr_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if asr_result.returncode != 0 or not asr_artifact_path:
+                    print(f"  ❌ ASR failed")
+                    if asr_result.stderr:
+                        print(f"     Error: {asr_result.stderr[-200:]}")
+                    sys.exit(EXIT_ERROR)
+                
+                print(f"  ✅ ASR: {asr_artifact_path}")
+                
+                # Run summarize on ASR artifact
+                print(f"  Step 2: Running summarize...")
+                sum_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_summarize.py"),
+                          "--from-artifact", asr_artifact_path]
+                
+                sum_result = subprocess.run(sum_cmd, capture_output=True, text=True)
+                
+                # Parse summary artifact path
+                summary_artifact_path = None
+                for line in (sum_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        summary_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if sum_result.returncode == 0:
+                    print(f"\n✅ Pipeline completed")
+                    print(f"📄 ASR Artifact: {asr_artifact_path}")
+                    if summary_artifact_path:
+                        print(f"📄 Summary Artifact: {summary_artifact_path}")
+                else:
+                    print(f"  ⚠️ Summarize failed (artifact may still exist)")
+                    if sum_result.stderr:
+                        print(f"     Error: {sum_result.stderr[-200:]}")
+                
+                return
+            
+            # Standard single-runner tasks
             script_map = {
                 "asr": "scripts/run_asr.py",
                 "vad": "scripts/run_vad.py",

@@ -42,6 +42,7 @@ from harness.nlp_schema import (
     load_asr_artifact, validate_nlp_artifact,
     SUMMARY_PROMPT_TEMPLATE,
 )
+from harness.llm_provider import get_llm_completion, LLMResult, ErrorCode
 
 logging.basicConfig(level=logging.INFO, format='%(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("run_summarize")
@@ -50,41 +51,9 @@ logger = logging.getLogger("run_summarize")
 DEFAULT_NLP_MODEL = "gemini-2.0-flash"
 
 
-def get_gemini_summary(transcript: str, max_sentences: int = 5) -> Tuple[List[str], Dict[str, Any]]:
-    """
-    Generate summary using Gemini API.
-    
-    Returns:
-        (sentences, metrics) - List of summary sentences and API metrics
-    """
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        raise ImportError("google-generativeai not installed. Run: pip install google-generativeai")
-    
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY not set")
-    
-    genai.configure(api_key=api_key)
-    
-    # Build prompt
-    prompt = SUMMARY_PROMPT_TEMPLATE.format(
-        max_sentences=max_sentences,
-        transcript=transcript[:15000]  # Limit transcript length
-    )
-    
-    # Call API
-    t0 = time.time()
-    model = genai.GenerativeModel(DEFAULT_NLP_MODEL)
-    response = model.generate_content(prompt)
-    latency_ms = (time.time() - t0) * 1000
-    
-    # Parse response into sentences
-    raw_text = response.text.strip()
-    
-    # Extract bullet points or sentences
-    lines = raw_text.split('\n')
+def parse_summary_response(text: str, max_sentences: int) -> List[str]:
+    """Parse LLM response into list of sentences."""
+    lines = text.split('\n')
     sentences = []
     for line in lines:
         line = line.strip()
@@ -94,16 +63,45 @@ def get_gemini_summary(transcript: str, max_sentences: int = 5) -> Tuple[List[st
         if line and len(line) > 10:  # Skip very short lines
             sentences.append(line)
     
-    # Limit to max_sentences
-    sentences = sentences[:max_sentences]
+    return sentences[:max_sentences]
+
+
+def get_summary(
+    transcript: str, 
+    transcript_hash: str,
+    max_sentences: int = 5, 
+    model: str = DEFAULT_NLP_MODEL,
+    max_attempts: int = 3,
+) -> Tuple[LLMResult, List[str]]:
+    """
+    Generate summary using LLM provider with retry and caching.
     
-    metrics = {
-        'latency_ms': round(latency_ms, 1),
-        'prompt_tokens': len(prompt.split()),  # Approximate
-        'model': DEFAULT_NLP_MODEL,
-    }
+    Returns:
+        (LLMResult, sentences) - Result includes success/failure status
+    """
+    # Build prompt
+    prompt = SUMMARY_PROMPT_TEMPLATE.format(
+        max_sentences=max_sentences,
+        transcript=transcript[:15000]  # Limit transcript length
+    )
     
-    return sentences, metrics
+    prompt_hash = compute_text_hash(SUMMARY_PROMPT_TEMPLATE)
+    
+    # Call LLM with retry and caching
+    result = get_llm_completion(
+        prompt=prompt,
+        model=model,
+        text_hash=transcript_hash,
+        prompt_hash=prompt_hash,
+        max_attempts=max_attempts,
+        use_cache=True,
+    )
+    
+    if result.success:
+        sentences = parse_summary_response(result.text, max_sentences)
+        return result, sentences
+    else:
+        return result, []
 
 
 def run_asr_first(input_path: Path, asr_model: str = None, pre: str = None) -> Path:
@@ -186,7 +184,7 @@ def run_summarize(
     transcript_hash = compute_text_hash(transcript)
     word_count = len(transcript.split())
     
-    logger.info(f"Transcript: {word_count} words, hash={transcript_hash[:12]}")
+    logger.info(f\"Transcript: {word_count} words, hash={transcript_hash[:12]}\")
     
     # Get ASR metadata
     asr_model_id = asr_artifact['run_context']['model_id']
@@ -195,17 +193,27 @@ def run_summarize(
     # Compute prompt hash for reproducibility
     prompt_hash = compute_text_hash(SUMMARY_PROMPT_TEMPLATE)
     
-    # Generate summary
-    logger.info(f"Generating summary (max {max_sentences} sentences)...")
-    try:
-        sentences, api_metrics = get_gemini_summary(transcript, max_sentences)
-    except Exception as e:
-        logger.error(f"Summary generation failed: {e}")
-        raise
+    # Generate summary using LLM provider (with retry and caching)
+    logger.info(f\"Generating summary (max {max_sentences} sentences)...\")
+    llm_result, sentences = get_summary(
+        transcript, 
+        transcript_hash, 
+        max_sentences=max_sentences, 
+        model=nlp_model,
+        max_attempts=3,
+    )
     
-    # Build output
+    # Build output (even for failures)
+    is_failure = not llm_result.success
     summary_word_count = sum(len(s.split()) for s in sentences)
     compression_ratio = word_count / summary_word_count if summary_word_count > 0 else 0
+    
+    if llm_result.success:
+        logger.info(f\"Summary: {len(sentences)} sentences, compression={compression_ratio:.1f}x\")
+        if llm_result.cached:
+            logger.info(\"(from cache)\")
+    else:
+        logger.warning(f\"LLM failed: {llm_result.error_code} - {llm_result.error_message}\")
     
     summary_output = SummaryOutput(
         sentences=sentences,
@@ -213,8 +221,6 @@ def run_summarize(
         source_word_count=word_count,
         compression_ratio=compression_ratio,
     )
-    
-    logger.info(f"Summary: {len(sentences)} sentences, compression={compression_ratio:.1f}x")
     
     # Build artifact
     run_context = NLPRunContext(
@@ -242,12 +248,19 @@ def run_summarize(
     )
     
     structural_metrics = {
-        'latency_ms': api_metrics.get('latency_ms'),
+        'latency_ms': llm_result.latency_ms,
         'summary_sentences': len(sentences),
         'summary_word_count': summary_word_count,
         'compression_ratio': round(compression_ratio, 2),
         'max_sentences_requested': max_sentences,
+        'cached': llm_result.cached,
+        'attempts': llm_result.attempts,
     }
+    
+    # Track errors for failure artifacts
+    errors = []
+    if is_failure:
+        errors.append(f"{llm_result.error_code}: {llm_result.error_message}")
     
     artifact = NLPArtifact(
         run_context=run_context,
@@ -255,8 +268,11 @@ def run_summarize(
         provenance=provenance,
         output=summary_output.to_dict(),
         metrics_structural=structural_metrics,
-        gates={'has_failure': len(sentences) == 0},
-        errors=[],
+        gates={
+            'has_failure': is_failure,
+            'error_code': llm_result.error_code if is_failure else None,
+        },
+        errors=errors,
     )
     
     # Validate
