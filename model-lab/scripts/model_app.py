@@ -338,6 +338,34 @@ def cmd_recommend(args):
                 
                 return
             
+            # Action Items With Assignee
+            if args.task == "action_items_with_assignee_from_asr":
+                print(f"  Step 1: Running Alignment Pipeline...")
+                
+                ai_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_action_items_with_assignee.py"),
+                          "--input", str(audio_path.resolve())]
+                if getattr(args, 'pre', None):
+                    ai_cmd.extend(["--pre", args.pre])
+                
+                ai_result = subprocess.run(ai_cmd, capture_output=True, text=True)
+                
+                ai_artifact_path = None
+                for line in (ai_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        ai_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if ai_result.returncode == 0 and ai_artifact_path:
+                    print(f"\n✅ Pipeline completed")
+                    print(f"📄 Action Items (Assignee) Artifact: {ai_artifact_path}")
+                else:
+                    print(f"  ❌ Action Extraction failed")
+                    if ai_result.stderr:
+                        print(f"     Error: {ai_result.stderr[-500:]}")
+                    sys.exit(EXIT_ERROR)
+                
+                return
+            
             # Standard single-runner tasks
             script_map = {
                 "asr": "scripts/run_asr.py",
