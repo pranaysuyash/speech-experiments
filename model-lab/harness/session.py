@@ -213,7 +213,24 @@ class SessionRunner:
         """
         import os
         eval_mode = os.environ.get("MODEL_LAB_EVAL_MODE", "enriched")
+        if eval_mode == "enriched_v0": # Force new mode if strictly needed, but let's stick to "enriched" or just update default.
+            # We want to be backward compatible in "enriched" mode?
+            # User request implies extending default behavior.
+            pass
+
         eval_path = self.session_dir / "eval.json"
+        
+        # Extended V1: Load run_request.json to get context (use_case_id)
+        use_case_id = None
+        model_id = None
+        run_request_path = self.session_dir / "run_request.json"
+        if run_request_path.exists():
+            try:
+                rr = json.loads(run_request_path.read_text(encoding="utf-8"))
+                use_case_id = rr.get("use_case_id")
+                model_id = rr.get("model_id")
+            except Exception:
+                pass
         
         from datetime import datetime
         
@@ -223,8 +240,11 @@ class SessionRunner:
             eval_data = {
                 "schema_version": "1",
                 "run_id": run_id,
-                "use_case_id": None,
-                "model_id": None,
+                "schema_version": "1",
+                "run_id": run_id,
+                "use_case_id": use_case_id, # Updated from None
+                "model_id": model_id, # Updated from None
+                "params": manifest.get("config", {}),
                 "params": manifest.get("config", {}),
                 "metrics": {},
                 "checks": [],
@@ -253,7 +273,6 @@ class SessionRunner:
         manifest_parseable = False
         if manifest_exists:
             try:
-                import json
                 json.loads(bundle_manifest_path.read_text())
                 manifest_parseable = True
             except Exception:
@@ -341,20 +360,105 @@ class SessionRunner:
                 "evidence_paths": ["manifest.json"]
             })
         
+        score_cards = []
+        if use_case_id == "meeting_smoke":
+             score_cards = self._compute_proxy_scores()
+
         run_id = manifest.get("run_id") or self.run_id
         eval_data = {
             "schema_version": "1",
             "run_id": run_id,
-            "use_case_id": None,
-            "model_id": None,
+            "use_case_id": use_case_id,
+            "model_id": model_id,
             "params": manifest.get("config", {}),
             "metrics": {},  # V1: no computed metrics
+            "score_cards": score_cards,
             "checks": checks,
             "findings": findings,
             "generated_at": datetime.now().isoformat()
         }
         
         atomic_write_json(eval_path, eval_data)
+
+    def _compute_proxy_scores(self) -> List[Dict[str, Any]]:
+        """Compute deterministic proxy scores for meeting_smoke."""
+        scores = []
+        
+        # 1. Artifact Completeness
+        # We check bundle/transcript.txt, bundle/summary.md, bundle/action_items.csv
+        required = ["bundle/transcript.txt", "bundle/summary.md", "bundle/action_items.csv"]
+        found = [p for p in required if (self.session_dir / p).exists()]
+        score_completeness = int((len(found) / len(required)) * 100)
+        scores.append({
+            "name": "artifact_completeness",
+            "label": "Artifact Completeness",
+            "type": "proxy",
+            "score": score_completeness,
+            "evidence_paths": found,
+            "notes": f"Found {len(found)}/{len(required)} artifacts"
+        })
+
+        # 2. Transcript Length OK
+        # > 100 chars?
+        t_path = self.session_dir / "bundle" / "transcript.txt"
+        t_ok = False
+        t_len = 0
+        if t_path.exists():
+            try:
+                text = t_path.read_text(encoding="utf-8")
+                t_len = len(text)
+                if t_len > 100:
+                    t_ok = True
+            except:
+                pass
+        scores.append({
+            "name": "transcript_length_ok",
+            "label": "Transcript Viability",
+            "type": "proxy",
+            "score": 100 if t_ok else 0,
+            "evidence_paths": ["bundle/transcript.txt"] if t_path.exists() else [],
+            "notes": f"Length: {t_len} chars"
+        })
+
+        # 3. Action Items Parseable
+        # Valid CSV header?
+        ai_path = self.session_dir / "bundle" / "action_items.csv"
+        ai_ok = False
+        if ai_path.exists():
+             try:
+                 import csv
+                 with ai_path.open("r", encoding="utf-8") as f:
+                     reader = csv.reader(f)
+                     rows = list(reader)
+                     if len(rows) > 0: # Has header at least
+                          ai_ok = True
+             except:
+                 pass
+        scores.append({
+            "name": "action_items_parseable",
+            "label": "Action Items Format",
+            "type": "proxy",
+            "score": 100 if ai_ok else 0,
+            "evidence_paths": ["bundle/action_items.csv"] if ai_path.exists() else [],
+            "notes": "Valid CSV" if ai_ok else "Invalid/Missing"
+        })
+
+        # 4. Summary Non-Empty
+        s_path = self.session_dir / "bundle" / "summary.md"
+        s_ok = False
+        if s_path.exists():
+            if s_path.stat().st_size > 50:
+                 s_ok = True
+        scores.append({
+             "name": "summary_nonempty",
+             "label": "Summary Content",
+             "type": "proxy",
+             "score": 100 if s_ok else 0,
+             "evidence_paths": ["bundle/summary.md"] if s_path.exists() else [],
+             "notes": "Content > 50 bytes" if s_ok else "Empty/Missing"
+        })
+
+        return scores
 
     def _save_manifest(self, m: Dict[str, Any]) -> None:
         atomic_write_json(self.manifest_path, m)

@@ -68,7 +68,19 @@ def _load_experiment(experiment_id: str) -> Optional[Dict[str, Any]]:
     try:
         request = json.loads(request_path.read_text(encoding="utf-8"))
         state = json.loads(state_path.read_text(encoding="utf-8"))
-        return {**request, "runs": state["runs"], "last_updated_at": state["last_updated_at"]}
+        
+        runs = state["runs"]
+        # Enrich runs with eval data if available
+        from server.api.eval_loader import load_eval
+        for run in runs:
+            rid = run.get("run_id")
+            if rid:
+                 run_path = _runs_root() / rid
+                 eval_data = load_eval(run_path)
+                 if eval_data:
+                     run["score_cards"] = eval_data.get("score_cards", [])
+        
+        return {**request, "runs": runs, "last_updated_at": state["last_updated_at"]}
     except Exception:
         return None
 

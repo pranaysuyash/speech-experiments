@@ -37,6 +37,20 @@ class Finding:
 
 
 @dataclass
+class ScoreCard:
+    """A scored metric with provenance."""
+    name: str  # e.g., "artifact_completeness"
+    label: str  # Human readable label
+    type: str  # "proxy" or "llm_judge"
+    score: int  # 0-100
+    evidence_paths: List[str] = field(default_factory=list)
+    notes: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class EvalResult:
     """Per-run evaluation results following the eval.json contract."""
     schema_version: str
@@ -48,6 +62,7 @@ class EvalResult:
     checks: List[Check]
     findings: List[Finding]
     generated_at: str  # ISO8601
+    score_cards: List[ScoreCard] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -59,6 +74,7 @@ class EvalResult:
             "metrics": self.metrics,
             "checks": [c.to_dict() for c in self.checks],
             "findings": [f.to_dict() for f in self.findings],
+            "score_cards": [s.to_dict() for s in self.score_cards],
             "generated_at": self.generated_at
         }
     
@@ -74,6 +90,7 @@ class EvalResult:
             metrics=data.get("metrics", {}),
             checks=[Check(**c) for c in data.get("checks", [])],
             findings=[Finding(**f) for f in data.get("findings", [])],
+            score_cards=[ScoreCard(**s) for s in data.get("score_cards", [])],
             generated_at=data["generated_at"]
         )
 

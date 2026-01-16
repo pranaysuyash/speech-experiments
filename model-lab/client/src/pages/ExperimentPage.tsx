@@ -10,6 +10,7 @@ interface ExperimentRun {
     created_at: string;
     started_at: string | null;
     ended_at: string | null;
+    score_cards?: { name: string; label: string; score: number }[];
 }
 
 interface Experiment {
@@ -47,6 +48,9 @@ export default function ExperimentPage() {
     const [compareData, setCompareData] = useState<any>(null);
     const [compareLoading, setCompareLoading] = useState(false);
     const [compareError, setCompareError] = useState<string | null>(null);
+
+    // Sort state
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'candidate_id', direction: 'asc' });
 
     const didStartAll = useRef(false);
 
@@ -152,6 +156,43 @@ export default function ExperimentPage() {
         );
     }
 
+    // Compute unique score columns
+    const scoreColumns = Array.from(new Set(
+        experiment.runs.flatMap(r => r.score_cards?.map(s => s.name) || [])
+    )).sort();
+
+    // Map name to label (find first occurrence)
+    const scoreLabels: Record<string, string> = {};
+    experiment.runs.forEach(r => {
+        r.score_cards?.forEach(s => {
+            if (!scoreLabels[s.name]) scoreLabels[s.name] = s.label;
+        });
+    });
+
+    // Sorting logic
+    const sortedRuns = [...experiment.runs].sort((a, b) => {
+        let valA: any = a[sortConfig.key as keyof ExperimentRun];
+        let valB: any = b[sortConfig.key as keyof ExperimentRun];
+
+        // Handle score keys
+        if (sortConfig.key.startsWith('score:')) {
+            const scoreName = sortConfig.key.split(':')[1];
+            valA = a.score_cards?.find(s => s.name === scoreName)?.score ?? -1;
+            valB = b.score_cards?.find(s => s.name === scoreName)?.score ?? -1;
+        }
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const handleSort = (key: string) => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
     return (
         <div style={{ padding: '2rem' }}>
             {/* Header */}
@@ -174,15 +215,24 @@ export default function ExperimentPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                         <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <th style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600 }}>ID</th>
+                            <th onClick={() => handleSort('candidate_id')} style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600, cursor: 'pointer' }}>ID {sortConfig.key === 'candidate_id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                             <th style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600 }}>Label</th>
                             <th style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600 }}>Preset</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600 }}>Status</th>
+                            <th onClick={() => handleSort('status')} style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600, cursor: 'pointer' }}>Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                             <th style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600 }}>Run</th>
+                            {scoreColumns.map(name => (
+                                <th
+                                    key={name}
+                                    onClick={() => handleSort(`score:${name}`)}
+                                    style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem' }}
+                                >
+                                    {scoreLabels[name]} {sortConfig.key === `score:${name}` && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                </th>
+                            ))}
                         </tr>
                     </thead>
                     <tbody>
-                        {experiment.runs.map((run) => {
+                        {sortedRuns.map((run) => {
                             const candidate = experiment.candidates.find(c => c.candidate_id === run.candidate_id);
                             const colors = STATUS_COLORS[run.status] || { bg: '#f3f4f6', text: '#6b7280' };
 
@@ -214,6 +264,21 @@ export default function ExperimentPage() {
                                             <span style={{ color: '#9ca3af' }}>—</span>
                                         )}
                                     </td>
+                                    {scoreColumns.map(name => {
+                                        const score = run.score_cards?.find(s => s.name === name)?.score;
+                                        return (
+                                            <td key={name} style={{ padding: '0.5rem' }}>
+                                                {score !== undefined ? (
+                                                    <span style={{
+                                                        fontWeight: 600,
+                                                        color: score >= 80 ? '#059669' : score >= 50 ? '#d97706' : '#dc2626'
+                                                    }}>
+                                                        {score}
+                                                    </span>
+                                                ) : <span style={{ color: '#d1d5db' }}>-</span>}
+                                            </td>
+                                        );
+                                    })}
                                 </tr>
                             );
                         })}
@@ -326,3 +391,4 @@ export default function ExperimentPage() {
         </div>
     );
 }
+
