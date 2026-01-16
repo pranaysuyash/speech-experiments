@@ -1,0 +1,48 @@
+name: Model Lab CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: model-lab
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "model-lab/.python-version"
+
+      - name: Install Python deps
+        run: uv sync --all-extras --dev
+
+      - name: Python tests (fast lane)
+        run: uv run pytest -q -m "not real_e2e"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: model-lab/client/package-lock.json
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: model-lab/client
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: model-lab/client
+

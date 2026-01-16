@@ -1,0 +1,60 @@
+name: Model Lab E2E (Opt-in)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: model-lab
+    env:
+      RUN_REAL_E2E: "1"
+      MODEL_LAB_BASE_URL: "http://localhost:8000"
+      MODEL_LAB_RUNS_ROOT: "${{ github.workspace }}/model-lab/.ci-runs"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps (ffmpeg)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        working-directory: .
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "model-lab/.python-version"
+
+      - name: Install Python deps
+        run: uv sync --all-extras --dev
+
+      - name: Start backend
+        run: |
+          mkdir -p "${MODEL_LAB_RUNS_ROOT}"
+          uv run uvicorn server.main:app --host 127.0.0.1 --port 8000 &
+          echo $! > /tmp/model_lab_server.pid
+          # Wait for health
+          for i in $(seq 1 50); do
+            if curl -fsS "${MODEL_LAB_BASE_URL}/api/health" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 0.2
+          done
+          echo "Backend did not become healthy"
+          exit 1
+
+      - name: Run real E2E tests
+        run: uv run pytest -q -m "real_e2e"
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/model_lab_server.pid ]; then
+            kill "$(cat /tmp/model_lab_server.pid)" || true
+          fi
+        working-directory: .

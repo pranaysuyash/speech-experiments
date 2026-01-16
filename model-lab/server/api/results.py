@@ -24,19 +24,18 @@ def get_run_eval(run_id: str):
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     
-    # Look for eval.json in bundle/ or run root
     manifest_path = Path(run["manifest_path"])
     run_root = manifest_path.parent
-    
+
     eval_paths = [
         run_root / "bundle" / "eval.json",
-        run_root / "eval.json"
+        run_root / "eval.json",
     ]
-    
+
     for eval_path in eval_paths:
         if eval_path.exists():
             return json.loads(eval_path.read_text())
-    
+
     # 404 if not found - frontend must handle gracefully
     raise HTTPException(status_code=404, detail="Evaluation not available for this run")
 
@@ -79,26 +78,26 @@ def get_results(
         run_root = manifest_path.parent
         eval_paths = [
             run_root / "bundle" / "eval.json",
-            run_root / "eval.json"
+            run_root / "eval.json",
         ]
-        
+
         for eval_path in eval_paths:
-            if eval_path.exists():
-                try:
-                    eval_data = json.loads(eval_path.read_text())
-                    result["eval_available"] = True
-                    result["use_case_id"] = eval_data.get("use_case_id")
-                    result["model_id"] = eval_data.get("model_id")
-                    result["metrics"] = eval_data.get("metrics", {})
-                    
-                    # Checks summary
-                    checks = eval_data.get("checks", [])
-                    result["checks_total"] = len(checks)
-                    result["checks_passed"] = sum(1 for c in checks if c.get("passed"))
-                    
-                    break
-                except Exception:
-                    pass  # Ignore malformed eval files
+            if not eval_path.exists():
+                continue
+            try:
+                eval_data = json.loads(eval_path.read_text())
+                result["eval_available"] = True
+                result["use_case_id"] = eval_data.get("use_case_id")
+                result["model_id"] = eval_data.get("model_id")
+                result["metrics"] = eval_data.get("metrics", {})
+
+                checks = eval_data.get("checks", [])
+                result["checks_total"] = len(checks)
+                result["checks_passed"] = sum(1 for c in checks if c.get("passed"))
+                break
+            except Exception:
+                # Ignore malformed eval files
+                continue
         
         # Apply eval-based filters
         if use_case_id and result["use_case_id"] != use_case_id:
@@ -133,20 +132,17 @@ def get_findings(
     for run in runs:
         manifest_path = Path(run["manifest_path"])
         run_root = manifest_path.parent
-        eval_paths = [
-            run_root / "bundle" / "eval.json",
-            run_root / "eval.json"
-        ]
-        
-        eval_data = None
-        for eval_path in eval_paths:
-            if eval_path.exists():
-                try:
-                    eval_data = json.loads(eval_path.read_text())
-                    break
-                except Exception:
-                    continue
-        
+        eval_data: Optional[Dict[str, Any]] = None
+        for eval_path in [run_root / "bundle" / "eval.json", run_root / "eval.json"]:
+            if not eval_path.exists():
+                continue
+            try:
+                eval_data = json.loads(eval_path.read_text())
+                break
+            except Exception:
+                eval_data = None
+                continue
+
         if not eval_data:
             continue
         
