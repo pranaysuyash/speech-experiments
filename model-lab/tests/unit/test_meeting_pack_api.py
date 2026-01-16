@@ -1,6 +1,5 @@
 import importlib
 import json
-import os
 import zipfile
 from pathlib import Path
 
@@ -30,9 +29,9 @@ def test_bundle_endpoint_lists_and_downloads(tmp_path: Path, monkeypatch):
         "run_id": run_id,
         "generated_at": "2026-01-01T00:00:00Z",
         "artifacts": [
-            {"name": "summary.md", "path": "bundle/summary.md", "bytes": (bundle_dir / "summary.md").stat().st_size, "sha256": "x", "content_type": "text/markdown"},
-            {"name": "transcript.json", "path": "bundle/transcript.json", "bytes": (bundle_dir / "transcript.json").stat().st_size, "sha256": "x", "content_type": "application/json"},
-            {"name": "action_items.csv", "path": "bundle/action_items.csv", "bytes": (bundle_dir / "action_items.csv").stat().st_size, "sha256": "x", "content_type": "text/csv"},
+            {"name": "summary.md", "rel_path": "bundle/summary.md", "bytes": (bundle_dir / "summary.md").stat().st_size, "sha256": "x", "content_type": "text/markdown"},
+            {"name": "transcript.json", "rel_path": "bundle/transcript.json", "bytes": (bundle_dir / "transcript.json").stat().st_size, "sha256": "x", "content_type": "application/json"},
+            {"name": "action_items.csv", "rel_path": "bundle/action_items.csv", "bytes": (bundle_dir / "action_items.csv").stat().st_size, "sha256": "x", "content_type": "text/csv"},
         ],
         "absent": [{"name": "decisions.md", "reason": "missing"}],
     }
@@ -61,6 +60,16 @@ def test_bundle_endpoint_lists_and_downloads(tmp_path: Path, monkeypatch):
     assert "# Summary" in r.text
     assert r.headers["content-type"].startswith("text/markdown")
 
+    # Preview cap: refuse when too small
+    r = client.get(f"/api/runs/{run_id}/bundle/summary.md?max_bytes=1")
+    assert r.status_code == 413
+
+    # Path traversal attempts should not succeed
+    r = client.get(f"/api/runs/{run_id}/bundle/%2e%2e")
+    assert r.status_code in (400, 404)
+    r = client.get(f"/api/runs/{run_id}/bundle/%2e%2e%2fsummary.md")
+    assert r.status_code in (400, 404)
+
     r = client.get(f"/api/runs/{run_id}/bundle.zip")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("application/zip")
@@ -73,4 +82,12 @@ def test_bundle_endpoint_lists_and_downloads(tmp_path: Path, monkeypatch):
         assert "summary.md" in names
         assert "transcript.json" in names
         assert "action_items.csv" in names
+        for n in names:
+            assert not n.startswith("/")
+            assert ".." not in n
+            assert "/" not in n  # zip contains only flat, relative names
 
+    # Cached zip should be stable for the same manifest
+    r2 = client.get(f"/api/runs/{run_id}/bundle.zip")
+    assert r2.status_code == 200
+    assert r.content == r2.content

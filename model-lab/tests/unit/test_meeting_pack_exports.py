@@ -21,6 +21,8 @@ def test_bundle_manifest_schema(tmp_path: Path):
         {
             "run_id": run_id,
             "status": "COMPLETED",
+            "started_at": "2026-01-01T00:00:00",
+            "ended_at": "2026-01-01T00:00:10",
             "steps": {},
         },
     )
@@ -33,6 +35,7 @@ def test_bundle_manifest_schema(tmp_path: Path):
     assert m["schema_version"] == MEETING_PACK_SCHEMA_VERSION
     assert m["run_id"] == run_id
     assert isinstance(m["generated_at"], str)
+    assert m["generated_at"] == "2026-01-01T00:00:10Z"
     assert isinstance(m["artifacts"], list)
     assert isinstance(m["absent"], list)
 
@@ -96,6 +99,7 @@ def test_bundle_contains_expected_files_when_inputs_exist(tmp_path: Path):
         {
             "run_id": run_id,
             "status": "COMPLETED",
+            "ended_at": "2026-01-01T00:00:10",
             "steps": {
                 "alignment": {"status": "COMPLETED", "artifacts": [{"path": str(alignment_path)}]},
                 "summarize_by_speaker": {"status": "COMPLETED", "artifacts": [{"path": str(summary_path)}]},
@@ -122,4 +126,3 @@ def test_bundle_contains_expected_files_when_inputs_exist(tmp_path: Path):
     assert "summary.md" not in absent
     assert "action_items.csv" not in absent
     assert "decisions.md" not in absent
-

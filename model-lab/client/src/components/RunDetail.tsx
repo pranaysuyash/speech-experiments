@@ -207,7 +207,13 @@ export default function RunDetail({ onBack }: RunDetailProps) {
         try {
             const url = api.getMeetingPackArtifactPreviewUrl(runId, name, 200_000);
             const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!res.ok) {
+                if (res.status === 413) {
+                    setPreviewText('Preview too large; download instead.');
+                    return;
+                }
+                throw new Error(`HTTP ${res.status}`);
+            }
             const text = await res.text();
             if (name.endsWith('.csv')) {
                 const parsed = parseCsv(text);
@@ -486,7 +492,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                                                     <div key={a.name} className="flex items-center justify-between gap-2 text-xs">
                                                         <div className="min-w-0">
                                                             <div className="font-mono truncate">{a.name}</div>
-                                                            <div className="text-gray-500">{humanBytes(a.bytes)}{a.modified_at ? ` • ${a.modified_at}` : ''}</div>
+                                                            <div className="text-gray-500">{humanBytes(a.bytes)}</div>
                                                         </div>
                                                         <div className="flex gap-1">
                                                             {(a.name === 'summary.md' || a.name === 'decisions.md' || a.name === 'action_items.csv') && (

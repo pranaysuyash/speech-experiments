@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from typing import List, Dict, Any, Optional
+import hashlib
 import json
 import zipfile
 import os
 from pathlib import Path
+import re
 
 from server.services.runs_index import get_index
 from server.services.safe_files import safe_file_path
@@ -154,15 +156,75 @@ def get_bundle_manifest(run_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to read bundle manifest: {e}")
 
 
-_BUNDLE_ALLOWED_FILES = {
-    "bundle_manifest.json": "application/json",
-    "transcript.json": "application/json",
-    "summary.md": "text/markdown",
-    "action_items.csv": "text/csv",
-    "decisions.md": "text/markdown",
-    "chapters.json": "application/json",
-    "entities.json": "application/json",
-}
+_ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def _validate_artifact_name(name: str) -> None:
+    # FastAPI will percent-decode route params, but we hard-reject anything that could
+    # be interpreted differently by downstream components (double decode, windows paths, etc).
+    if not name or not isinstance(name, str):
+        raise HTTPException(status_code=400, detail="Invalid artifact name")
+    if "\x00" in name or "%" in name or "/" in name or "\\" in name or ".." in name:
+        raise HTTPException(status_code=400, detail="Invalid artifact name")
+    if not _ARTIFACT_NAME_RE.match(name):
+        raise HTTPException(status_code=400, detail="Invalid artifact name")
+
+
+def _load_bundle_manifest(run_id: str) -> Dict[str, Any]:
+    p = safe_file_path(run_id, "bundle/bundle_manifest.json")
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read bundle manifest: {e}")
+
+
+def _artifact_rel_path(entry: Dict[str, Any]) -> Optional[str]:
+    # v0.1 uses rel_path; older versions may use path.
+    rp = entry.get("rel_path")
+    if isinstance(rp, str) and rp:
+        return rp
+    rp = entry.get("path")
+    if isinstance(rp, str) and rp:
+        return rp
+    return None
+
+
+def _resolve_manifest_listed_artifact(run_id: str, artifact_name: str) -> Dict[str, Any]:
+    """
+    Enforce allowlist-by-manifest: only artifacts listed in bundle_manifest.json can be served.
+    Returns {rel_path, content_type}.
+    """
+    if artifact_name == "bundle_manifest.json":
+        return {"rel_path": "bundle/bundle_manifest.json", "content_type": "application/json"}
+
+    manifest = _load_bundle_manifest(run_id)
+    artifacts = manifest.get("artifacts", [])
+    if not isinstance(artifacts, list):
+        raise HTTPException(status_code=500, detail="Invalid bundle manifest")
+
+    match = None
+    for a in artifacts:
+        if isinstance(a, dict) and a.get("name") == artifact_name:
+            match = a
+            break
+    if not match:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    rel_path = _artifact_rel_path(match)
+    if not rel_path:
+        raise HTTPException(status_code=500, detail="Invalid bundle manifest artifact entry")
+
+    # Must be exactly under bundle/ and match the requested name.
+    rel_path_norm = rel_path.replace("\\", "/")
+    if rel_path_norm != f"bundle/{artifact_name}":
+        raise HTTPException(status_code=403, detail="Invalid artifact path")
+
+    content_type = match.get("content_type")
+    if not isinstance(content_type, str) or not content_type:
+        # Conservative fallback
+        content_type = "application/octet-stream"
+
+    return {"rel_path": rel_path_norm, "content_type": content_type}
 
 
 @router.get("/{run_id}/bundle/{artifact_name}")
@@ -171,24 +233,26 @@ def download_bundle_artifact(run_id: str, artifact_name: str, max_bytes: Optiona
 
     If max_bytes is provided, returns at most that many bytes (for UI previews).
     """
-    if "/" in artifact_name or "\\" in artifact_name:
-        raise HTTPException(status_code=400, detail="Invalid artifact name")
-    content_type = _BUNDLE_ALLOWED_FILES.get(artifact_name)
-    if not content_type:
-        raise HTTPException(status_code=404, detail="Unknown artifact")
+    _validate_artifact_name(artifact_name)
+    resolved = _resolve_manifest_listed_artifact(run_id, artifact_name)
+    content_type = resolved["content_type"]
+    path = safe_file_path(run_id, resolved["rel_path"])
 
-    path = safe_file_path(run_id, f"bundle/{artifact_name}")
     if max_bytes is not None:
         # Preview mode: cap content, never stream huge files into the browser.
         # Only allow for text-ish formats.
         if not (content_type.startswith("text/") or content_type == "application/json"):
             raise HTTPException(status_code=400, detail="Preview not supported for this artifact")
+        if path.stat().st_size > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail={"error_code": "PREVIEW_TOO_LARGE", "message": "Preview too large; download instead."},
+            )
         with open(path, "rb") as f:
             data = f.read(max_bytes)
         # Best-effort UTF-8 decode for preview.
         text = data.decode("utf-8", errors="replace")
-        headers = {"X-Content-Truncated": "1" if path.stat().st_size > len(data) else "0"}
-        return Response(content=text, media_type=content_type, headers=headers)
+        return Response(content=text, media_type=content_type)
 
     return FileResponse(path, media_type=content_type, filename=artifact_name)
 
@@ -199,25 +263,30 @@ def download_bundle_zip(run_id: str):
     # Ensure manifest exists
     run_dir = safe_file_path(run_id, "manifest.json").parent
     manifest_path = safe_file_path(run_id, "bundle/bundle_manifest.json")
-    try:
-        bundle_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read bundle manifest: {e}")
+    bundle_manifest = _load_bundle_manifest(run_id)
+    manifest_bytes = manifest_path.read_bytes()
+    manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
 
     bundle_dir = run_dir / "bundle"
-    zip_path = bundle_dir / "meeting_pack.zip"
+    zip_path = bundle_dir / f"meeting_pack_{manifest_sha256[:16]}.zip"
 
     files: List[Dict[str, str]] = []
     files.append({"name": "bundle_manifest.json", "path": str(manifest_path)})
     for a in bundle_manifest.get("artifacts", []):
-        name = a.get("name")
-        rel_path = a.get("path")
-        if not isinstance(name, str) or not isinstance(rel_path, str):
+        if not isinstance(a, dict):
             continue
-        if name not in _BUNDLE_ALLOWED_FILES:
+        name = a.get("name")
+        if not isinstance(name, str):
+            continue
+        _validate_artifact_name(name)
+        rel_path = _artifact_rel_path(a)
+        if not rel_path:
+            continue
+        rel_path_norm = rel_path.replace("\\", "/")
+        if rel_path_norm != f"bundle/{name}":
             continue
         try:
-            p = safe_file_path(run_id, rel_path)
+            p = safe_file_path(run_id, rel_path_norm)
         except HTTPException:
             continue
         files.append({"name": name, "path": str(p)})
@@ -225,22 +294,18 @@ def download_bundle_zip(run_id: str):
     if not files:
         raise HTTPException(status_code=404, detail="No bundle artifacts found")
 
-    # Cache: rebuild only if inputs changed since last build.
-    input_paths = [Path(f["path"]) for f in files]
-    newest_input_mtime = max(p.stat().st_mtime for p in input_paths)
+    # Cache: key by sha256(bundle_manifest.json) so repeated calls are cheap and stable.
     if zip_path.exists():
-        try:
-            if zip_path.stat().st_mtime >= newest_input_mtime:
-                return FileResponse(zip_path, media_type="application/zip", filename="meeting_pack.zip")
-        except OSError:
-            pass
+        return FileResponse(zip_path, media_type="application/zip", filename="meeting_pack.zip")
 
     zip_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_zip = zip_path.with_suffix(".zip.tmp")
     with zipfile.ZipFile(tmp_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for f in sorted(files, key=lambda x: x["name"]):
             # arcname is the bare filename to avoid zip-slip/path surprises
-            zf.write(f["path"], arcname=f["name"])
+            arcname = f["name"]
+            _validate_artifact_name(arcname)
+            zf.write(f["path"], arcname=arcname)
     os.replace(tmp_zip, zip_path)
 
     return FileResponse(zip_path, media_type="application/zip", filename="meeting_pack.zip")

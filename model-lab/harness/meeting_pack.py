@@ -7,7 +7,7 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 
 MEETING_PACK_SCHEMA_VERSION = "meeting_pack_bundle_manifest.v0.1"
@@ -28,11 +28,18 @@ def _sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return h.hexdigest()
 
 
-def _atomic_write_bytes(path: Path, data: bytes) -> None:
+def _atomic_write_bytes_if_changed(path: Path, data: bytes) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        try:
+            if path.read_bytes() == data:
+                return False
+        except Exception:
+            pass
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_bytes(data)
     tmp.replace(path)
+    return True
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
@@ -133,7 +140,7 @@ def _extract_action_items_rows(action_items_artifact: Dict[str, Any]) -> List[Di
 @dataclass(frozen=True)
 class BundleArtifact:
     name: str
-    relative_path: str
+    rel_path: str
     content_type: str
 
 
@@ -143,6 +150,26 @@ _EXPECTED_ARTIFACTS: List[BundleArtifact] = [
     BundleArtifact("action_items.csv", "bundle/action_items.csv", "text/csv"),
     BundleArtifact("decisions.md", "bundle/decisions.md", "text/markdown"),
 ]
+
+def _canonicalize_iso_utc(ts: Optional[str]) -> Optional[str]:
+    if not ts or not isinstance(ts, str):
+        return None
+    t = ts.strip()
+    if not t:
+        return None
+    # SessionRunner timestamps are UTC-like but may omit trailing "Z".
+    if t.endswith("Z"):
+        return t
+    return t + "Z"
+
+
+def _deterministic_generated_at(run_manifest: Dict[str, Any]) -> str:
+    # Prefer stable lifecycle timestamps to make bundle idempotent for the same run state.
+    for k in ("ended_at", "started_at", "updated_at"):
+        v = _canonicalize_iso_utc(run_manifest.get(k))
+        if v:
+            return v
+    return _now_iso_utc()
 
 
 def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
@@ -180,8 +207,9 @@ def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
     transcript_src = alignment_path or asr_path
     if transcript_src:
         segments = _normalize_segments(_read_json(transcript_src))
-        _atomic_write_bytes(transcript_out, (json.dumps({"segments": segments}, indent=2) + "\n").encode("utf-8"))
-        written.append(transcript_out)
+        payload = (json.dumps({"segments": segments}, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        if _atomic_write_bytes_if_changed(transcript_out, payload):
+            written.append(transcript_out)
     else:
         absent.append({"name": "transcript.json", "reason": "No alignment/asr artifact found"})
 
@@ -192,8 +220,8 @@ def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
     )
     if summary_path:
         md = _render_summary_md(_read_json(summary_path))
-        _atomic_write_bytes(summary_out, md.encode("utf-8"))
-        written.append(summary_out)
+        if _atomic_write_bytes_if_changed(summary_out, md.encode("utf-8")):
+            written.append(summary_out)
     else:
         absent.append({"name": "summary.md", "reason": "No summary artifact found"})
 
@@ -209,8 +237,8 @@ def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
         writer.writeheader()
         for r in rows:
             writer.writerow(r)
-        _atomic_write_bytes(action_items_out, s.getvalue().encode("utf-8"))
-        written.append(action_items_out)
+        if _atomic_write_bytes_if_changed(action_items_out, s.getvalue().encode("utf-8")):
+            written.append(action_items_out)
     else:
         absent.append({"name": "action_items.csv", "reason": "No action items artifact found"})
 
@@ -218,40 +246,40 @@ def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
     decisions_out = bundle_dir / "decisions.md"
     decisions_src = _discover_run_dir_artifact(run_dir, ["decisions.md", "decisions_*.md"])
     if decisions_src:
-        _atomic_write_bytes(decisions_out, decisions_src.read_bytes())
-        written.append(decisions_out)
+        if _atomic_write_bytes_if_changed(decisions_out, decisions_src.read_bytes()):
+            written.append(decisions_out)
     else:
         absent.append({"name": "decisions.md", "reason": "No decisions artifact found"})
 
     # Build manifest of what exists
     artifacts: List[Dict[str, Any]] = []
     for a in _EXPECTED_ARTIFACTS:
-        p = run_dir / a.relative_path
+        p = run_dir / a.rel_path
         if not p.exists():
             continue
         stat = p.stat()
         artifacts.append(
             {
                 "name": a.name,
-                "path": a.relative_path.replace("\\", "/"),
+                "rel_path": a.rel_path.replace("\\", "/"),
                 "bytes": int(stat.st_size),
                 "sha256": _sha256_file(p),
                 "content_type": a.content_type,
-                "modified_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stat.st_mtime)),
             }
         )
 
     bundle_manifest = {
         "schema_version": MEETING_PACK_SCHEMA_VERSION,
         "run_id": manifest.get("run_id", run_dir.name),
-        "generated_at": _now_iso_utc(),
-        "artifacts": artifacts,
-        "absent": absent,
+        "generated_at": _deterministic_generated_at(manifest),
+        "artifacts": sorted(artifacts, key=lambda x: x.get("name", "")),
+        "absent": sorted(absent, key=lambda x: x.get("name", "")),
     }
 
     bundle_manifest_path = bundle_dir / "bundle_manifest.json"
-    _atomic_write_bytes(bundle_manifest_path, (json.dumps(bundle_manifest, indent=2) + "\n").encode("utf-8"))
-    written.append(bundle_manifest_path)
+    manifest_bytes = (json.dumps(bundle_manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    if _atomic_write_bytes_if_changed(bundle_manifest_path, manifest_bytes):
+        written.append(bundle_manifest_path)
 
     return {
         "manifest_path": str(bundle_manifest_path),
