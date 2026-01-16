@@ -27,7 +27,7 @@ function App() {
 
         {/* Routes */}
         <Routes>
-          <Route path="/" element={<RunsList onSelectRun={(id) => window.location.href = `/runs/${id}`} />} />
+          <Route path="/" element={<RunsList onSelectRun={(id: string) => window.location.href = `/runs/${id}`} />} />
           <Route path="/runs/:runId" element={<RunDetail onBack={() => window.location.href = '/'} />} />
           <Route path="/lab/results" element={<ResultsPage />} />
           <Route path="/lab/findings" element={<FindingsPage />} />

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, type ReactNode } from 'react';
+import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { RunDetail as RunDetailType, Segment, SearchResult, MeetingPackManifest } from '../lib/api';
 import { ArrowLeft, Search, Download, FileText, Star, Trash2, Loader2 } from 'lucide-react';
@@ -9,7 +10,6 @@ import { TimelineTicks } from './TimelineTicks';
 import { formatAsSRT, formatAsTXT, downloadText } from '../lib/exporters';
 
 interface RunDetailProps {
-    runId: string;
     onBack: () => void;
 }
 
@@ -19,11 +19,10 @@ const SEARCH_DEBOUNCE_MS = 250;
 // Simple in-memory cache
 const searchCache = new Map<string, SearchResult[]>();
 
-export function RunDetail({ onBack }: RunDetailProps) {
+export default function RunDetail({ onBack }: RunDetailProps) {
     const { runId } = useParams<{ runId: string }>();
-    const [run, setRun] = useState<RunDetailType | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const runIdSafe = runId ?? "";
+    const [detail, setDetail] = useState<RunDetailType | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [audioUrl, setAudioUrl] = useState("");
     const [highlights, setHighlights] = useState<HighlightStore | null>(null);
@@ -57,6 +56,7 @@ export function RunDetail({ onBack }: RunDetailProps) {
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
+        if (!runId) return;
         loadDetail();
         setAudioUrl(api.getAudioUrl(runId));
         setHighlights(highlightsApi.get(runId));
@@ -76,7 +76,7 @@ export function RunDetail({ onBack }: RunDetailProps) {
 
     // Debounced server search
     useEffect(() => {
-        if (!useServerSearch || searchQuery.trim().length < 2) {
+        if (!runId || !useServerSearch || searchQuery.trim().length < 2) {
             setServerSearchResults([]);
             setIsSearching(false);
             return;
@@ -169,6 +169,7 @@ export function RunDetail({ onBack }: RunDetailProps) {
     }, [searchQuery, runId]);
 
     const loadDetail = async () => {
+        if (!runId) return;
         try {
             const data = await api.getTranscript(runId);
             setDetail(data);
@@ -178,6 +179,7 @@ export function RunDetail({ onBack }: RunDetailProps) {
     };
 
     const loadMeetingPack = async () => {
+        if (!runId) return;
         setMeetingPackLoading(true);
         setMeetingPackError(null);
         try {
@@ -198,11 +200,12 @@ export function RunDetail({ onBack }: RunDetailProps) {
     };
 
     const loadPreview = async (name: string) => {
+        if (!runId) return;
         setPreviewName(name);
         setPreviewText(null);
         setPreviewCsv(null);
         try {
-            const url = api.getMeetingPackArtifactUrl(runId, name);
+            const url = api.getMeetingPackArtifactPreviewUrl(runId, name, 200_000);
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const text = await res.text();
@@ -234,26 +237,26 @@ export function RunDetail({ onBack }: RunDetailProps) {
         );
 
         if (existing) {
-            const updated = highlightsApi.remove(runId, existing.id);
+            const updated = highlightsApi.remove(runIdSafe, existing.id);
             setHighlights({ ...updated });
         } else {
             // Add Note? V1 prompt
             // const note = prompt("Add a note (optional):") || "";
             const note = ""; // Skip prompt for speed in V1, rely on sidebar to edit notes later?
             // User asked for "Add note" optional. Let's just star for now.
-            const updated = highlightsApi.add(runId, seg, note);
+            const updated = highlightsApi.add(runIdSafe, seg, note);
             setHighlights({ ...updated });
         }
     };
 
     const exportHighlights = () => {
         if (!highlights || !detail) return;
-        const md = highlightsApi.exportMarkdown(highlights, runId);
+        const md = highlightsApi.exportMarkdown(highlights, runIdSafe);
         const blob = new Blob([md], { type: 'text/markdown' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${runId}_highlights.md`;
+        a.download = `${runIdSafe}_highlights.md`;
         a.click();
     };
 
@@ -265,6 +268,7 @@ export function RunDetail({ onBack }: RunDetailProps) {
 
     const duration = detail?.segments.length ? detail.segments[detail.segments.length - 1].end_s : 0;
 
+    if (!runId) return <div className="p-8">Missing run id</div>;
     if (!detail) return <div className="p-8">Loading detail...</div>;
 
     return (

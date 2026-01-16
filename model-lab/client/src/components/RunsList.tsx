@@ -7,7 +7,7 @@ interface RunsListProps {
     onSelectRun: (runId: string) => void;
 }
 
-export function RunsList({ onSelectRun }: RunsListProps) {
+export default function RunsList({ onSelectRun }: RunsListProps) {
     const [runs, setRuns] = useState<RunSummary[]>([]);
     const [loading, setLoading] = useState(true);
 

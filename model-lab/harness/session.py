@@ -620,6 +620,7 @@ class SessionRunner:
         self._save_manifest(m)
 
         t0 = time.time()
+        run_failed = False
         try:
             # 0. Check for stale RUNNING steps (Crash Recovery)
             stale_detected = False
@@ -683,21 +684,29 @@ class SessionRunner:
                 step_def = self.steps[step_name]
                 self._execute_step(m, step_def)
 
-            # Export Bundle (Session Level) - Partial export was done in catch, here strict final.
-            self._export_partial_bundle(final=True)
-            
             m["status"] = "COMPLETED"
             m["ended_at"] = now_iso()
             m["duration_ms"] = int((time.time() - t0) * 1000)
             self._save_manifest(m)
             
         except Exception as e:
+            run_failed = True
             logger.error(f"Session Failed: {e}", exc_info=True)
             m["status"] = "FAILED"
             m["warnings"].append(str(e))
             self._save_manifest(m)
-            self._export_partial_bundle(final=False)
             raise e
+        finally:
+            # Always try to produce a Meeting Pack manifest (and any available artifacts) as a value artifact.
+            # On failure, this creates a partial bundle that marks missing artifacts as absent.
+            try:
+                from harness.meeting_pack import build_meeting_pack
+                build_meeting_pack(self.session_dir)
+            except Exception as e:
+                logger.error(f"Failed to build Meeting Pack bundle: {e}")
+
+            # Always export the legacy zip (partial on failure).
+            self._export_partial_bundle(final=not run_failed)
             
         return m
 

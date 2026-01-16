@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from typing import List, Dict, Any, Optional
 import json
 import zipfile
+import os
+from pathlib import Path
 
 from server.services.runs_index import get_index
 from server.services.safe_files import safe_file_path
@@ -164,8 +166,11 @@ _BUNDLE_ALLOWED_FILES = {
 
 
 @router.get("/{run_id}/bundle/{artifact_name}")
-def download_bundle_artifact(run_id: str, artifact_name: str):
-    """Stream a single Meeting Pack artifact from bundle/ safely."""
+def download_bundle_artifact(run_id: str, artifact_name: str, max_bytes: Optional[int] = Query(default=None, ge=1, le=2_000_000)):
+    """Stream a single Meeting Pack artifact from bundle/ safely.
+
+    If max_bytes is provided, returns at most that many bytes (for UI previews).
+    """
     if "/" in artifact_name or "\\" in artifact_name:
         raise HTTPException(status_code=400, detail="Invalid artifact name")
     content_type = _BUNDLE_ALLOWED_FILES.get(artifact_name)
@@ -173,6 +178,18 @@ def download_bundle_artifact(run_id: str, artifact_name: str):
         raise HTTPException(status_code=404, detail="Unknown artifact")
 
     path = safe_file_path(run_id, f"bundle/{artifact_name}")
+    if max_bytes is not None:
+        # Preview mode: cap content, never stream huge files into the browser.
+        # Only allow for text-ish formats.
+        if not (content_type.startswith("text/") or content_type == "application/json"):
+            raise HTTPException(status_code=400, detail="Preview not supported for this artifact")
+        with open(path, "rb") as f:
+            data = f.read(max_bytes)
+        # Best-effort UTF-8 decode for preview.
+        text = data.decode("utf-8", errors="replace")
+        headers = {"X-Content-Truncated": "1" if path.stat().st_size > len(data) else "0"}
+        return Response(content=text, media_type=content_type, headers=headers)
+
     return FileResponse(path, media_type=content_type, filename=artifact_name)
 
 
@@ -208,10 +225,23 @@ def download_bundle_zip(run_id: str):
     if not files:
         raise HTTPException(status_code=404, detail="No bundle artifacts found")
 
+    # Cache: rebuild only if inputs changed since last build.
+    input_paths = [Path(f["path"]) for f in files]
+    newest_input_mtime = max(p.stat().st_mtime for p in input_paths)
+    if zip_path.exists():
+        try:
+            if zip_path.stat().st_mtime >= newest_input_mtime:
+                return FileResponse(zip_path, media_type="application/zip", filename="meeting_pack.zip")
+        except OSError:
+            pass
+
     zip_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    tmp_zip = zip_path.with_suffix(".zip.tmp")
+    with zipfile.ZipFile(tmp_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for f in sorted(files, key=lambda x: x["name"]):
+            # arcname is the bare filename to avoid zip-slip/path surprises
             zf.write(f["path"], arcname=f["name"])
+    os.replace(tmp_zip, zip_path)
 
     return FileResponse(zip_path, media_type="application/zip", filename="meeting_pack.zip")
 

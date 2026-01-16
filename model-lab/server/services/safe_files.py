@@ -56,7 +56,7 @@ def safe_file_path(run_id: str, relative_path: str) -> Path:
          raise HTTPException(status_code=403, detail="Invalid path")
          
     # Enforce strict containment
-    if not str(target_path).startswith(str(run_dir)):
+    if not target_path.is_relative_to(run_dir):
          raise HTTPException(status_code=403, detail="Path traversal detected")
          
     if not target_path.exists():
