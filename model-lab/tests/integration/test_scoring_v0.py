@@ -2,7 +2,6 @@
 import pytest
 from pathlib import Path
 import json
-import shutil
 import sys
 import os
 
@@ -22,8 +21,6 @@ def client():
 def run_dir(tmp_path):
     root = tmp_path / "runs"
     root.mkdir()
-    # Mock environment
-    import os
     os.environ["MODEL_LAB_RUNS_ROOT"] = str(root)
     yield root
 
@@ -36,30 +33,27 @@ def test_resolve_artifact_relpaths():
     paths_summary = resolve_artifact_relpaths("summary")
     assert "bundle/summary.md" == paths_summary[0]
     
-def test_scoring_logic_with_canonical_artifacts(tmp_path):
-    # Create dummy session dir using current expected paths (transcript.txt)
+def test_scoring_with_transcript_txt(tmp_path):
+    """Test scoring works with legacy .txt format"""
     session_dir = tmp_path / "test_run"
     session_dir.mkdir()
     (session_dir / "bundle").mkdir()
     
-    # Create artifacts that scoring checks for
+    # Create .txt artifacts
     long_text = "Long enough transcript " * 10
     (session_dir / "bundle" / "transcript.txt").write_text(long_text, encoding="utf-8")
     (session_dir / "bundle" / "summary.md").write_text("Summary content " * 5, encoding="utf-8")
     (session_dir / "bundle" / "action_items.csv").write_text("header,col\nval,val", encoding="utf-8")
     
-    # Create required input
-    input_path = tmp_path / "input.wav"
+    input_path = tmp_path / "input.wav" 
     input_path.write_text("dummy audio")
 
     runner = SessionRunner(input_path, tmp_path/"output", steps=[])
     runner.session_dir = session_dir
     runner.run_id = "test_run"
     
-    # Test compute
     scores = runner._compute_proxy_scores()
     
-    # Verify correctness
     assert len(scores) == 4
     
     completeness = next(s for s in scores if s["name"] == "artifact_completeness")
@@ -67,8 +61,43 @@ def test_scoring_logic_with_canonical_artifacts(tmp_path):
     
     transcript = next(s for s in scores if s["name"] == "transcript_length_ok")
     assert transcript["score"] == 100
-    # Note: scoring currently checks bundle/transcript.txt hardcoded
     assert "bundle/transcript.txt" in transcript["evidence_paths"][0]
+
+def test_scoring_with_transcript_json(tmp_path):
+    """Test scoring works with canonical .json format (Meeting Pack)"""
+    session_dir = tmp_path / "test_run"
+    session_dir.mkdir()
+    (session_dir / "bundle").mkdir()
+    
+    # Create .json artifacts (Meeting Pack canonical format)
+    transcript_data = {
+        "segments": [
+            {"text": "This is a long enough transcript with substantial content. ", "start_s": 0.0, "end_s": 1.0},
+            {"text": "It has multiple segments that will be joined together. ", "start_s": 1.0, "end_s": 2.0},
+            {"text": "Each segment contains text to ensure we exceed the threshold. ", "start_s": 2.0, "end_s": 3.0},
+        ]
+    }
+    (session_dir / "bundle" / "transcript.json").write_text(json.dumps(transcript_data), encoding="utf-8")
+    (session_dir / "bundle" / "summary.md").write_text("Summary content " * 5, encoding="utf-8")
+    (session_dir / "bundle" / "action_items.csv").write_text("header,col\nval,val", encoding="utf-8")
+    
+    input_path = tmp_path / "input.wav"
+    input_path.write_text("dummy audio")
+
+    runner = SessionRunner(input_path, tmp_path/"output", steps=[])
+    runner.session_dir = session_dir
+    runner.run_id = "test_run"
+    
+    scores = runner._compute_proxy_scores()
+    
+    assert len(scores) == 4
+    
+    completeness = next(s for s in scores if s["name"] == "artifact_completeness")
+    assert completeness["score"] == 100
+    
+    transcript = next(s for s in scores if s["name"] == "transcript_length_ok")
+    assert transcript["score"] == 100
+    assert "bundle/transcript.json" in transcript["evidence_paths"][0]
 
 def test_api_enrichment(client, run_dir):
     # Setup Experiment with 2 runs

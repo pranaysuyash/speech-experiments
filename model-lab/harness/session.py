@@ -385,43 +385,73 @@ class SessionRunner:
         scores = []
         
         # 1. Artifact Completeness
-        # We check bundle/transcript.txt, bundle/summary.md, bundle/action_items.csv
-        required = ["bundle/transcript.txt", "bundle/summary.md", "bundle/action_items.csv"]
-        found = [p for p in required if (self.session_dir / p).exists()]
-        score_completeness = int((len(found) / len(required)) * 100)
+        # Check for artifacts (try .txt first for legacy, then .json canonical)
+        required_checks = [
+            (["bundle/transcript.txt", "bundle/transcript.json"], "transcript"),
+            (["bundle/summary.md"], "summary"),
+            (["bundle/action_items.csv"], "action_items"),
+        ]
+        found = []
+        for paths, _ in required_checks:
+            if any((self.session_dir / p).exists() for p in paths):
+                found.append(next(p for p in paths if (self.session_dir / p).exists()))
+        
+        score_completeness = int((len(found) / len(required_checks)) * 100)
         scores.append({
             "name": "artifact_completeness",
             "label": "Artifact Completeness",
             "type": "proxy",
             "score": score_completeness,
             "evidence_paths": found,
-            "notes": f"Found {len(found)}/{len(required)} artifacts"
+            "notes": f"Found {len(found)}/{len(required_checks)} artifacts"
         })
 
         # 2. Transcript Length OK
-        # > 100 chars?
-        t_path = self.session_dir / "bundle" / "transcript.txt"
+        # Try .txt first (legacy), then .json (canonical)
+        t_path = None
+        for candidate in ["bundle/transcript.txt", "bundle/transcript.json"]:
+            p = self.session_dir / candidate
+            if p.exists():
+                t_path = p
+                break
+                
         t_ok = False
         t_len = 0
-        if t_path.exists():
+        t_text = None
+        if t_path:
             try:
-                text = t_path.read_text(encoding="utf-8")
-                t_len = len(text)
+                if t_path.suffix == ".json":
+                    # Parse Meeting Pack canonical format
+                    data = json.loads(t_path.read_text(encoding="utf-8"))
+                    # Extract text from segments
+                    if "segments" in data and isinstance(data["segments"], list):
+                        t_text = " ".join(seg.get("text", "") for seg in data["segments"] if isinstance(seg, dict))
+                        t_len = len(t_text)
+                    elif "text" in data:
+                        t_text = data["text"]
+                        t_len = len(t_text)
+                    else:
+                        t_len = 0
+                else:
+                    # Plain text file
+                    t_text = t_path.read_text(encoding="utf-8")
+                    t_len = len(t_text)
+                    
                 if t_len > 100:
                     t_ok = True
             except:
                 pass
+                
         scores.append({
             "name": "transcript_length_ok",
             "label": "Transcript Viability",
             "type": "proxy",
             "score": 100 if t_ok else 0,
-            "evidence_paths": ["bundle/transcript.txt"] if t_path.exists() else [],
-            "notes": f"Length: {t_len} chars"
+            "evidence_paths": [str(t_path.relative_to(self.session_dir))] if t_path else [],
+            "notes": f"Length: {t_len} chars" if t_path else "Missing"
         })
 
         # 3. Action Items Parseable
-        # Valid CSV header?
         ai_path = self.session_dir / "bundle" / "action_items.csv"
         ai_ok = False
         if ai_path.exists():
