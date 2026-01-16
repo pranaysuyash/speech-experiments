@@ -403,50 +403,9 @@ def compare_experiment_runs(
         if not run_id:
             return {"available": False, "text": None}
 
-        # Resolution rules: Bundle first, then legacy/task paths
+        from server.utils.artifacts import read_artifact_text
         run_dir = _runs_root() / run_id
-        paths = []
-        
-        if artifact == "transcript":
-            paths = [
-                run_dir / "bundle" / "transcript.txt",
-                run_dir / "asr" / "transcript.txt",
-            ]
-        elif artifact == "summary":
-            paths = [
-                run_dir / "bundle" / "summary.md",
-                run_dir / "session" / "summary.md",
-            ]
-        elif artifact == "action_items":
-            paths = [
-                run_dir / "bundle" / "action_items.csv",
-                run_dir / "session" / "action_items.csv",
-            ]
-            
-        target_path = next((p for p in paths if p.exists()), None)
-        
-        if not target_path:
-            return {"available": False, "text": None}
-            
-        file_size = target_path.stat().st_size
-        if file_size > max_bytes:
-            return {
-                "available": True, 
-                "text": None, 
-                "truncated": True, 
-                "size": file_size,
-                "error": "PREVIEW_TOO_LARGE"
-            }
-            
-        try:
-            text = target_path.read_text(encoding="utf-8")
-            return {
-                "available": True,
-                "text": text,
-                "size": len(text)
-            }
-        except Exception:
-            return {"available": False, "text": None, "error": "READ_ERROR"}
+        return read_artifact_text(run_dir, artifact, max_bytes)
 
     left_data = _read_artifact(left)
     right_data = _read_artifact(right)

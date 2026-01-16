@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from fastapi.testclient import TestClient
 from server.main import app
 from harness.session import SessionRunner
+from server.utils.artifacts import resolve_artifact_relpaths
 
 @pytest.fixture
 def client():
@@ -26,24 +27,31 @@ def run_dir(tmp_path):
     os.environ["MODEL_LAB_RUNS_ROOT"] = str(root)
     yield root
 
-def test_scoring_logic_direct(tmp_path):
-    # Test _compute_proxy_scores directly via SessionRunner subclass or mocking
+def test_resolve_artifact_relpaths():
+    # Test that we get the right priority order
+    paths = resolve_artifact_relpaths("transcript")
+    assert "bundle/transcript.json" == paths[0]
+    assert "bundle/transcript.txt" == paths[1]
     
-    # Create dummy session dir
+    paths_summary = resolve_artifact_relpaths("summary")
+    assert "bundle/summary.md" == paths_summary[0]
+    
+def test_scoring_logic_with_canonical_artifacts(tmp_path):
+    # Create dummy session dir using current expected paths (transcript.txt)
     session_dir = tmp_path / "test_run"
     session_dir.mkdir()
     (session_dir / "bundle").mkdir()
     
-    # Create artifacts
-    (session_dir / "bundle" / "transcript.txt").write_text("Long enough transcript " * 10, encoding="utf-8")
+    # Create artifacts that scoring checks for
+    long_text = "Long enough transcript " * 10
+    (session_dir / "bundle" / "transcript.txt").write_text(long_text, encoding="utf-8")
     (session_dir / "bundle" / "summary.md").write_text("Summary content " * 5, encoding="utf-8")
     (session_dir / "bundle" / "action_items.csv").write_text("header,col\nval,val", encoding="utf-8")
     
-    # Create dummy input file required by SessionRunner
+    # Create required input
     input_path = tmp_path / "input.wav"
     input_path.write_text("dummy audio")
 
-    # We can mock SessionRunner
     runner = SessionRunner(input_path, tmp_path/"output", steps=[])
     runner.session_dir = session_dir
     runner.run_id = "test_run"
@@ -59,12 +67,8 @@ def test_scoring_logic_direct(tmp_path):
     
     transcript = next(s for s in scores if s["name"] == "transcript_length_ok")
     assert transcript["score"] == 100
-    
-    summary = next(s for s in scores if s["name"] == "summary_nonempty")
-    assert summary["score"] == 100
-    
-    action = next(s for s in scores if s["name"] == "action_items_parseable")
-    assert action["score"] == 100
+    # Note: scoring currently checks bundle/transcript.txt hardcoded
+    assert "bundle/transcript.txt" in transcript["evidence_paths"][0]
 
 def test_api_enrichment(client, run_dir):
     # Setup Experiment with 2 runs

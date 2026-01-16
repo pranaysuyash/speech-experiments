@@ -10,7 +10,7 @@ interface ExperimentRun {
     created_at: string;
     started_at: string | null;
     ended_at: string | null;
-    score_cards?: { name: string; label: string; score: number }[];
+    score_cards?: { name: string; label: string; score: number; type: string }[];
 }
 
 interface Experiment {
@@ -163,9 +163,11 @@ export default function ExperimentPage() {
 
     // Map name to label (find first occurrence)
     const scoreLabels: Record<string, string> = {};
+    const scoreTypes: Record<string, string> = {};
     experiment.runs.forEach(r => {
         r.score_cards?.forEach(s => {
             if (!scoreLabels[s.name]) scoreLabels[s.name] = s.label;
+            if (!scoreTypes[s.name]) scoreTypes[s.name] = s.type;
         });
     });
 
@@ -226,7 +228,15 @@ export default function ExperimentPage() {
                                     onClick={() => handleSort(`score:${name}`)}
                                     style={{ textAlign: 'left', padding: '0.5rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem' }}
                                 >
-                                    {scoreLabels[name]} {sortConfig.key === `score:${name}` && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                        {scoreLabels[name]}
+                                        {scoreTypes[name] === 'proxy' && (
+                                            <span style={{ fontSize: '0.7em', background: '#f3f4f6', border: '1px solid #d1d5db', padding: '0 3px', borderRadius: 3, color: '#6b7280', fontWeight: 500 }}>
+                                                PROXY
+                                            </span>
+                                        )}
+                                        {sortConfig.key === `score:${name}` && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                    </div>
                                 </th>
                             ))}
                         </tr>
