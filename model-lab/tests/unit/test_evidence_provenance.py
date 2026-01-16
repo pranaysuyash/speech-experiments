@@ -193,6 +193,10 @@ class TestMandatoryProvenance:
             # Evidence artifacts live under task folders (e.g., runs/asr, runs/tts, etc.).
             if "runs/sessions/" in str(run_file).replace("\\", "/"):
                 continue
+            # Experiment metadata files are not evidence artifacts either.
+            # We exclude specific filenames to allow future evidence artifacts under runs/experiments/
+            if "runs/experiments/" in str(run_file).replace("\\", "/") and run_file.name in ("experiment_request.json", "experiment_state.json"):
+                continue
             # Skip summary files
             if run_file.name == "summary.json":
                 continue

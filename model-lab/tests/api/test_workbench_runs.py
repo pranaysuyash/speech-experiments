@@ -1,4 +1,5 @@
 import json
+import sys
 import threading
 import time
 from pathlib import Path
@@ -8,6 +9,9 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
     # Ensure the API writes inputs/runs under temp dirs
     monkeypatch.setenv("MODEL_LAB_INPUTS_ROOT", str(tmp_path / "inputs"))
     monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(tmp_path / "runs"))
+
+    # Fix imports for importlib mode
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
     # Patch SessionRunner.run to avoid real processing while preserving the contract:
     # create run dir + RUNNING manifest, then block briefly so worker remains busy.
@@ -27,9 +31,9 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
     monkeypatch.setattr(harness.session.SessionRunner, "run", fake_run)
 
     from fastapi.testclient import TestClient
-    from server.main import app
+    import server.main
 
-    client = TestClient(app)
+    client = TestClient(server.main.app)
 
     t0 = time.monotonic()
     resp = client.post(
@@ -61,6 +65,7 @@ def test_create_workbench_run_busy_returns_409(monkeypatch, tmp_path):
     monkeypatch.setenv("MODEL_LAB_INPUTS_ROOT", str(tmp_path / "inputs"))
     monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(tmp_path / "runs"))
 
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     import harness.session
 
     # Create a blocking run so the worker stays active while we send a second request.
@@ -79,9 +84,9 @@ def test_create_workbench_run_busy_returns_409(monkeypatch, tmp_path):
     monkeypatch.setattr(harness.session.SessionRunner, "run", blocking_run)
 
     from fastapi.testclient import TestClient
-    from server.main import app
+    import server.main
 
-    client = TestClient(app)
+    client = TestClient(server.main.app)
 
     # First request starts worker (async thread)
     r1 = client.post(

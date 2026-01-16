@@ -78,6 +78,7 @@ def get_results(
             result["use_case_id"] = eval_data.get("use_case_id")
             result["model_id"] = eval_data.get("model_id")
             result["metrics"] = eval_data.get("metrics", {})
+            result["score_cards"] = eval_data.get("score_cards", [])
             
             checks = eval_data.get("checks", [])
             result["checks_total"] = len(checks)

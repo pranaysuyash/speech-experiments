@@ -77,17 +77,10 @@ results/
 outputs/
 logs/
 *.log
-runs/**/*.png
-runs/**/*.jpg
-runs/**/*.wav
-runs/**/*.mp3
-# Session pipeline outputs (never commit)
-runs/sessions/
-# But keep summary and model card files
+
+# Runs directory - track ONLY .gitkeep, ignore all generated artifacts
+runs/
 !runs/.gitkeep
-!runs/*/.gitkeep
-!runs/**/summary.json
-!runs/**/model_card.json
 
 # Environment files (keep structure but ignore sensitive data)
 env/
@@ -173,10 +166,6 @@ profile_default/
 *.big
 
 # Keep essential directory structure
-!runs/*/
 !models/*/
 !data/*/
 !harness/*/
-
-# Override structure keepers: never commit session runs
-runs/sessions/

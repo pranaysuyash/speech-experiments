@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import logging
 
-from server.api import runs, results, workbench
+from server.api import runs, results, workbench, experiments, candidates
 
 # Configure logging
 logger = logging.getLogger("server")
@@ -23,6 +23,8 @@ app.add_middleware(
 app.include_router(runs.router)
 app.include_router(results.router)
 app.include_router(workbench.router)
+app.include_router(experiments.router)
+app.include_router(candidates.router)
 
 @app.get("/health")
 def health_check():
