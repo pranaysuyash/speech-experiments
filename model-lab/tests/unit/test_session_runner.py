@@ -107,5 +107,20 @@ class TestSessionRunner(unittest.TestCase):
             # Verify it proceeded to execute (since it was FAILED/not COMPLETED)
             mock_exec.assert_called()
 
+    def test_eval_json_is_written_at_run_root(self):
+        runner = SessionRunner(self.input_file, self.output_dir)
+
+        with patch.object(runner, "_execute_step"), \
+             patch.object(runner, "_topo_order", return_value=[]), \
+             patch.object(runner, "_export_partial_bundle"), \
+             patch("harness.meeting_pack.build_meeting_pack"):
+            runner.run()
+
+        eval_path = runner.session_dir / "eval.json"
+        self.assertTrue(eval_path.exists())
+        data = json.loads(eval_path.read_text())
+        self.assertEqual(data["schema_version"], "1")
+        self.assertEqual(data["run_id"], runner.run_id)
+
 if __name__ == "__main__":
     unittest.main()

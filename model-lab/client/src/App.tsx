@@ -3,6 +3,7 @@ import RunsList from './components/RunsList';
 import RunDetail from './components/RunDetail';
 import ResultsPage from './pages/ResultsPage';
 import FindingsPage from './pages/FindingsPage';
+import WorkbenchPage from './pages/WorkbenchPage';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
             Model Lab
           </Link>
           <Link to="/" style={{ textDecoration: 'none', color: '#4b5563' }}>Runs</Link>
+          <Link to="/lab/workbench" style={{ textDecoration: 'none', color: '#4b5563' }}>Workbench</Link>
           <Link to="/lab/results" style={{ textDecoration: 'none', color: '#4b5563' }}>Results</Link>
           <Link to="/lab/findings" style={{ textDecoration: 'none', color: '#4b5563' }}>Findings</Link>
         </nav>
@@ -29,6 +31,7 @@ function App() {
         <Routes>
           <Route path="/" element={<RunsList onSelectRun={(id: string) => window.location.href = `/runs/${id}`} />} />
           <Route path="/runs/:runId" element={<RunDetail onBack={() => window.location.href = '/'} />} />
+          <Route path="/lab/workbench" element={<WorkbenchPage />} />
           <Route path="/lab/results" element={<ResultsPage />} />
           <Route path="/lab/findings" element={<FindingsPage />} />
         </Routes>

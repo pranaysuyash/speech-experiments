@@ -188,51 +188,176 @@ class SessionRunner:
             return json.loads(self.manifest_path.read_text(encoding="utf-8"))
         return self._default_manifest()
 
-    def _save_manifest(self, m: Dict[str, Any]) -> None:
-        atomic_write_json(self.manifest_path, m)
+    # Fixed check names - stable contract, never change dynamically
+    EVAL_CHECK_NAMES = [
+        "bundle_manifest_present",
+        "bundle_manifest_parseable",
+        "transcript_present",
+        "summary_present",
+        "action_items_present",
+        "decisions_present",
+        "asr_output_present",
+        "diarization_present",
+        "alignment_present",
+        "run_terminal_status_ok",
+    ]
 
     def _write_eval_json(self, manifest: Dict[str, Any]) -> None:
-        """Write eval.json contract for results/findings UI (V1: identity only)."""
-        bundle_dir = self.session_dir / "bundle"
-        if not bundle_dir.exists():
-            return  # No bundle, skip eval
+        """Write eval.json contract for results/findings UI.
+
+        Contract:
+        - Written after the bundle attempt (best-effort)
+        - Written at run root: <run_dir>/eval.json
+        - Does not mutate the run manifest semantics (status/error fields)
+        - MODE: MODEL_LAB_EVAL_MODE=enriched (default) | identity
+        """
+        import os
+        eval_mode = os.environ.get("MODEL_LAB_EVAL_MODE", "enriched")
+        eval_path = self.session_dir / "eval.json"
         
-        eval_path = bundle_dir / "eval.json"
-        
-        # Build minimal eval with identity and availability checks
         from datetime import datetime
         
+        if eval_mode == "identity":
+            # Identity mode: schema header only, empty checks/findings
+            run_id = manifest.get("run_id") or self.run_id
+            eval_data = {
+                "schema_version": "1",
+                "run_id": run_id,
+                "use_case_id": None,
+                "model_id": None,
+                "params": manifest.get("config", {}),
+                "metrics": {},
+                "checks": [],
+                "findings": [],
+                "generated_at": datetime.now().isoformat()
+            }
+            atomic_write_json(eval_path, eval_data)
+            return
+        
+        # Enriched mode (default): 10 fixed checks based on filesystem + manifest
+        checks = []
+        findings = []
+        
+        # Check 1: bundle_manifest_present
+        bundle_manifest_path = self.session_dir / "bundle" / "bundle_manifest.json"
+        manifest_exists = bundle_manifest_path.exists()
+        checks.append({
+            "name": "bundle_manifest_present",
+            "passed": manifest_exists,
+            "severity": "info",
+            "message": "Bundle manifest present" if manifest_exists else "Bundle manifest not found",
+            "evidence_paths": ["bundle/bundle_manifest.json"] if manifest_exists else []
+        })
+        
+        # Check 2: bundle_manifest_parseable
+        manifest_parseable = False
+        if manifest_exists:
+            try:
+                import json
+                json.loads(bundle_manifest_path.read_text())
+                manifest_parseable = True
+            except Exception:
+                pass
+        checks.append({
+            "name": "bundle_manifest_parseable",
+            "passed": manifest_parseable,
+            "severity": "warn" if manifest_exists and not manifest_parseable else "info",
+            "message": "Bundle manifest valid JSON" if manifest_parseable else ("Bundle manifest invalid JSON" if manifest_exists else "N/A - no manifest"),
+            "evidence_paths": ["bundle/bundle_manifest.json"] if manifest_exists else []
+        })
+        if manifest_exists and not manifest_parseable:
+            findings.append({
+                "finding_id": "bundle:manifest_invalid",
+                "severity": "medium",
+                "category": "system",
+                "title": "Bundle manifest is not valid JSON",
+                "details": "bundle_manifest.json exists but cannot be parsed",
+                "evidence_paths": ["bundle/bundle_manifest.json"]
+            })
+        
+        # Checks 3-6: artifact presence
+        artifacts = [
+            ("transcript_present", "bundle/transcript.txt", "Transcript"),
+            ("summary_present", "bundle/summary.md", "Summary"),
+            ("action_items_present", "bundle/action_items.csv", "Action items"),
+            ("decisions_present", "bundle/decisions.md", "Decisions"),
+        ]
+        for check_name, rel_path, label in artifacts:
+            exists = (self.session_dir / rel_path).exists()
+            checks.append({
+                "name": check_name,
+                "passed": exists,
+                "severity": "info",
+                "message": f"{label} generated" if exists else f"{label} not generated",
+                "evidence_paths": [rel_path] if exists else []
+            })
+        
+        # Checks 7-9: processing outputs
+        processing = [
+            ("asr_output_present", "artifacts/asr.json", "ASR output"),
+            ("diarization_present", "artifacts/diarization.json", "Diarization output"),
+            ("alignment_present", "artifacts/alignment.json", "Alignment output"),
+        ]
+        for check_name, rel_path, label in processing:
+            exists = (self.session_dir / rel_path).exists()
+            checks.append({
+                "name": check_name,
+                "passed": exists,
+                "severity": "info",
+                "message": f"{label} present" if exists else f"{label} not present",
+                "evidence_paths": [rel_path] if exists else []
+            })
+        
+        # Check 10: run_terminal_status_ok
+        status = manifest["status"]
+        status_ok = status == "COMPLETED"
+        checks.append({
+            "name": "run_terminal_status_ok",
+            "passed": status_ok,
+            "severity": "fail" if status in ("FAILED", "STALE") else "info",
+            "message": f"Run completed successfully" if status_ok else f"Run status: {status}",
+            "evidence_paths": ["manifest.json"]
+        })
+        
+        # Generate finding for failures
+        if status == "FAILED":
+            error_step = manifest.get("error_step", "unknown")
+            error_msg = manifest.get("error_message", "Unknown error")
+            findings.append({
+                "finding_id": f"{manifest.get('error_code', 'Error')}:{error_step}",
+                "severity": "high",
+                "category": "system",
+                "title": f"Run failed at {error_step}",
+                "details": error_msg[:200],
+                "evidence_paths": ["manifest.json"]
+            })
+        elif status == "STALE":
+            findings.append({
+                "finding_id": "system:stale_run",
+                "severity": "medium",
+                "category": "system",
+                "title": "Run stopped responding",
+                "details": f"No heartbeat since {manifest.get('updated_at', 'unknown')}",
+                "evidence_paths": ["manifest.json"]
+            })
+        
+        run_id = manifest.get("run_id") or self.run_id
         eval_data = {
             "schema_version": "1",
-            "run_id": manifest["run_id"],
-            "use_case_id": None,  # V1: not tracked yet
-            "model_id": None,     # V1: not tracked yet
+            "run_id": run_id,
+            "use_case_id": None,
+            "model_id": None,
             "params": manifest.get("config", {}),
-            "metrics": {},  # V1: no metrics computed yet
-            "checks": [
-                {
-                    "name": "eval_availability",
-                    "passed": True,
-                    "severity": "info",
-                    "message": "Evaluation contract available (V1: identity only)",
-                    "evidence_paths": []
-                }
-            ],
-            "findings": [],  # V1: no findings yet
+            "metrics": {},  # V1: no computed metrics
+            "checks": checks,
+            "findings": findings,
             "generated_at": datetime.now().isoformat()
         }
         
-        # Add check for missing metrics
-        if manifest["status"] == "COMPLETED":
-            eval_data["checks"].append({
-                "name": "metrics_availability",
-                "passed": False,
-                "severity": "warn",
-                "message": "Metrics computation not yet implemented",
-                "evidence_paths": []
-            })
-        
         atomic_write_json(eval_path, eval_data)
+
+    def _save_manifest(self, m: Dict[str, Any]) -> None:
+        atomic_write_json(self.manifest_path, m)
 
     def _register_steps(self) -> None:
         # 1. Ingest
@@ -704,6 +829,12 @@ class SessionRunner:
                 build_meeting_pack(self.session_dir)
             except Exception as e:
                 logger.error(f"Failed to build Meeting Pack bundle: {e}")
+
+            # Write eval.json after bundle attempt (success or failure).
+            try:
+                self._write_eval_json(m)
+            except Exception as e:
+                logger.error(f"Failed to write eval.json: {e}")
 
             # Always export the legacy zip (partial on failure).
             self._export_partial_bundle(final=not run_failed)

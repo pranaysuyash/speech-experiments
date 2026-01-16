@@ -34,33 +34,19 @@ def _console_url(run_id: str, port: int) -> str:
 
 
 def _emit_run_result(run_id: str, run_dir: str, console_port: int) -> None:
-    """Emit machine-parsable run result.
-    
-    Prints a JSON sentinel line that wrappers can parse deterministically.
-    Also optionally writes result.json to the run directory.
-    
-    Args:
-        run_id: The deterministic run identifier
-        run_dir: Absolute path to the run directory
-        console_port: Frontend console port number
-    """
+    """Emit machine-parseable result sentinel (one-line, compact JSON)."""
     payload = {
         "run_id": run_id,
         "run_dir": run_dir,
-        "console_url": _console_url(run_id, console_port),
+        "console_url": _console_url(run_id, console_port)
     }
-
-    # Optional: write a file for humans/tools
-    try:
-        result_path = Path(run_dir) / "result.json"
-        result_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    except Exception:
-        # Do not fail the run due to a convenience file
-        pass
-
-    # Required: single sentinel line for wrappers
-    # This format is a PERMANENT contract - never change it
-    print("RUN_SESSION_RESULT=" + json.dumps(payload, separators=(",", ":")))
+    print("------------------------------------------------------------")
+    # Compact JSON on one line for bomb-proof parsing
+    print("RUN_SESSION_RESULT=" + json.dumps(payload, separators=(",", ":"), ensure_ascii=False), flush=True)
+    print()
+    print("=" * 60)
+    print("✅ Meeting processed successfully!")
+    print("=" * 60)
 
 
 def parse_args() -> argparse.Namespace:
