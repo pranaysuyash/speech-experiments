@@ -4,6 +4,7 @@ import RunDetail from './components/RunDetail';
 import ResultsPage from './pages/ResultsPage';
 import FindingsPage from './pages/FindingsPage';
 import WorkbenchPage from './pages/WorkbenchPage';
+import ExperimentPage from './pages/ExperimentPage';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
           <Route path="/" element={<RunsList onSelectRun={(id: string) => window.location.href = `/runs/${id}`} />} />
           <Route path="/runs/:runId" element={<RunDetail onBack={() => window.location.href = '/'} />} />
           <Route path="/lab/workbench" element={<WorkbenchPage />} />
+          <Route path="/lab/experiments/:experimentId" element={<ExperimentPage />} />
           <Route path="/lab/results" element={<ResultsPage />} />
           <Route path="/lab/findings" element={<FindingsPage />} />
         </Routes>
