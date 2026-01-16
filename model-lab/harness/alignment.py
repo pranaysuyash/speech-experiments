@@ -210,3 +210,108 @@ def align_artifacts(asr_path: str, diarization_path: str) -> AlignedTranscript:
         source_asr_path=str(asr_path),
         source_diarization_path=str(diarization_path),
     )
+
+
+def load_alignment(path: Path) -> AlignedTranscript:
+    """Load alignment artifact from disk."""
+    with open(path) as f:
+        data = json.load(f)
+    
+    # Handle wrapped artifact "output" vs raw keys
+    output = data.get("output", data)
+    raw_segments = output.get("segments", [])
+    
+    segments = []
+    for s in raw_segments:
+        segments.append(AlignedSegment(
+            start_s=s.get("start_s", s.get("start", 0.0)),
+            end_s=s.get("end_s", s.get("end", 0.0)),
+            text=s.get("text", ""),
+            speaker=s.get("speaker"),
+            speaker_id=s.get("speaker_id", "unknown"),
+            confidence=s.get("confidence", 0.0)
+        ))
+        
+    metrics_data = output.get("metrics", {})
+    metrics = AlignmentMetrics(
+        total_duration_s=metrics_data.get("total_duration_s", 0.0),
+        assigned_duration_s=metrics_data.get("assigned_duration_s", 0.0),
+        coverage_ratio=metrics_data.get("coverage_ratio", 0.0),
+        unknown_ratio=metrics_data.get("unknown_ratio", 0.0),
+        speaker_switch_count=metrics_data.get("speaker_switch_count", 0),
+        speaker_distribution=metrics_data.get("speaker_distribution", {})
+    )
+    
+    inputs = data.get("inputs", {})
+    return AlignedTranscript(
+        segments=segments,
+        metrics=metrics,
+        source_asr_path=inputs.get("parent_artifact_path", inputs.get("parent_artifact_hash", "")),
+        source_diarization_path=""
+    )
+
+
+def run_alignment(
+    asr_path: Path,
+    diarization_path: Path,
+    output_dir: Path,
+    force: bool = False
+) -> Path:
+    """
+    Run alignment task.
+    
+    Args:
+        asr_path: Path to ASR artifact.
+        diarization_path: Path to Diarization artifact.
+        output_dir: Directory to save artifact.
+        force: Overwrite existing.
+        
+    Returns:
+        Path to alignment artifact.
+    """
+    from harness.runner_schema import compute_pcm_hash, compute_file_hash
+    
+    asr_path = asr_path.resolve()
+    diarization_path = diarization_path.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Check inputs exist
+    if not asr_path.exists():
+        raise FileNotFoundError(f"ASR not found: {asr_path}")
+    if not diarization_path.exists():
+        raise FileNotFoundError(f"Diarization not found: {diarization_path}")
+        
+    # Run Core Logic
+    aligned_transcript = align_artifacts(str(asr_path), str(diarization_path))
+    
+    # Save Artifact
+    artifact_name = f"alignment_{asr_path.stem.replace('asr_', '')}.json"
+    artifact_path = output_dir / artifact_name
+    
+    # Compute hashes
+    asr_hash = compute_file_hash(asr_path)
+    diar_hash = compute_file_hash(diarization_path)
+    
+    # Construct output JSON (wrapping core logic result)
+    output_data = {
+        "segments": [s.to_dict() for s in aligned_transcript.segments],
+        "metrics": aligned_transcript.metrics.to_dict(),
+        "source_asr_path": str(asr_path),
+        "source_diarization_path": str(diarization_path)
+    }
+    
+    final_data = {
+        "inputs": {
+            "parent_artifact_path": str(asr_path),
+            "parent_artifact_hash": asr_hash,
+            "diarization_path": str(diarization_path),
+            "diarization_hash": diar_hash
+        },
+        "output": output_data
+    }
+    
+    with open(artifact_path, 'w') as f:
+        json.dump(final_data, f, indent=2)
+        
+    return artifact_path
+

@@ -338,6 +338,34 @@ def cmd_recommend(args):
                 
                 return
             
+            # Chapters from ASR
+            if args.task == "chapters_from_asr":
+                print(f"  Step 1: Running Alignment Pipeline...")
+                
+                chapters_cmd = [sys.executable, str(Path(__file__).parent.parent / "scripts/run_chapters.py"),
+                                "--input", str(audio_path.resolve())]
+                if getattr(args, 'pre', None):
+                    chapters_cmd.extend(["--pre", args.pre])
+                
+                chapters_result = subprocess.run(chapters_cmd, capture_output=True, text=True)
+                
+                chapters_artifact_path = None
+                for line in (chapters_result.stdout or '').split('\n'):
+                    if line.startswith("ARTIFACT_PATH:"):
+                        chapters_artifact_path = line.split(":", 1)[1].strip()
+                        break
+                
+                if chapters_result.returncode == 0 and chapters_artifact_path:
+                    print(f"\n✅ Pipeline completed")
+                    print(f"📄 Chapters Artifact: {chapters_artifact_path}")
+                else:
+                    print(f"  ❌ Chapters extraction failed")
+                    if chapters_result.stderr:
+                        print(f"     Error: {chapters_result.stderr[-500:]}")
+                    sys.exit(EXIT_ERROR)
+                
+                return
+            
             # Action Items With Assignee
             if args.task == "action_items_with_assignee_from_asr":
                 print(f"  Step 1: Running Alignment Pipeline...")
@@ -915,7 +943,7 @@ Examples:
     # recommend
     p_recommend = subparsers.add_parser("recommend", help="Get recommendation for use case or task")
     p_recommend.add_argument("--use-case", "-u", help="Use case ID")
-    p_recommend.add_argument("--task", "-t", help="Task: asr, vad, diarization, v2v")
+    p_recommend.add_argument("--task", "-t", help="Task: asr, vad, diarization, v2v, chapters_from_asr, etc.")
     p_recommend.add_argument("--audio", "-a", type=Path, help="Audio file to run on")
     p_recommend.add_argument("--prompt", "-p", help="Text prompt for V2V (only valid with --task v2v)")
     p_recommend.add_argument("--device", help="Filter by device: cpu, mps, cuda")
@@ -925,7 +953,7 @@ Examples:
     
     # run
     p_run = subparsers.add_parser("run", help="Run model on task/dataset")
-    p_run.add_argument("--task", "-t", required=True, help="Task: asr, vad, diarization, v2v")
+    p_run.add_argument("--task", "-t", required=True, help="Task: asr, vad, diarization, v2v, alignment_from_asr")
     p_run.add_argument("--model", "-m", required=True, help="Model ID")
     p_run.add_argument("--dataset", "-d", help="Dataset ID")
     p_run.add_argument("--device", help="Device: cpu, mps, cuda")

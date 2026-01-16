@@ -1,0 +1,36 @@
+name: PR CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+            enable-cache: true
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Import Hygiene Check
+        run: uv run python -m unittest tests/unit/test_import_hygiene.py
+
+      - name: Run Tests (Fast Lane)
+        # Excludes real_e2e tests to keep it fast and cheap
+        run: uv run pytest -m "not real_e2e"
+
+      - name: Lint (Ruff)
+        run: uv run ruff check .

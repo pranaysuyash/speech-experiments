@@ -4,10 +4,7 @@ Ensures consistent audio loading, preprocessing, and format handling across mode
 """
 
 import hashlib
-import soundfile as sf
 import numpy as np
-import torch
-import torchaudio
 from pathlib import Path
 from typing import Tuple, Optional, Dict, Any
 import logging
@@ -60,6 +57,8 @@ class AudioLoader:
             sample_rate: Sample rate in Hz
             metadata: Audio metadata
         """
+        import soundfile as sf  # Lazy import
+
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
@@ -102,6 +101,9 @@ class AudioLoader:
 
     def _resample_audio(self, audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
         """Resample audio using torchaudio."""
+        import torch
+        import torchaudio
+
         # Convert to tensor if needed
         if isinstance(audio, np.ndarray):
             audio_tensor = torch.from_numpy(audio).float()
@@ -119,6 +121,7 @@ class AudioLoader:
 
     def save_audio(self, audio: np.ndarray, sample_rate: int, output_path: Path):
         """Save audio to file."""
+        import soundfile as sf # Lazy import
         output_path.parent.mkdir(parents=True, exist_ok=True)
         sf.write(output_path, audio, sample_rate)
         logger.info(f"Saved audio to {output_path}")

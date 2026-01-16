@@ -81,6 +81,8 @@ runs/**/*.png
 runs/**/*.jpg
 runs/**/*.wav
 runs/**/*.mp3
+# Session pipeline outputs (never commit)
+runs/sessions/
 # But keep summary and model card files
 !runs/.gitkeep
 !runs/*/.gitkeep
@@ -175,3 +177,6 @@ profile_default/
 !models/*/
 !data/*/
 !harness/*/
+
+# Override structure keepers: never commit session runs
+runs/sessions/

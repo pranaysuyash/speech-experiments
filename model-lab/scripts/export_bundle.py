@@ -32,6 +32,7 @@ logging.basicConfig(level=logging.INFO, format='%(name)s - %(levelname)s - %(mes
 logger = logging.getLogger("export_bundle")
 
 # Search paths for artifacts
+MANIFEST_VERSION = "1.1.0"
 RUNS_DIR = Path("runs")
 TASKS = [
     "asr",
@@ -42,6 +43,7 @@ TASKS = [
     "nlp/action_items",
     "nlp/action_items_assignee",
     "nlp/ner",
+    "nlp/chapters",
 ]
 
 def find_latest_artifact_for_task(task_dir: Path, source_hash: str) -> Optional[Path]:
@@ -195,7 +197,7 @@ def collect_session_artifacts(input_path: Path) -> Dict[str, Path]:
                     return (path, compute_file_hash(path))
             return None
             
-        for task in ["nlp/summarize_by_speaker", "nlp/action_items_assignee"]:
+        for task in ["nlp/summarize_by_speaker", "nlp/action_items_assignee", "nlp/chapters"]:
             found = scan_grandchildren(task, RUNS_DIR / task)
             if found:
                 session_artifacts[task] = found[0]
@@ -215,6 +217,7 @@ def create_bundle(input_path: Path, output_path: Path, dry_run: bool = False):
         return
         
     manifest = {
+        "schema_version": MANIFEST_VERSION,
         "export_date": datetime.now().isoformat(),
         "input_file": input_path.name,
         "input_hash": compute_input_hash(input_path),

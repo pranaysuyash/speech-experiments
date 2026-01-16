@@ -1,0 +1,46 @@
+name: Nightly Real E2E
+
+on:
+  schedule:
+    - cron: '0 8 * * *' # Run daily at 8:00 UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+            enable-cache: true
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Install System Dependencies (ffmpeg)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Cache Model Directory
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/huggingface
+          key: huggingface-models-${{ runner.os }}
+          restore-keys: |
+            huggingface-models-${{ runner.os }}
+
+      - name: Run Real E2E Smoke Test
+        env:
+          RUN_REAL_E2E: "1"
+          # Ensure models are cached or downloaded to expected location
+          HF_HOME: /home/runner/.cache/huggingface
+        run: |
+          uv run pytest tests/integration/test_real_smoke.py -s
+          # Optionally run failure injection test in real mode if desired:
+          # uv run pytest tests/integration/test_partial_bundle_on_failure.py -s

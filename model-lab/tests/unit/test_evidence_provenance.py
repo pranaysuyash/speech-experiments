@@ -189,6 +189,10 @@ class TestMandatoryProvenance:
         
         violations = []
         for run_file in runs_dir.glob("**/*.json"):
+            # Session pipeline metadata is not treated as "evidence artifacts".
+            # Evidence artifacts live under task folders (e.g., runs/asr, runs/tts, etc.).
+            if "runs/sessions/" in str(run_file).replace("\\", "/"):
+                continue
             # Skip summary files
             if run_file.name == "summary.json":
                 continue
@@ -215,6 +219,8 @@ class TestMandatoryProvenance:
         
         violations = []
         for run_file in runs_dir.glob("**/*.json"):
+            if "runs/sessions/" in str(run_file).replace("\\", "/"):
+                continue
             if run_file.name == "summary.json":
                 continue
             
@@ -383,5 +389,4 @@ class TestRunContext:
         if violations:
             import warnings
             warnings.warn(f"Audio tasks without duration: {len(violations)}")
-
 

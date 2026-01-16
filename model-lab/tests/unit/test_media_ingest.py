@@ -1,196 +1,81 @@
 """
-Tests for media ingestion.
+Tests for media ingestion (session pipeline).
 
 These tests verify:
-1. Media type detection (video vs audio)
-2. Canonical audio output (mono, 16kHz, float32)
-3. Hash computation (source_media_hash vs audio_hash)
-4. Graceful handling of missing ffmpeg
+1. ingest_media produces a canonical processed WAV (mono, 16kHz)
+2. Hash fields are populated and deterministic
+3. Missing files raise a clear error
 """
 
-import pytest
-import numpy as np
-import sys
-import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+import pytest
 
-from harness.media_ingest import (
-    detect_media_type,
-    compute_pcm_hash,
-    compute_file_hash,
-    check_ffmpeg_available,
-    ingest_media,
-    IngestResult,
-    IngestError,
-    FFmpegNotFoundError,
-    VIDEO_EXTENSIONS,
-    AUDIO_EXTENSIONS,
-    CANONICAL_SAMPLE_RATE,
-)
+from harness.media_ingest import IngestConfig, ingest_media, sha256_file, get_ffmpeg_version
 
 
-class TestMediaTypeDetection:
-    """Tests for media type detection."""
-    
-    def test_detect_video_extensions(self):
-        """Common video extensions detected correctly."""
-        for ext in ['.mp4', '.mkv', '.mov', '.avi', '.webm']:
-            assert detect_media_type(Path(f"test{ext}")) == "video"
-    
-    def test_detect_audio_extensions(self):
-        """Common audio extensions detected correctly."""
-        for ext in ['.wav', '.mp3', '.flac', '.ogg', '.m4a']:
-            assert detect_media_type(Path(f"test{ext}")) == "audio"
-    
-    def test_unknown_extension(self):
-        """Unknown extensions return 'unknown'."""
-        assert detect_media_type(Path("test.xyz")) == "unknown"
+def test_get_ffmpeg_version_returns_string():
+    v = get_ffmpeg_version()
+    assert isinstance(v, str)
+    assert v
 
 
-class TestHashComputation:
-    """Tests for hash computation."""
-    
-    def test_pcm_hash_deterministic(self):
-        """Same audio produces same hash."""
-        audio = np.array([0.1, 0.2, 0.3], dtype=np.float32)
-        hash1 = compute_pcm_hash(audio)
-        hash2 = compute_pcm_hash(audio)
-        assert hash1 == hash2
-    
-    def test_pcm_hash_different_for_different_audio(self):
-        """Different audio produces different hash."""
-        audio1 = np.array([0.1, 0.2, 0.3], dtype=np.float32)
-        audio2 = np.array([0.3, 0.2, 0.1], dtype=np.float32)
-        assert compute_pcm_hash(audio1) != compute_pcm_hash(audio2)
-    
-    def test_pcm_hash_length(self):
-        """Hash is 16 characters by default."""
-        audio = np.array([0.1, 0.2, 0.3], dtype=np.float32)
-        assert len(compute_pcm_hash(audio)) == 16
+@pytest.fixture
+def sample_wav(tmp_path: Path) -> Path:
+    import numpy as np
+    import soundfile as sf
+
+    sr = 16000
+    t = np.linspace(0, 1, sr, endpoint=False)
+    audio = (0.1 * np.sin(2 * np.pi * 440 * t)).astype("float32")
+
+    wav_path = tmp_path / "test.wav"
+    sf.write(wav_path, audio, sr)
+    return wav_path
 
 
-class TestFFmpegCheck:
-    """Tests for ffmpeg availability check."""
-    
-    def test_check_ffmpeg_returns_tuple(self):
-        """check_ffmpeg_available returns (bool, version_or_None)."""
-        available, version = check_ffmpeg_available()
-        assert isinstance(available, bool)
-        if available:
-            assert version is not None
-        else:
-            assert version is None
+def test_ingest_produces_canonical_wav(sample_wav: Path, tmp_path: Path):
+    artifacts_dir = tmp_path / "artifacts"
+    cfg = IngestConfig(normalize=False, trim_silence=False)
+
+    result = ingest_media(sample_wav, artifacts_dir, cfg)
+
+    assert result["source_media_path"].endswith("test.wav")
+    assert result["source_media_hash"] == sha256_file(sample_wav)
+    assert len(result["source_media_hash"]) == 64
+
+    processed_path = Path(result["processed_audio_path"])
+    assert processed_path.exists()
+    assert processed_path.name == "processed_audio.wav"
+    assert processed_path.parent.name == "ingest"
+
+    assert len(result["audio_content_hash"]) == 64
+    assert len(result["audio_fingerprint"]) == 64
+    assert len(result["preprocess_hash"]) == 64
+
+    import soundfile as sf
+
+    audio, sr = sf.read(processed_path)
+    assert sr == 16000
+    # mono: either 1D array or Nx1
+    assert len(audio.shape) in (1, 2)
+    if len(audio.shape) == 2:
+        assert audio.shape[1] == 1
 
 
-class TestIngestWithRealFile:
-    """Integration tests with real audio files."""
-    
-    @pytest.fixture
-    def sample_wav(self, tmp_path):
-        """Create a sample WAV file for testing."""
-        import soundfile as sf
-        
-        # Create 1 second of sine wave
-        sr = 16000
-        t = np.linspace(0, 1, sr)
-        audio = (np.sin(2 * np.pi * 440 * t)).astype(np.float32)
-        
-        wav_path = tmp_path / "test.wav"
-        sf.write(wav_path, audio, sr)
-        return wav_path
-    
-    def test_ingest_wav_produces_correct_result(self, sample_wav):
-        """Ingesting WAV produces IngestResult with correct properties."""
-        result = ingest_media(sample_wav)
-        
-        try:
-            # Check types
-            assert isinstance(result, IngestResult)
-            assert isinstance(result.audio, np.ndarray)
-            
-            # Check canonical properties
-            assert result.sample_rate == CANONICAL_SAMPLE_RATE
-            assert result.audio.dtype == np.float32
-            
-            # Check hashes are populated
-            assert len(result.source_media_hash) == 16
-            assert len(result.audio_hash) == 16
-            
-            # Check metadata
-            assert result.source_media_path == sample_wav
-            assert result.original_format == ".wav"
-            assert result.audio_duration_s > 0
-        finally:
-            result.cleanup()
-    
-    def test_ingest_wav_hash_is_from_pcm(self, sample_wav):
-        """audio_hash is computed from PCM, not file bytes."""
-        result = ingest_media(sample_wav)
-        
-        try:
-            # Manually compute PCM hash
-            expected_hash = compute_pcm_hash(result.audio)
-            assert result.audio_hash == expected_hash
-            
-            # source_media_hash should be different (file bytes)
-            assert result.source_media_hash != result.audio_hash
-        finally:
-            result.cleanup()
-    
-    def test_ingest_nonexistent_file_raises(self):
-        """Ingesting nonexistent file raises IngestError."""
-        with pytest.raises(IngestError) as exc_info:
-            ingest_media(Path("/nonexistent/file.wav"))
-        
-        assert "not found" in str(exc_info.value).lower()
+def test_ingest_is_deterministic_for_same_input(sample_wav: Path, tmp_path: Path):
+    cfg = IngestConfig(normalize=False, trim_silence=False)
+    a = ingest_media(sample_wav, tmp_path / "a", cfg)
+    b = ingest_media(sample_wav, tmp_path / "b", cfg)
+
+    assert a["source_media_hash"] == b["source_media_hash"]
+    assert a["audio_content_hash"] == b["audio_content_hash"]
+    assert a["preprocess_hash"] == b["preprocess_hash"]
+    assert a["audio_fingerprint"] == b["audio_fingerprint"]
 
 
-class TestIngestArtifactSchema:
-    """Tests that ingest results can populate artifact schema correctly."""
-    
-    @pytest.fixture
-    def sample_wav(self, tmp_path):
-        """Create a sample WAV file."""
-        import soundfile as sf
-        sr = 16000
-        audio = np.zeros(sr, dtype=np.float32)  # 1 second silence
-        wav_path = tmp_path / "test.wav"
-        sf.write(wav_path, audio, sr)
-        return wav_path
-    
-    def test_ingest_result_has_all_required_fields(self, sample_wav):
-        """IngestResult has all fields needed for artifact inputs section."""
-        result = ingest_media(sample_wav)
-        
-        try:
-            # Required for runner_schema.InputsSchema
-            assert hasattr(result, 'source_media_path')
-            assert hasattr(result, 'source_media_hash')
-            assert hasattr(result, 'audio_hash')
-            assert hasattr(result, 'audio_duration_s')
-            assert hasattr(result, 'sample_rate')
-            
-            # Required for ingest provenance
-            assert hasattr(result, 'ingest_tool')
-            assert hasattr(result, 'ingest_version')
-            assert hasattr(result, 'is_extracted')
-        finally:
-            result.cleanup()
+def test_ingest_missing_file_raises(tmp_path: Path):
+    cfg = IngestConfig()
+    with pytest.raises(FileNotFoundError):
+        ingest_media(tmp_path / "nope.wav", tmp_path / "artifacts", cfg)
 
-
-# Skip video tests if no ffmpeg
-@pytest.mark.skipif(
-    not check_ffmpeg_available()[0],
-    reason="ffmpeg not installed"
-)
-class TestVideoIngestion:
-    """Tests for video file ingestion (requires ffmpeg)."""
-    
-    def test_ffmpeg_is_available(self):
-        """Verify ffmpeg is available for video tests."""
-        available, version = check_ffmpeg_available()
-        assert available
-        assert version is not None

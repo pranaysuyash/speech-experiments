@@ -4,8 +4,6 @@ Implements audio similarity, naturalness, and timing metrics.
 """
 
 import numpy as np
-import torch
-import torchaudio
 from typing import Tuple, Dict, Any, List
 from dataclasses import dataclass
 import logging
@@ -35,6 +33,9 @@ class TTSMetrics:
         Calculate MFCC-based audio similarity.
         Higher values indicate more similar audio.
         """
+        import torch
+        import torchaudio
+
         # Convert to tensors
         if isinstance(audio1, np.ndarray):
             audio1 = torch.from_numpy(audio1).float()
@@ -141,6 +142,8 @@ class VoiceQualityMetrics:
     @staticmethod
     def calculate_spectral_centroid(audio: np.ndarray, sr: int) -> float:
         """Calculate spectral centroid (brightness)."""
+        import torch
+
         if isinstance(audio, np.ndarray):
             audio = torch.from_numpy(audio).float()
 
@@ -162,6 +165,8 @@ class VoiceQualityMetrics:
     @staticmethod
     def calculate_energy(audio: np.ndarray) -> float:
         """Calculate RMS energy."""
+        import torch
+
         if isinstance(audio, np.ndarray):
             audio = torch.from_numpy(audio).float()
         return torch.sqrt(torch.mean(audio**2)).item()

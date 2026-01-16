@@ -5,8 +5,8 @@ Supports LFM2.5-Audio, Whisper, SeamlessM4T, Distil-Whisper, Whisper.cpp, etc.
 All loaders MUST return Bundle Contract v1 (see contracts.py).
 """
 
+from __future__ import annotations
 import hashlib
-import torch
 from typing import Dict, Any, Optional, Callable, List
 from pathlib import Path
 import logging
@@ -194,6 +194,7 @@ def load_lfm2_5_audio(config: Dict[str, Any], device: str) -> Bundle:
     """
     try:
         from liquid_audio import LFM2AudioModel, LFM2AudioProcessor
+        import torch
 
         model_name = config.get('model_name', 'LiquidAI/LFM2.5-Audio-1.5B')
 
@@ -483,6 +484,7 @@ def load_whisper(config: Dict[str, Any], device: str) -> Bundle:
     """Load Whisper model with Bundle Contract v1."""
     try:
         import whisper
+        import torch # Added for internal use
 
         model_name = config.get('model_name', 'large-v3')
         model = whisper.load_model(model_name, device=device)
@@ -526,6 +528,7 @@ def load_faster_whisper(config: Dict[str, Any], device: str) -> Bundle:
     """Load Faster-Whisper model with Bundle Contract v1."""
     try:
         from faster_whisper import WhisperModel
+        import torch # Added for consistency if needed, though fw uses numpy
 
         model_name = config.get('model_name', 'large-v3')
         compute_type = config.get('inference', {}).get('compute_type', 'float16')
@@ -580,6 +583,7 @@ def load_seamlessm4t(config: Dict[str, Any], device: str) -> Bundle:
     """Load SeamlessM4T model with Bundle Contract v1."""
     try:
         from transformers import SeamlessM4TForSpeechToText, AutoProcessor
+        import torch
 
         model_name = config.get('model_name', 'facebook/seamless-m4t-v2-large')
         processor = AutoProcessor.from_pretrained(model_name)
@@ -631,6 +635,7 @@ def load_distil_whisper(config: Dict[str, Any], device: str) -> Bundle:
     """
     try:
         from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+        import torch
 
         model_id = config.get("model_name", "distil-whisper/distil-large-v3")
 
@@ -703,6 +708,8 @@ def load_whisper_cpp(config: Dict[str, Any], device: str) -> Bundle:
     import tempfile
     import soundfile as sf
     import numpy as np
+    
+    # Needs torch check? No, CLI based.
 
     whisper_cpp_config = config.get("whisper_cpp", {})
     bin_path = whisper_cpp_config.get("bin_path", "whisper-cli")
@@ -745,6 +752,7 @@ def load_whisper_cpp(config: Dict[str, Any], device: str) -> Bundle:
         Writes temp wav file and calls CLI.
         """
         # Ensure numpy array
+        import torch # Need torch to check if tensor
         if isinstance(audio, torch.Tensor):
             audio = audio.cpu().numpy()
         if isinstance(audio, np.ndarray) and audio.dtype != np.float32:
@@ -778,6 +786,8 @@ def load_whisper_cpp(config: Dict[str, Any], device: str) -> Bundle:
 def load_silero_vad(config: Dict[str, Any], device: str) -> Bundle:
     """Load Silero VAD model with Bundle Contract v1."""
     try:
+        import torch
+
         # Load from Torch Hub
         model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
                                       model='silero_vad',
