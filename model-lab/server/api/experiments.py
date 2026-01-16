@@ -357,3 +357,103 @@ def start_all_runs(experiment_id: str) -> JSONResponse:
         raise HTTPException(status_code=404, detail="Experiment not found")
     
     return JSONResponse(content={"experiment": exp})
+
+
+@router.get("/{experiment_id}/compare")
+def compare_experiment_runs(
+    experiment_id: str,
+    left: str,
+    right: str,
+    artifact: str,
+    max_bytes: int = 200_000,
+) -> JSONResponse:
+    """
+    Compare two runs in an experiment.
+    
+    Artifacts supported: transcript, summary, action_items.
+    Enforces size limit for diff sanity.
+    """
+    allowed_artifacts = ["transcript", "summary", "action_items"]
+    if artifact not in allowed_artifacts:
+        raise HTTPException(status_code=400, detail=f"Invalid artifact. Allowed: {allowed_artifacts}")
+        
+    exp = _load_experiment(experiment_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+        
+    runs_map = {r["run_id"]: r for r in exp["runs"] if r["run_id"]}
+    
+    if left not in runs_map or right not in runs_map:
+        raise HTTPException(status_code=400, detail="Run IDs must belong to this experiment")
+        
+    def _read_artifact(run_id: str) -> Dict[str, Any]:
+        """Read artifact safely with fallback logic."""
+        if not run_id:
+            return {"available": False, "text": None}
+
+        # Resolution rules: Bundle first, then legacy/task paths
+        run_dir = _runs_root() / run_id
+        paths = []
+        
+        if artifact == "transcript":
+            paths = [
+                run_dir / "bundle" / "transcript.txt",
+                run_dir / "asr" / "transcript.txt",
+            ]
+        elif artifact == "summary":
+            paths = [
+                run_dir / "bundle" / "summary.md",
+                run_dir / "session" / "summary.md",
+            ]
+        elif artifact == "action_items":
+            paths = [
+                run_dir / "bundle" / "action_items.csv",
+                run_dir / "session" / "action_items.csv",
+            ]
+            
+        target_path = next((p for p in paths if p.exists()), None)
+        
+        if not target_path:
+            return {"available": False, "text": None}
+            
+        file_size = target_path.stat().st_size
+        if file_size > max_bytes:
+            return {
+                "available": True, 
+                "text": None, 
+                "truncated": True, 
+                "size": file_size,
+                "error": "PREVIEW_TOO_LARGE"
+            }
+            
+        try:
+            text = target_path.read_text(encoding="utf-8")
+            return {
+                "available": True,
+                "text": text,
+                "size": len(text)
+            }
+        except Exception:
+            return {"available": False, "text": None, "error": "READ_ERROR"}
+
+    left_data = _read_artifact(left)
+    right_data = _read_artifact(right)
+    
+    # If both requested files form a "too large" pair, signal 413
+    if left_data.get("error") == "PREVIEW_TOO_LARGE" or right_data.get("error") == "PREVIEW_TOO_LARGE":
+         return JSONResponse(
+            status_code=413,
+            content={
+                "error_code": "PREVIEW_TOO_LARGE",
+                "left": left_data,
+                "right": right_data
+            }
+        )
+
+    return JSONResponse(
+        content={
+            "artifact": artifact,
+            "left": left_data,
+            "right": right_data,
+        }
+    )

@@ -139,6 +139,13 @@ export const api = {
     return res.data;
   },
 
+  getExperimentComparison: async (experimentId: string, leftRunId: string, rightRunId: string, artifact: string, maxBytes = 200000): Promise<any> => {
+    const res = await axios.get(`${API_BASE}/experiments/${experimentId}/compare`, {
+        params: { left: leftRunId, right: rightRunId, artifact, max_bytes: maxBytes }
+    });
+    return res.data;
+  },
+
   getPresets: async (): Promise<{ steps_preset: string; label: string; description?: string }[]> => {
     const res = await axios.get(`${API_BASE}/workbench/presets`);
     return res.data;
