@@ -385,9 +385,9 @@ class SessionRunner:
         scores = []
         
         # 1. Artifact Completeness
-        # Check for artifacts (try .txt first for legacy, then .json canonical)
+        # Check for artifacts (try .json first for canonical, then .txt legacy)
         required_checks = [
-            (["bundle/transcript.txt", "bundle/transcript.json"], "transcript"),
+            (["bundle/transcript.json", "bundle/transcript.txt"], "transcript"),
             (["bundle/summary.md"], "summary"),
             (["bundle/action_items.csv"], "action_items"),
         ]
@@ -407,9 +407,9 @@ class SessionRunner:
         })
 
         # 2. Transcript Length OK
-        # Try .txt first (legacy), then .json (canonical)
+        # Try .json first (canonical), then .txt (legacy)
         t_path = None
-        for candidate in ["bundle/transcript.txt", "bundle/transcript.json"]:
+        for candidate in ["bundle/transcript.json", "bundle/transcript.txt"]:
             p = self.session_dir / candidate
             if p.exists():
                 t_path = p
