@@ -61,9 +61,11 @@ def atomic_write_json(path: Path, obj: Any) -> None:
 
 
 def compute_run_id(input_hash: str) -> str:
-    # Deterministic enough: timestamp + short hash
+    # Deterministic enough: timestamp + short hash + uuid for uniqueness
+    import uuid
     ts = time.strftime("%Y%m%d_%H%M%S", time.gmtime())
-    short = hashlib.sha256((ts + input_hash).encode("utf-8")).hexdigest()[:10]
+    unique = uuid.uuid4().hex[:6]  # Add randomness to prevent collisions
+    short = hashlib.sha256((ts + input_hash + unique).encode("utf-8")).hexdigest()[:10]
     return f"{ts}_{short}"
 
 # Schema version for Manifest
@@ -537,8 +539,17 @@ class SessionRunner:
         # 3. Diarization
         def diarization_func(ctx: SessionContext) -> Dict[str, Any]:
             if not ctx.audio_path: raise RuntimeError("No audio")
-            from harness.diarization import run_diarization
-            return run_diarization(ctx.audio_path, ctx.artifacts_dir, config=self.extra_config.get("diarization", {}))
+            try:
+                from harness.diarization import run_diarization
+                diar_config = self.extra_config.get("diarization", {})
+                model_name = diar_config.get("model_name", "heuristic_diarization")
+                output_dir = ctx.artifacts_dir / "diarization"
+                output_dir.mkdir(parents=True, exist_ok=True)
+                artifact_path = run_diarization(ctx.audio_path, model_name, output_dir)
+                return {"artifacts": [{"path": str(artifact_path)}]}
+            except Exception as e:
+                logger.warning(f"Diarization failed (non-fatal): {e}")
+                return {"artifacts": [], "warning": str(e)}
             
         def diarization_artifacts(res: Dict) -> List[Path]:
             return [Path(p["path"]) for p in res.get("artifacts", [])]

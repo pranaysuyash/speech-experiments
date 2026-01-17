@@ -541,6 +541,11 @@ def load_faster_whisper(config: Dict[str, Any], device: str) -> Bundle:
         else:
             device_fw = 'cpu'
 
+        # Force int8/float32 on CPU if float16 requested (which is default but fails on many CPUs)
+        if device_fw == 'cpu' and compute_type == 'float16':
+            compute_type = 'int8'
+            # logger.info("Forced compute_type='int8' for CPU execution")
+
         model = WhisperModel(
             model_name,
             device=device_fw,
@@ -925,6 +930,7 @@ def load_heuristic_diarizer(config: Dict[str, Any], device: str) -> Bundle:
     Fallback for when pyannote is not available.
     """
     try:
+        import torch
         # Reuse Silero VAD loading logic
         model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
                                       model='silero_vad',
@@ -942,7 +948,9 @@ def load_heuristic_diarizer(config: Dict[str, Any], device: str) -> Bundle:
             """
             import numpy as np
             if isinstance(audio, np.ndarray):
-                audio = torch.from_numpy(audio)
+                audio = torch.from_numpy(audio).float()  # Ensure float32
+            else:
+                audio = audio.float()  # Ensure float32
             
             if audio.dim() > 1:
                 audio = audio.squeeze()

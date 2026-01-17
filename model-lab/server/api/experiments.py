@@ -339,6 +339,7 @@ def start_next_run(experiment_id: str) -> JSONResponse:
     now = datetime.now(timezone.utc)
     state["runs"][queued_idx]["status"] = "RUNNING"
     state["runs"][queued_idx]["run_id"] = result["run_id"]
+    state["runs"][queued_idx]["input_hash"] = result.get("input_hash")
     state["runs"][queued_idx]["started_at"] = now.isoformat()
     state["last_updated_at"] = now.isoformat()
     
@@ -404,8 +405,30 @@ def compare_experiment_runs(
             return {"available": False, "text": None}
 
         from server.utils.artifacts import read_artifact_text
-        run_dir = _runs_root() / run_id
-        return read_artifact_text(run_dir, artifact, max_bytes)
+        
+        runs_root = _runs_root() / "sessions"
+        run_record = runs_map.get(run_id)
+        input_hash = run_record.get("input_hash") if run_record else None
+        
+        if input_hash:
+             found_run_dir = runs_root / input_hash / run_id
+        else:
+             # Look for run_id in sessions glob (legacy fallback)
+             found_run_dir = None
+             if runs_root.exists():
+                 for path in runs_root.glob(f"*/{run_id}"):
+                     if path.is_dir():
+                         found_run_dir = path
+                         break
+             if not found_run_dir:
+                 found_run_dir = _runs_root() / run_id
+             
+        # The artifact is likely in the "bundle" subdirectory for sessions
+        # Try finding it in bundle first, then root of run
+        if (found_run_dir / "bundle" / artifact).exists():
+             return read_artifact_text(found_run_dir / "bundle", artifact, max_bytes)
+             
+        return read_artifact_text(found_run_dir, artifact, max_bytes)
 
     left_data = _read_artifact(left)
     right_data = _read_artifact(right)

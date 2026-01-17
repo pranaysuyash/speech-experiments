@@ -16,10 +16,14 @@ from harness.session import SessionRunner
 
 
 router = APIRouter(prefix="/api/workbench", tags=["workbench"])
-
+# State
 _WORKER_LOCK = threading.Lock()
 _WORKER_ACTIVE = False
 _ACTIVE_RUN_ID: Optional[str] = None
+
+# Concurrency Governor
+_ACTIVE_RUNS_COUNT = 0
+_MAX_CONCURRENT_RUNS = 3  # Allow A/B + one extra
 
 
 def _runs_root() -> Path:
@@ -31,19 +35,19 @@ def _inputs_root() -> Path:
 
 
 def _try_acquire_worker() -> bool:
-    global _WORKER_ACTIVE
+    global _ACTIVE_RUNS_COUNT
     with _WORKER_LOCK:
-        if _WORKER_ACTIVE:
+        if _ACTIVE_RUNS_COUNT >= _MAX_CONCURRENT_RUNS:
             return False
-        _WORKER_ACTIVE = True
+        _ACTIVE_RUNS_COUNT += 1
         return True
 
 
 def _release_worker() -> None:
-    global _WORKER_ACTIVE, _ACTIVE_RUN_ID
+    global _ACTIVE_RUNS_COUNT
     with _WORKER_LOCK:
-        _WORKER_ACTIVE = False
-        _ACTIVE_RUN_ID = None
+        if _ACTIVE_RUNS_COUNT > 0:
+            _ACTIVE_RUNS_COUNT -= 1
 
 
 def _safe_filename(name: str) -> str:
@@ -159,31 +163,76 @@ def start_run_from_path(
             candidate_snapshot=candidate_snapshot,
         )
         
-        def _bg() -> None:
+        # Write additional run request info needed by worker
+        run_request_path = runner.session_dir / "run_request.json"
+        if run_request_path.exists():
+            run_request = json.loads(run_request_path.read_text(encoding="utf-8"))
+        else:
+            run_request = {}
+        
+        run_request.update({
+            "run_id": runner.run_id,
+            "input_path": str(input_path),
+            "steps": steps,
+            "steps_preset": steps_preset,
+        })
+        
+        tmp_path = run_request_path.with_suffix(".json.tmp")
+        tmp_path.write_text(json.dumps(run_request, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(run_request_path)
+        
+        # Write initial manifest with RUNNING status
+        import subprocess
+        manifest_path = runner.manifest_path
+        initial_manifest = {
+            "run_id": runner.run_id,
+            "status": "RUNNING",
+            "started_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+            "steps_completed": [],
+            "steps": {},
+            "warnings": [],
+        }
+        tmp_manifest = manifest_path.with_suffix(".json.tmp")
+        tmp_manifest.parent.mkdir(parents=True, exist_ok=True)
+        tmp_manifest.write_text(json.dumps(initial_manifest, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_manifest.replace(manifest_path)
+        
+        # Spawn subprocess worker - runs completely independently
+        log_file = runner.session_dir / "worker.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(log_file, "w") as log_f:
+            proc = subprocess.Popen(
+                [
+                    "uv", "run", "python", "-m", "harness.run_worker",
+                    "--run-dir", str(runner.session_dir),
+                ],
+                stdout=log_f,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,  # Detach from parent
+                cwd=str(Path(__file__).parent.parent.parent),  # Project root
+            )
+        
+        # Store PID for monitoring
+        pid_file = runner.session_dir / "worker.pid"
+        pid_file.write_text(str(proc.pid))
+        
+        # Release worker lock in a background thread that waits for subprocess
+        def _wait_and_release() -> None:
             try:
-                runner.run()
+                proc.wait()
             finally:
                 _release_worker()
         
-        thread = threading.Thread(target=_bg, name=f"workbench-run-{runner.run_id}", daemon=True)
-        thread.start()
-        
-        # Wait for the manifest to appear as RUNNING
-        deadline = time.monotonic() + 0.5
-        while time.monotonic() < deadline:
-            if runner.manifest_path.exists():
-                try:
-                    m = json.loads(runner.manifest_path.read_text(encoding="utf-8"))
-                    if m.get("status") == "RUNNING":
-                        break
-                except Exception:
-                    pass
-            time.sleep(0.01)
+        wait_thread = threading.Thread(target=_wait_and_release, daemon=True)
+        wait_thread.start()
         
         return {
             "run_id": runner.run_id,
+            "input_hash": sha256_hex,
             "run_dir": str(runner.session_dir),
             "console_url": f"/runs/{runner.run_id}",
+            "worker_pid": proc.pid,
         }
     except RunnerBusyError:
         raise

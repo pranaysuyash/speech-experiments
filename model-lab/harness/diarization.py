@@ -47,12 +47,17 @@ def run_diarization(
     input_path = input_path.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # 1. Ingest
-    ingest = ingest_media(input_path)
+    # 1. Load already-processed audio (input_path is from the ingest step)
+    import soundfile as sf
+    audio, sr = sf.read(str(input_path))
+    
+    # Compute hash for provenance
+    import hashlib
+    audio_hash = hashlib.sha256(audio.tobytes()).hexdigest()[:16]
     
     # Preprocessing
-    audio_for_model = ingest.audio
-    sr_for_model = ingest.sample_rate
+    audio_for_model = audio
+    sr_for_model = sr
     
     if pre_ops:
          results = run_preprocessing_chain(audio_for_model, sr_for_model, pre_ops.split(','))
@@ -60,54 +65,41 @@ def run_diarization(
              audio_for_model = results[-1].audio
              sr_for_model = results[-1].sample_rate
 
-    # 2. Load Model
-    loader = ModelRegistry.get_loader(model_name)
-    if not loader:
-        raise ValueError(f"Model {model_name} not found in registry")
+    # 2. Load Model via ModelRegistry
+    try:
+        bundle = ModelRegistry.load_model(model_name, {}, device)
+    except Exception as e:
+        raise ValueError(f"Failed to load diarization model {model_name}: {e}")
         
-    # 3. Run Diarization
+    # 3. Run Diarization via bundle's diarization capability
     t0 = time.time()
-    with loader.load(device=device) as model:
-        # Assuming model.diarize returns a simplified result object or Pyannote Annotation
-        # In existing scripts, we convert result to list of segments.
-        result = model.diarize(audio_for_model, sr_for_model)
+    diarize_func = bundle.get("diarization", {}).get("diarize")
+    if not diarize_func:
+        # Fallback: return empty result if model doesn't support diarization
+        logger.warning(f"Model {model_name} doesn't have diarize capability")
+        segments = []
+    else:
+        result = diarize_func(audio_for_model, sr_for_model)
+        segments = result.get("segments", [])
         
     duration_ms = int((time.time() - t0) * 1000)
     
-    # 4. Process Output
-    # Convert result to standard list of segments: {start, end, speaker}
-    # If result has .iter_tracks() (pyannote):
-    segments = []
-    if hasattr(result, "itertracks"):
-        for turn, _, speaker in result.itertracks(yield_label=True):
-            segments.append({
-                "start": turn.start,
-                "end": turn.end,
-                "speaker": speaker
-            })
-    elif isinstance(result, list): # Heuristic might return list
-        segments = result
-    else:
-        # Fallback or error?
-        logger.warning(f"Unknown diarization result type: {type(result)}")
-        segments = []
+    # 4. Segments already extracted from result, proceed to artifact creation
 
     # 5. Create Artifact
     artifact_name = f"diarization_{model_name}.json"
     artifact_path = output_dir / artifact_name
     
     run_ctx = create_run_context(
-        task="diarization",
-        model_id=model_name,
-        dataset_id="session",
-        compute_device=device
+        device=device,
+        model_version=model_name,
     )
     
     prov = create_provenance(dataset_id="session")
     
     inputs = InputsSchema(
-        audio_hash=ingest.audio_hash,
-        media_path=str(input_path)
+        audio_path=str(input_path),
+        audio_hash=audio_hash,
     )
     
     output_data = {
