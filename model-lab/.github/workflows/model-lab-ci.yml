@@ -24,6 +24,9 @@ jobs:
       - name: Install Python dependencies
         run: uv sync
       
+      - name: Block tracked runs artifacts
+        run: ./scripts/ci/deny-tracked-runs.sh
+      
       - name: Run fast lane tests
         run: uv run pytest -q -m "not real_e2e"
         env:
