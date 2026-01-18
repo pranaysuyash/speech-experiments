@@ -62,6 +62,32 @@ export interface MeetingPackManifest {
   absent: { name: string; reason: string }[];
 }
 
+export interface ComparisonSummary {
+  schema_version: "v1";
+  experiment_id: string;
+  candidates: {
+    A: { label: string; run_id: string | null; status: string };
+    B: { label: string; run_id: string | null; status: string };
+  };
+  readiness: {
+    comparable: boolean;
+    reason?: "NOT_TERMINAL" | "MISSING_RESULTS" | "INCOMPATIBLE_STEPS" | "SINGLE_RUN_ONLY";
+  };
+  metrics?: {
+    word_count?: { A: number; B: number; delta: number; pct_change: number };
+    duration_s?: { A: number; B: number; delta: number; pct_change: number };
+    confidence_avg?: { A: number; B: number; delta: number; pct_change: number };
+  };
+  verdicts: {
+    overall: "A_BETTER" | "B_BETTER" | "INCONCLUSIVE" | "NEUTRAL" | "PENDING";
+    reasons: string[];
+  };
+  provenance: {
+    computed_at: string;
+    results_schema: "v1";
+  };
+}
+
 export interface ResultSummary {
   schema_version: "v1";
   run_id: string;
@@ -170,6 +196,11 @@ export const api = {
         params: { left: leftRunId, right: rightRunId, artifact, max_bytes: maxBytes }
     });
     return res.data;
+  },
+
+  getExperimentComparisonResults: async (experimentId: string): Promise<ComparisonSummary> => {
+      const res = await axios.get(`${API_BASE}/experiments/${experimentId}/compare-results`);
+      return res.data;
   },
 
   getPresets: async (): Promise<{ steps_preset: string; label: string; description?: string }[]> => {

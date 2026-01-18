@@ -27,6 +27,8 @@ from server.api.candidates import (
     get_candidate_snapshot,
     USE_CASES,
 )
+from server.services.compare_results_v1 import compute_comparison_v1
+from server.services.results_v1 import compute_result_v1
 
 
 router = APIRouter(prefix="/api/experiments", tags=["experiments"])
@@ -471,3 +473,42 @@ def compare_experiment_runs(
             "right": right_data,
         }
     )
+
+@router.get("/{experiment_id}/compare-results")
+def compare_experiment_results(experiment_id: str):
+    """
+    Get semantic comparison of two runs in an experiment (v1).
+    Pure projection of results into verdicts.
+    """
+    # 1. Load Experiment
+    exp_data = _load_experiment(experiment_id)
+    if not exp_data:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+        
+    runs = exp_data.get("runs", [])
+    
+    # 2. Identify Runs
+    # Logic: We need exactly 2 runs to compare A vs B.
+    # If < 2, return comparable=False (handled by logic, but we need to feed Nones)
+    
+    res_a = None
+    res_b = None
+    
+    if len(runs) >= 1:
+        rid_a = runs[0].get("run_id")
+        if rid_a:
+            try:
+                res_a = compute_result_v1(rid_a)
+            except Exception:
+                pass # Result loading failed (maybe run deleted or ancient)
+                
+    if len(runs) >= 2:
+        rid_b = runs[1].get("run_id")
+        if rid_b:
+             try:
+                 res_b = compute_result_v1(rid_b)
+             except Exception:
+                 pass
+
+    # 3. Compute Comparison
+    return compute_comparison_v1(experiment_id, res_a, res_b)

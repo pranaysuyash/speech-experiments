@@ -15,7 +15,7 @@ from fastapi import HTTPException
 
 from server.services.runs_index import get_index
 from server.services.safe_files import safe_file_path
-from server.api.experiments import _load_experiment
+
 
 logger = logging.getLogger("server.results")
 
@@ -62,6 +62,7 @@ def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
         candidate_label = "Unknown"
         
         if experiment_id:
+            from server.api.experiments import _load_experiment
             exp_data = _load_experiment(experiment_id)
             if exp_data:
                 # Find this run in the experiment to get the snapshot label

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import type { ComparisonSummary } from '../lib/api';
 
 interface ExperimentRun {
     candidate_id: string;
@@ -41,18 +42,13 @@ export default function ExperimentPage() {
     const [experiment, setExperiment] = useState<Experiment | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // Compare state
-    const [compareArtifact, setCompareArtifact] = useState<'transcript' | 'summary' | 'action_items'>('transcript');
-    const [leftRunId, setLeftRunId] = useState<string>('');
-    const [rightRunId, setRightRunId] = useState<string>('');
-    const [compareData, setCompareData] = useState<any>(null);
-    const [compareLoading, setCompareLoading] = useState(false);
-    const [compareError, setCompareError] = useState<string | null>(null);
+    // Comparison state
+    const [comparison, setComparison] = useState<ComparisonSummary | null>(null);
+    const [compLoading, setCompLoading] = useState(false);
+    const [compError, setCompError] = useState<string | null>(null);
 
-    // Sort state
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'candidate_id', direction: 'asc' });
+    // ... Sort state ...
 
-    // Initial load
     useEffect(() => {
         if (!experimentId) return;
 
@@ -61,15 +57,17 @@ export default function ExperimentPage() {
                 const data = await api.getExperiment(experimentId);
                 setExperiment(data);
 
-                // Default selections if available and not set
-                if (!leftRunId && !rightRunId) {
-                    if (data.runs.length >= 2) {
-                        const r1 = data.runs[0].run_id;
-                        const r2 = data.runs[1].run_id;
-                        if (r1) setLeftRunId(r1);
-                        if (r2) setRightRunId(r2);
-                    } else if (data.runs.length === 1 && data.runs[0].run_id) {
-                        setLeftRunId(data.runs[0].run_id);
+                // Load comparison if strictly 2 runs or just try it
+                if (data.runs.length > 0) {
+                    setCompLoading(true);
+                    try {
+                        const comp = await api.getExperimentComparisonResults(experimentId);
+                        setComparison(comp);
+                    } catch (err) {
+                        console.error("Comparison load failed", err);
+                        setCompError("Could not load semantic comparison.");
+                    } finally {
+                        setCompLoading(false);
                     }
                 }
             } catch (e: any) {
@@ -80,62 +78,23 @@ export default function ExperimentPage() {
         load();
     }, [experimentId]);
 
-    // Polling (Read-Only)
+    // Polling updates logic
     useEffect(() => {
         if (!experimentId) return;
-
-        const poll = async () => {
+        const interval = setInterval(async () => {
+            const data = await api.getExperiment(experimentId);
+            setExperiment(data);
+            // Optionally refresh comparison too if status changed?
+            // For V1 let's just refresh comparison every time we poll experiment, 
+            // or only if we know it's pending.
+            // Simplicity: Refresh both.
             try {
-                const data = await api.getExperiment(experimentId);
-                setExperiment(data);
-            } catch {
-                // Ignore polling errors
-            }
-        };
-
-        const interval = setInterval(poll, 1500);
+                const comp = await api.getExperimentComparisonResults(experimentId);
+                setComparison(comp);
+            } catch (e) { }
+        }, 3000);
         return () => clearInterval(interval);
     }, [experimentId]);
-
-    // Fetch comparison (Gated)
-    useEffect(() => {
-        if (!experimentId || !leftRunId || !rightRunId || !experiment) return;
-
-        // Guard: Only fetch if both runs are terminal
-        const lRun = experiment.runs.find(r => r.run_id === leftRunId);
-        const rRun = experiment.runs.find(r => r.run_id === rightRunId);
-
-        const isTerminal = (status: string) => ['COMPLETED', 'FAILED'].includes(status);
-
-        if (!lRun || !rRun || !isTerminal(lRun.status) || !isTerminal(rRun.status)) {
-            setCompareData(null);
-            // Optionally set a message or just wait. 
-            // We can let the UI show "Run not ready" message instead of clearing data if we want strictness.
-            return;
-        }
-
-        const fetchCompare = async () => {
-            setCompareLoading(true);
-            setCompareError(null);
-            try {
-                const data = await api.getExperimentComparison(experimentId, leftRunId, rightRunId, compareArtifact);
-                setCompareData(data);
-            } catch (e: any) {
-                // If 413, we still get data in body usually? 
-                // Axios throws on 413. We need to check if response has data.
-                if (e.response && e.response.status === 413) {
-                    setCompareData(e.response.data); // Display the too large error state
-                } else {
-                    setCompareError('Failed to load comparison.');
-                    setCompareData(null);
-                }
-            } finally {
-                setCompareLoading(false);
-            }
-        };
-
-        fetchCompare();
-    }, [experimentId, leftRunId, rightRunId, compareArtifact, experiment]);
 
     if (error) {
         return (
@@ -295,103 +254,89 @@ export default function ExperimentPage() {
                 </table>
             </div>
 
-            {/* Compare Panel */}
+            {/* Semantic Comparison Panel (B2) */}
             <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid #e5e7eb' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Compare Runs</h2>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Semantic Comparison</h2>
 
-                    {/* Artifact Tabs */}
-                    <div style={{ display: 'flex', background: '#f3f4f6', padding: '0.25rem', borderRadius: 8 }}>
-                        {(['transcript', 'summary', 'action_items'] as const).map((art) => (
-                            <button
-                                key={art}
-                                onClick={() => setCompareArtifact(art)}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    borderRadius: 6,
-                                    fontSize: '0.875rem',
-                                    fontWeight: 600,
-                                    background: compareArtifact === art ? 'white' : 'transparent',
-                                    color: compareArtifact === art ? '#111827' : '#6b7280',
-                                    boxShadow: compareArtifact === art ? '0 1px 2px 0 rgba(0,0,0,0.05)' : 'none',
-                                    cursor: 'pointer',
-                                    border: 'none',
-                                    textTransform: 'capitalize'
-                                }}
-                            >
-                                {art.replace('_', ' ')}
-                            </button>
-                        ))}
+                {compLoading ? (
+                    <div style={{ padding: '2rem', color: '#6b7280' }}>Analyzing results...</div>
+                ) : compError ? (
+                    <div style={{ padding: '1rem', background: '#fee2e2', color: '#dc2626', borderRadius: 6 }}>{compError}</div>
+                ) : !comparison ? (
+                    <div style={{ padding: '2rem', color: '#9ca3af', border: '2px dashed #e5e7eb', borderRadius: 8, textAlign: 'center' }}>
+                        Comparison unavailable.
                     </div>
-                </div>
-
-                {/* Run Selectors */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                    <select
-                        value={leftRunId}
-                        onChange={(e) => setLeftRunId(e.target.value)}
-                        style={{ padding: '0.5rem', borderRadius: 6, border: '1px solid #d1d5db', width: '100%' }}
-                    >
-                        <option value="">Select Left Run...</option>
-                        {experiment.runs.map(r => r.run_id && (
-                            <option key={`L-${r.run_id}`} value={r.run_id}>
-                                {experiment.candidates.find(c => c.candidate_id === r.candidate_id)?.label} ({r.run_id.slice(0, 8)}...)
-                            </option>
-                        ))}
-                    </select>
-
-                    <select
-                        value={rightRunId}
-                        onChange={(e) => setRightRunId(e.target.value)}
-                        style={{ padding: '0.5rem', borderRadius: 6, border: '1px solid #d1d5db', width: '100%' }}
-                    >
-                        <option value="">Select Right Run...</option>
-                        {experiment.runs.map(r => r.run_id && (
-                            <option key={`R-${r.run_id}`} value={r.run_id}>
-                                {experiment.candidates.find(c => c.candidate_id === r.candidate_id)?.label} ({r.run_id.slice(0, 8)}...)
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Comparison Content */}
-                {compareLoading ? (
-                    <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-                        Loading comparison...
-                    </div>
-                ) : compareError ? (
-                    <div style={{ color: '#dc2626', background: '#fee2e2', padding: '1rem', borderRadius: 8 }}>
-                        {compareError}
-                    </div>
-                ) : compareData ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        {/* Left Content */}
-                        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
-                            <div style={{ background: '#f9fafb', padding: '0.5rem 1rem', borderBottom: '1px solid #e5e7eb', fontSize: '0.75rem', color: '#6b7280', display: 'flex', justifyContent: 'space-between' }}>
-                                <span>{compareData.left?.size ? `${(compareData.left.size / 1024).toFixed(1)} KB` : '0 KB'}</span>
-                                {compareData.left?.truncated && <span style={{ color: '#d97706', fontWeight: 600 }}>TRUNCATED</span>}
-                            </div>
-                            <pre style={{ margin: 0, padding: '1rem', fontSize: '0.8rem', whiteSpace: 'pre-wrap', maxHeight: '600px', overflowY: 'auto', background: compareData.left?.available ? 'white' : '#f3f4f6', color: compareData.left?.available ? 'inherit' : '#9ca3af' }}>
-                                {compareData.left?.error ? `Error: ${compareData.left.error}` :
-                                    compareData.left?.available ? compareData.left.text : 'Artifact not available'}
-                            </pre>
-                        </div>
-
-                        {/* Right Content */}
-                        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
-                            <div style={{ background: '#f9fafb', padding: '0.5rem 1rem', borderBottom: '1px solid #e5e7eb', fontSize: '0.75rem', color: '#6b7280', display: 'flex', justifyContent: 'space-between' }}>
-                                <span>{compareData.right?.size ? `${(compareData.right.size / 1024).toFixed(1)} KB` : '0 KB'}</span>
-                                {compareData.right?.truncated && <span style={{ color: '#d97706', fontWeight: 600 }}>TRUNCATED</span>}
-                            </div>
-                            <pre style={{ margin: 0, padding: '1rem', fontSize: '0.8rem', whiteSpace: 'pre-wrap', maxHeight: '600px', overflowY: 'auto', background: compareData.right?.available ? 'white' : '#f3f4f6', color: compareData.right?.available ? 'inherit' : '#9ca3af' }}>
-                                {compareData.right?.error ? `Error: ${compareData.right.error}` :
-                                    compareData.right?.available ? compareData.right.text : 'Artifact not available'}
-                            </pre>
+                ) : !comparison.readiness.comparable ? (
+                    <div style={{ padding: '2rem', background: '#f9fafb', borderRadius: 8, textAlign: 'center' }}>
+                        <div style={{ fontWeight: 600, color: '#4b5563', marginBottom: '0.5rem' }}>Evaluation Pending</div>
+                        <div style={{ fontFamily: 'monospace', color: '#6b7280' }}>
+                            Reason: {comparison.readiness.reason}
                         </div>
                     </div>
                 ) : (
-                    <div style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af', border: '2px dashed #e5e7eb', borderRadius: 8 }}>
-                        Select two runs to compare.
+                    <div>
+                        {/* Verdict Banner */}
+                        <div style={{
+                            padding: '1.5rem',
+                            borderRadius: 8,
+                            marginBottom: '2rem',
+                            background: comparison.verdicts.overall.includes('BETTER') ? '#ecfdf5' : '#f3f4f6',
+                            border: `1px solid ${comparison.verdicts.overall.includes('BETTER') ? '#a7f3d0' : '#e5e7eb'}`
+                        }}>
+                            <div style={{
+                                fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem',
+                                color: comparison.verdicts.overall.includes('BETTER') ? '#047857' : '#374151'
+                            }}>
+                                VERDICT: {comparison.verdicts.overall}
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#4b5563' }}>
+                                {comparison.verdicts.reasons.map((r, i) => (
+                                    <li key={i}>{r}</li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        {/* Metrics Table */}
+                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>Key Metrics</h3>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                            <thead>
+                                <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                                    <th style={{ textAlign: 'left', padding: '0.75rem' }}>Metric</th>
+                                    <th style={{ textAlign: 'right', padding: '0.75rem' }}>
+                                        {comparison.candidates.A.label} <span style={{ fontSize: '0.8em', color: '#9ca3af' }}>(A)</span>
+                                    </th>
+                                    <th style={{ textAlign: 'right', padding: '0.75rem' }}>
+                                        {comparison.candidates.B.label} <span style={{ fontSize: '0.8em', color: '#9ca3af' }}>(B)</span>
+                                    </th>
+                                    <th style={{ textAlign: 'right', padding: '0.75rem' }}>Delta</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {comparison.metrics && Object.entries(comparison.metrics).map(([key, m]) => (
+                                    <tr key={key} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '0.75rem', fontWeight: 500, color: '#374151' }}>{key}</td>
+                                        <td style={{ padding: '0.75rem', textAlign: 'right', fontFamily: 'monospace' }}>
+                                            {typeof m.A === 'number' ?
+                                                (key === 'confidence_avg' ? (m.A * 100).toFixed(1) + '%' :
+                                                    key === 'duration_s' ? m.A.toFixed(2) + 's' : m.A)
+                                                : '-'}
+                                        </td>
+                                        <td style={{ padding: '0.75rem', textAlign: 'right', fontFamily: 'monospace' }}>
+                                            {typeof m.B === 'number' ?
+                                                (key === 'confidence_avg' ? (m.B * 100).toFixed(1) + '%' :
+                                                    key === 'duration_s' ? m.B.toFixed(2) + 's' : m.B)
+                                                : '-'}
+                                        </td>
+                                        <td style={{
+                                            padding: '0.75rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600,
+                                            color: m.delta > 0 ? '#059669' : m.delta < 0 ? '#dc2626' : '#6b7280'
+                                        }}>
+                                            {m.pct_change > 0 ? '+' : ''}{m.pct_change.toFixed(1)}%
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>
