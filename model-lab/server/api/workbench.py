@@ -187,7 +187,7 @@ def start_run_from_path(
         initial_manifest = {
             "run_id": runner.run_id,
             "status": "RUNNING",
-            "started_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+            "started_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()) + "Z",  # FIXED: Add Z suffix for UTC
             "steps_completed": [],
             "steps": {},
             "warnings": [],

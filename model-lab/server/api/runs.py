@@ -80,7 +80,7 @@ def get_run_status(run_id: str):
                 return {
                     "run_id": run_id,
                     "status": status,
-                    "started_at": run.get("started_at"),
+                    "started_at": manifest.get("started_at"),  # Read from manifest, not index cache
                     "steps_completed": run.get("steps_completed", []),
                     "current_step": current_step,
                     "updated_at": updated_at,
@@ -94,7 +94,7 @@ def get_run_status(run_id: str):
     return {
         "run_id": run_id,
         "status": status,
-        "started_at": run.get("started_at"),
+        "started_at": manifest.get("started_at"),  # Read from manifest, not index cache
         "steps_completed": run.get("steps_completed", []),
         "current_step": current_step,
         "updated_at": updated_at

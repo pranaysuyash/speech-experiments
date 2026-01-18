@@ -50,7 +50,7 @@ class StepDef:
 
 
 def now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()) + "Z"
 
 
 def atomic_write_json(path: Path, obj: Any) -> None:
