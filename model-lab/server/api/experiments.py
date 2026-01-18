@@ -75,6 +75,23 @@ def _load_experiment(experiment_id: str) -> Optional[Dict[str, Any]]:
         request = json.loads(request_path.read_text(encoding="utf-8"))
         state = json.loads(state_path.read_text(encoding="utf-8"))
         
+        # Provenance Check
+        prov_status = "UNVERIFIED"
+        stored_prov = state.get("provenance")
+        
+        if stored_prov and stored_prov.get("algorithm") == "sha256":
+            req_canonical = json.dumps(request, sort_keys=True, separators=(',', ':')).encode('utf-8')
+            req_hash = hashlib.sha256(req_canonical).hexdigest()
+            
+            if req_hash == stored_prov.get("hash"):
+                prov_status = "VERIFIED"
+            else:
+                prov_status = "CORRUPTED"
+                import logging
+                logging.getLogger("server.experiments").error(
+                    f"Provenance Mismatch for {experiment_id}: stored={stored_prov.get('hash')}, computed={req_hash}"
+                )
+        
         runs = state["runs"]
         # Enrich runs with eval data if available
         from server.api.eval_loader import load_eval
@@ -86,7 +103,7 @@ def _load_experiment(experiment_id: str) -> Optional[Dict[str, Any]]:
                  if eval_data:
                      run["score_cards"] = eval_data.get("score_cards", [])
         
-        return {**request, "runs": runs, "last_updated_at": state["last_updated_at"]}
+        return {**request, "runs": runs, "last_updated_at": state["last_updated_at"], "provenance_status": prov_status}
     except Exception:
         return None
 
@@ -223,10 +240,19 @@ async def create_experiment(
     }
     _atomic_write_json(exp_dir / "experiment_request.json", request_data)
     
+    # Compute provenance hash
+    req_canonical = json.dumps(request_data, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    req_hash = hashlib.sha256(req_canonical).hexdigest()
+    
     # Write experiment_state.json
     state_data = {
         "schema_version": "1",
         "experiment_id": experiment_id,
+        "provenance": {
+            "hash": req_hash,
+            "algorithm": "sha256",
+            "timestamp": now.isoformat(),
+        },
         "runs": [
             {
                 "candidate_id": c["candidate_id"],
