@@ -1,13 +1,15 @@
 #!/bin/bash
 set -euo pipefail
+trap 'kill 0 || true' EXIT
 
-# 0) Prove HEAD and show the actual diff you claim
-git rev-parse HEAD
-git show --name-only --oneline -n 1
-git diff --stat HEAD~1..HEAD
+# 0) Prove HEAD
+if command -v git &> /dev/null; then
+  git rev-parse HEAD
+  git show --name-only --oneline -n 1
+fi
 
 # 1) Create experiment with two FULL candidates
-curl -sS -X POST localhost:8000/api/experiments \
+curl -sS --max-time 10 -X POST localhost:8000/api/experiments \
   -F "file=@/tmp/test_audio.wav" \
   -F "use_case_id=asr_smoke" \
   -F "candidate_ids=asr_full_default,asr_full_default" | tee /tmp/exp.json
@@ -19,9 +21,10 @@ PY
 echo "EXP_ID=$EXP_ID"
 
 # 2) Start A and B
-curl -sS -X POST "localhost:8000/api/experiments/$EXP_ID/runs/start" \
+# 2) Start A and B
+curl -sS --max-time 10 -X POST "localhost:8000/api/experiments/$EXP_ID/runs/start" \
   -H 'content-type: application/json' -d '{"candidate_id":"A"}' | tee /tmp/startA.json
-curl -sS -X POST "localhost:8000/api/experiments/$EXP_ID/runs/start" \
+curl -sS --max-time 10 -X POST "localhost:8000/api/experiments/$EXP_ID/runs/start" \
   -H 'content-type: application/json' -d '{"candidate_id":"B"}' | tee /tmp/startB.json
 
 RUN_A=$(python3 - <<'PY'
@@ -44,8 +47,8 @@ done
 
 # 4) Poll until terminal
 while true; do
-  A=$(curl -sS "localhost:8000/api/experiments/$EXP_ID" | python3 -c "import sys,json; r=json.load(sys.stdin)['runs']; print(next((x['status'] for x in r if x['candidate_id']=='A'), 'UNKNOWN'))")
-  B=$(curl -sS "localhost:8000/api/experiments/$EXP_ID" | python3 -c "import sys,json; r=json.load(sys.stdin)['runs']; print(next((x['status'] for x in r if x['candidate_id']=='B'), 'UNKNOWN'))")
+  A=$(curl -sS --max-time 5 "localhost:8000/api/experiments/$EXP_ID" | python3 -c "import sys,json; r=json.load(sys.stdin)['runs']; print(next((x['status'] for x in r if x['candidate_id']=='A'), 'UNKNOWN'))")
+  B=$(curl -sS --max-time 5 "localhost:8000/api/experiments/$EXP_ID" | python3 -c "import sys,json; r=json.load(sys.stdin)['runs']; print(next((x['status'] for x in r if x['candidate_id']=='B'), 'UNKNOWN'))")
   echo "A=$A B=$B"
   if [[ "$A" =~ ^(COMPLETED|FAILED)$ && "$B" =~ ^(COMPLETED|FAILED)$ ]]; then
     break
@@ -54,7 +57,8 @@ while true; do
 done
 
 # 5) Compare transcript A vs B
-curl -sS "localhost:8000/api/experiments/$EXP_ID/compare?left=$RUN_A&right=$RUN_B&artifact=transcript" \
+# 5) Compare transcript A vs B
+curl -sS --max-time 10 "localhost:8000/api/experiments/$EXP_ID/compare?left=$RUN_A&right=$RUN_B&artifact=transcript" \
   | tee /tmp/compare.json
 
 python3 - <<'PY'

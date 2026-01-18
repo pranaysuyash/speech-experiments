@@ -21,6 +21,12 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from server.api.workbench import PRESETS, RunnerBusyError, start_run_from_path
+from server.api.candidates import (
+    get_candidates_for_use_case,
+    get_candidate,
+    get_candidate_snapshot,
+    USE_CASES,
+)
 
 
 router = APIRouter(prefix="/api/experiments", tags=["experiments"])
@@ -89,44 +95,32 @@ def _load_experiment(experiment_id: str) -> Optional[Dict[str, Any]]:
 async def create_experiment(
     file: UploadFile = File(...),
     use_case_id: str = Form(...),
-    candidate_ids: Optional[str] = Form(None),  # comma-separated
+    candidate_ids: str = Form(...),  # comma-separated
 ) -> JSONResponse:
-    """
-    Create an experiment with 2 candidate runs.
     
-    Accepts either:
-    - candidate_ids: comma-separated candidate IDs (preferred)
-    - Falls back to first 2 candidates for use_case_id
-    
-    Returns 400 if fewer than 2 candidates exist.
-    """
-    from server.api.candidates import (
-        get_candidates_for_use_case,
-        get_candidate,
-        get_candidate_snapshot,
-        USE_CASES,
-    )
+    # DEBUG: Force print
+    print(f"DEBUG: START create_experiment candidate_ids='{candidate_ids}'")
     
     # Parse candidate_ids if provided
     parsed_candidate_ids = None
     if candidate_ids:
-        parsed_candidate_ids = [c.strip() for c in candidate_ids.split(",") if c.strip()]
+         parsed_candidate_ids = [c.strip() for c in candidate_ids.split(",") if c.strip()]
     
     # Validate and get candidates
-    if parsed_candidate_ids and len(parsed_candidate_ids) >= 2:
+    if parsed_candidate_ids and len(parsed_candidate_ids) >= 1:
         # User specified candidates
         candidates_list = []
-        for cid in parsed_candidate_ids[:2]:
+        for cid in parsed_candidate_ids:
             c = get_candidate(cid)
             if not c:
                 return JSONResponse(
                     status_code=400,
-                    content={"error_code": "INVALID_CANDIDATE", "message": f"Candidate not found: {cid}"}
+                    content={"error_code": "INVALID_CANDIDATE", "error_message": f"Candidate not found: {cid}"}
                 )
             if c.use_case_id != use_case_id:
                 return JSONResponse(
                     status_code=400,
-                    content={"error_code": "CANDIDATE_USE_CASE_MISMATCH", "message": f"Candidate {cid} is for {c.use_case_id}, not {use_case_id}"}
+                    content={"error_code": "CANDIDATE_USE_CASE_MISMATCH", "error_message": f"Candidate {cid} is for {c.use_case_id}, not {use_case_id}"}
                 )
             candidates_list.append(c)
     else:
@@ -139,8 +133,8 @@ async def create_experiment(
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "NEED_TWO_CANDIDATES",
-                        "message": f"Experiments require at least 2 candidates. Use case {use_case_id} has {len(candidates_list)}."
+                        "error_code": "INVALID_CANDIDATE_COUNT",
+                        "error_message": f"Experiments require at least 2 candidates. Use case {use_case_id} has {len(candidates_list)}."
                     }
                 )
             # Create synthetic candidates from presets
@@ -197,7 +191,7 @@ async def create_experiment(
     
     # Build candidates with snapshots (for reproducibility)
     candidate_configs = []
-    for i, c in enumerate(candidates_list[:2]):
+    for i, c in enumerate(candidates_list):
         config = {
             "candidate_id": ["A", "B"][i],
             "candidate_ref": c.candidate_id,  # original candidate ID

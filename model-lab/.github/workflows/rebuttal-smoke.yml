@@ -1,0 +1,40 @@
+name: Rebuttal Smoke Test
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv pip install -r requirements.txt
+          # backend deps
+          
+      - name: Create Dummy Audio
+        run: |
+          # Create a dummy wav file since we don't commit binary blobs
+          # This needs ffmpeg or just python wave write
+          python3 -c "import wave; w = wave.open('/tmp/test_audio.wav', 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(b'\x00' * 32000); w.close()"
+          
+      - name: Start Server
+        run: |
+          nohup uv run uvicorn server.main:app --host 0.0.0.0 --port 8000 --workers 1 &
+          sleep 5
+          
+      - name: Run Smoke Test
+        run: |
+          bash tests/e2e/test_rebuttal_smoke.sh

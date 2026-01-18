@@ -52,41 +52,35 @@ export default function ExperimentPage() {
     // Sort state
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'candidate_id', direction: 'asc' });
 
-    const didStartAll = useRef(false);
-
-    // Initial load + start-all
+    // Initial load
     useEffect(() => {
         if (!experimentId) return;
 
-        const loadAndStart = async () => {
+        const load = async () => {
             try {
-                // Start-all once (best effort)
-                if (!didStartAll.current) {
-                    didStartAll.current = true;
-                    await api.startExperimentAll(experimentId).catch(() => { });
-                }
-
                 const data = await api.getExperiment(experimentId);
                 setExperiment(data);
 
-                // key defaults off runs if available
-                if (data.runs.length >= 2) {
-                    const r1 = data.runs[0].run_id;
-                    const r2 = data.runs[1].run_id;
-                    if (r1) setLeftRunId(r1);
-                    if (r2) setRightRunId(r2);
-                } else if (data.runs.length === 1 && data.runs[0].run_id) {
-                    setLeftRunId(data.runs[0].run_id);
+                // Default selections if available and not set
+                if (!leftRunId && !rightRunId) {
+                    if (data.runs.length >= 2) {
+                        const r1 = data.runs[0].run_id;
+                        const r2 = data.runs[1].run_id;
+                        if (r1) setLeftRunId(r1);
+                        if (r2) setRightRunId(r2);
+                    } else if (data.runs.length === 1 && data.runs[0].run_id) {
+                        setLeftRunId(data.runs[0].run_id);
+                    }
                 }
             } catch (e: any) {
                 setError(e?.message || 'Failed to load experiment');
             }
         };
 
-        loadAndStart();
+        load();
     }, [experimentId]);
 
-    // Polling + queue-lite
+    // Polling (Read-Only)
     useEffect(() => {
         if (!experimentId) return;
 
@@ -94,14 +88,6 @@ export default function ExperimentPage() {
             try {
                 const data = await api.getExperiment(experimentId);
                 setExperiment(data);
-
-                // Queue-lite: if any QUEUED and none RUNNING, try to start
-                const hasQueued = data.runs.some((r: ExperimentRun) => r.status === 'QUEUED');
-                const hasRunning = data.runs.some((r: ExperimentRun) => r.status === 'RUNNING');
-
-                if (hasQueued && !hasRunning) {
-                    await api.startExperimentNext(experimentId).catch(() => { });
-                }
             } catch {
                 // Ignore polling errors
             }
@@ -111,9 +97,22 @@ export default function ExperimentPage() {
         return () => clearInterval(interval);
     }, [experimentId]);
 
-    // Fetch comparison
+    // Fetch comparison (Gated)
     useEffect(() => {
-        if (!experimentId || !leftRunId || !rightRunId) return;
+        if (!experimentId || !leftRunId || !rightRunId || !experiment) return;
+
+        // Guard: Only fetch if both runs are terminal
+        const lRun = experiment.runs.find(r => r.run_id === leftRunId);
+        const rRun = experiment.runs.find(r => r.run_id === rightRunId);
+
+        const isTerminal = (status: string) => ['COMPLETED', 'FAILED'].includes(status);
+
+        if (!lRun || !rRun || !isTerminal(lRun.status) || !isTerminal(rRun.status)) {
+            setCompareData(null);
+            // Optionally set a message or just wait. 
+            // We can let the UI show "Run not ready" message instead of clearing data if we want strictness.
+            return;
+        }
 
         const fetchCompare = async () => {
             setCompareLoading(true);
@@ -136,7 +135,7 @@ export default function ExperimentPage() {
         };
 
         fetchCompare();
-    }, [experimentId, leftRunId, rightRunId, compareArtifact]);
+    }, [experimentId, leftRunId, rightRunId, compareArtifact, experiment]);
 
     if (error) {
         return (

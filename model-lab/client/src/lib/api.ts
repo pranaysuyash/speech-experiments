@@ -117,7 +117,7 @@ export const api = {
     const form = new FormData();
     form.append('file', file);
     form.append('use_case_id', use_case_id);
-    if (candidate_ids && candidate_ids.length >= 2) {
+    if (candidate_ids && candidate_ids.length >= 1) {
       form.append('candidate_ids', candidate_ids.join(','));
     }
     const res = await axios.post(`${API_BASE}/experiments`, form);
