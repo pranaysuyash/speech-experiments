@@ -1,60 +1,19 @@
 import { useEffect, useState, useRef, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { RunDetail as RunDetailType, Segment, SearchResult, MeetingPackManifest } from '../lib/api';
-import { ArrowLeft, Search, Download, FileText, Star, Trash2, Loader2 } from 'lucide-react';
-import { highlightsApi } from '../lib/highlights';
-import type { HighlightStore } from '../lib/highlights';
-import { getKeyAction, keyboardReducer } from '../lib/keyboard';
-import { TimelineTicks } from './TimelineTicks';
-import { formatAsSRT, formatAsTXT, downloadText } from '../lib/exporters';
+import type { RunDetail as RunDetailType, Segment, SearchResult, MeetingPackManifest, ResultSummary } from '../lib/api';
 
-interface RunDetailProps {
-    onBack: () => void;
-}
-
-const LARGE_RUN_THRESHOLD = 1500;
-const SEARCH_DEBOUNCE_MS = 250;
-
-// Simple in-memory cache
-const searchCache = new Map<string, SearchResult[]>();
+// ... (imports)
 
 export default function RunDetail({ onBack }: RunDetailProps) {
     const { runId } = useParams<{ runId: string }>();
     const runIdSafe = runId ?? "";
     const [status, setStatus] = useState<any>(null); // TODO: type this proper
     const [detail, setDetail] = useState<RunDetailType | null>(null);
+    const [result, setResult] = useState<ResultSummary | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
-    const [audioUrl, setAudioUrl] = useState("");
-    const [highlights, setHighlights] = useState<HighlightStore | null>(null);
-    const [activeTab, setActiveTab] = useState<'search' | 'highlights' | 'export'>('search');
-    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-    const [serverSearchResults, setServerSearchResults] = useState<SearchResult[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [searchMode, setSearchMode] = useState<'local' | 'server'>('local');
-    const [meetingPack, setMeetingPack] = useState<MeetingPackManifest | null>(null);
-    const [meetingPackLoading, setMeetingPackLoading] = useState(false);
-    const [meetingPackError, setMeetingPackError] = useState<string | null>(null);
-    const [previewName, setPreviewName] = useState<string | null>(null);
-    const [previewText, setPreviewText] = useState<string | null>(null);
-    const [previewCsv, setPreviewCsv] = useState<{ headers: string[]; rows: string[][] } | null>(null);
 
-    const segments = detail?.segments || [];
-    const useServerSearch = segments.length > LARGE_RUN_THRESHOLD;
-
-    // Compute filtered segments based on mode
-    const filteredSegments = useServerSearch && searchQuery.trim().length >= 2
-        ? serverSearchResults.map(r => {
-            const seg = segments.find(s => (s as any).id === r.segment_id);
-            return seg || { start_s: r.start_s, end_s: r.end_s, text: r.text, speaker: undefined };
-        })
-        : segments.filter(s => s.text.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const audioRef = useRef<HTMLAudioElement>(null);
-    const searchInputRef = useRef<HTMLInputElement>(null);
-    const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
-    const abortControllerRef = useRef<AbortController | null>(null);
-    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // ...
 
     // Poll for status until terminal
     useEffect(() => {
@@ -66,16 +25,28 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 const s = await api.getRunStatus(runId);
                 setStatus(s);
 
-                if (s.status === 'COMPLETED' && !detail) {
-                    loadDetail();
-                    setAudioUrl(api.getAudioUrl(runId));
-                    setHighlights(highlightsApi.get(runId));
-                    loadMeetingPack();
-                }
-
-                // Stop polling if terminal
+                // Terminal State Handling
                 if (['COMPLETED', 'FAILED', 'STALE'].includes(s.status)) {
+                    // Stop polling
                     if (pollTimer) clearInterval(pollTimer);
+
+                    // Fetch semantic results
+                    try {
+                        const res = await api.getRunResults(runId);
+                        setResult(res);
+
+                        // If we have useful artifacts (COMPLETED or PARTIAL), load details
+                        const shouldLoadArtifacts = s.status === 'COMPLETED' || (s.status === 'FAILED' && res.quality_flags.is_partial);
+
+                        if (shouldLoadArtifacts && !detail) {
+                            loadDetail();
+                            setAudioUrl(api.getAudioUrl(runId));
+                            setHighlights(highlightsApi.get(runId));
+                            loadMeetingPack();
+                        }
+                    } catch (err) {
+                        console.error("Failed to load results", err);
+                    }
                 }
             } catch (e) {
                 console.error("Failed to get status", e);
@@ -130,7 +101,10 @@ export default function RunDetail({ onBack }: RunDetailProps) {
         );
     }
 
-    if (status.status === 'FAILED' || status.status === 'STALE') {
+    const isFailed = status.status === 'FAILED' || status.status === 'STALE';
+    const showPartial = isFailed && result?.quality_flags.is_partial;
+
+    if (isFailed && !showPartial) {
         return (
             <div className="p-8 max-w-2xl mx-auto text-center mt-20">
                 <div className="mx-auto mb-4 w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
@@ -156,8 +130,30 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h2 className="font-bold text-lg">{detail.run_id}</h2>
-                        <div className="text-xs text-gray-500">Analyst Console</div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="font-bold text-lg">{detail.run_id}</h2>
+                            {result?.quality_flags.is_partial && (
+                                <span className="px-2 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                                    PARTIAL
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-500 mt-1 font-mono">
+                            {result?.metrics && (
+                                <>
+                                    {result.metrics.duration_s && (
+                                        <span>⏱ {result.metrics.duration_s.toFixed(1)}s</span>
+                                    )}
+                                    {result.metrics.word_count !== undefined && (
+                                        <span>📝 {result.metrics.word_count} words</span>
+                                    )}
+                                    {result.metrics.confidence_avg && (
+                                        <span>🎯 {(result.metrics.confidence_avg * 100).toFixed(1)}%</span>
+                                    )}
+                                </>
+                            )}
+                            {!result && <span>Analyst Console</span>}
+                        </div>
                     </div>
                 </div>
 

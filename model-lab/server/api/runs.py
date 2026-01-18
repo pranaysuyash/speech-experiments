@@ -10,8 +10,30 @@ import re
 
 from server.services.runs_index import get_index
 from server.services.safe_files import safe_file_path
+from server.services.results_v1 import compute_result_v1
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
+
+@router.get("/{run_id}/results")
+def get_run_results(run_id: str):
+    """
+    Get the semantic results (v1) for a run.
+    Pure projection of artifacts into metrics and flags.
+    """
+    # Check existence via index
+    if not get_index().get_run(run_id):
+         raise HTTPException(status_code=404, detail="Run not found")
+    
+    try:
+        result = compute_result_v1(run_id)
+        if not result:
+             # Should match index check, but verifying
+             raise HTTPException(status_code=404, detail="Run not found or unreadable")
+        return result
+    except Exception as e:
+        import logging
+        logging.getLogger("server.api").error(f"Error computing results for {run_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to compute results")
 
 @router.get("")
 def list_runs(refresh: bool = False):

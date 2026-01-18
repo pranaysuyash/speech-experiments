@@ -62,6 +62,32 @@ export interface MeetingPackManifest {
   absent: { name: string; reason: string }[];
 }
 
+export interface ResultSummary {
+  schema_version: "v1";
+  run_id: string;
+  experiment_id: string;
+  candidate_label: string;
+  status: "COMPLETED" | "FAILED" | "QUEUED" | "RUNNING" | "STALE";
+  executed_steps: string[];
+  metrics: {
+    duration_s?: number;
+    audio_duration_s?: number;
+    word_count?: number;
+    segment_count?: number;
+    confidence_avg?: number;
+  };
+  quality_flags: {
+    is_partial: boolean;
+    is_empty: boolean;
+    warnings: string[];
+  };
+  provenance: {
+    manifest_hash?: string;
+    computed_at: string;
+    semantics_version: "v1";
+  };
+}
+
 export const api = {
   getRuns: async (refresh = false): Promise<RunSummary[]> => {
     const res = await axios.get(`${API_BASE}/runs`, { params: { refresh } });
@@ -164,5 +190,10 @@ export const api = {
   getMeetingPackManifest: async (runId: string): Promise<MeetingPackManifest> => {
     const res = await axios.get(`${API_BASE}/runs/${runId}/bundle`);
     return res.data;
+  },
+
+  getRunResults: async (runId: string): Promise<ResultSummary> => {
+      const res = await axios.get(`${API_BASE}/runs/${runId}/results`);
+      return res.data;
   },
 };
