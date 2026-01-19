@@ -233,7 +233,7 @@ def get_llm_completion(
         cache_key = compute_cache_key(text_hash, prompt_hash, model)
         cached = get_cached_response(cache_key)
         if cached:
-            logger.info(f"Cache hit for {cache_key[:12]}")
+            logger.debug(f"Cache hit for {cache_key[:12]}")
             return LLMResult(
                 success=True,
                 text=cached,

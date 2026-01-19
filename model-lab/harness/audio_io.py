@@ -72,7 +72,7 @@ class AudioLoader:
         if audio.ndim > 1:
             if convert_to_mono:
                 audio = audio.mean(axis=1)
-                logger.info(f"Converted to mono: {audio_path.name}")
+                logger.debug(f"Converted to mono: {audio_path.name}")
             else:
                 audio = audio.T  # (channels, samples)
 
@@ -84,7 +84,7 @@ class AudioLoader:
         if sample_rate != target_sr:
             audio = self._resample_audio(audio, sample_rate, target_sr)
             sample_rate = target_sr
-            logger.info(f"Resampled to {target_sr}Hz: {audio_path.name}")
+            logger.debug(f"Resampled to {target_sr}Hz: {audio_path.name}")
 
         # Metadata - use original_sample_rate, not post-resample value
         metadata = {
@@ -96,7 +96,7 @@ class AudioLoader:
             'path': str(audio_path)
         }
 
-        logger.info(f"Loaded {audio_path.name}: {metadata['duration_seconds']:.1f}s @ {sample_rate}Hz")
+        logger.debug(f"Loaded {audio_path.name}: {metadata['duration_seconds']:.1f}s @ {sample_rate}Hz")
         return audio, sample_rate, metadata
 
     def _resample_audio(self, audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
@@ -124,7 +124,7 @@ class AudioLoader:
         import soundfile as sf # Lazy import
         output_path.parent.mkdir(parents=True, exist_ok=True)
         sf.write(output_path, audio, sample_rate)
-        logger.info(f"Saved audio to {output_path}")
+        logger.debug(f"Saved audio to {output_path}")
 
 
 class GroundTruthLoader:

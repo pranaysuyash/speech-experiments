@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { RunDetail as RunDetailType, ResultSummary } from '../lib/api';
-import { Loader2, ArrowLeft, Trash2, Download } from 'lucide-react';
-import { deriveProgressSignal, isStalled } from '../lib/runProgress';
+import { Loader2, ArrowLeft, Download } from 'lucide-react';
+// import { deriveProgressSignal, isStalled } from '../lib/runProgress'; // Removed client-side heuristics
 import { getFailureStep } from '../lib/failureDetection';
 
 interface RunDetailProps {
@@ -27,7 +27,6 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     const [status, setStatus] = useState<any>(null); // TODO: strict typing
     const [detail, setDetail] = useState<RunDetailType | null>(null);
     const [result, setResult] = useState<ResultSummary | null>(null);
-    const [lastPolledAt, setLastPolledAt] = useState<number>(0);
 
     // Poll for status until terminal
     useEffect(() => {
@@ -38,7 +37,6 @@ export default function RunDetail({ onBack }: RunDetailProps) {
             try {
                 const s = await api.getRunStatus(runId);
                 setStatus(s);
-                setLastPolledAt(Date.now());
 
                 // Terminal State Handling
                 if (['COMPLETED', 'FAILED', 'STALE'].includes(s.status)) {
@@ -165,38 +163,22 @@ export default function RunDetail({ onBack }: RunDetailProps) {
             }
         }
 
-        // Derive progress signal from updated_at (centralized helper)
-        const { secondsSinceProgress } = deriveProgressSignal(status.updated_at);
-        const isStalledState = isStalled(status.status, secondsSinceProgress);
-        const isRunningActive = status.status === 'RUNNING' && !isStalledState;
-        const timeSinceProgress = secondsSinceProgress ?? 0; // fallback for display only
+        // Derive progress signal from updated_at directly (no heuristics)
+        const timeSinceProgress = status.updated_at ? Math.floor((Date.now() - new Date(status.updated_at).getTime()) / 1000) : 0;
 
-        // Progress signal messaging (user-friendly language)
+        // Progress signal messaging (freshness only)
         let progressMsg = '';
         let progressClass = 'text-gray-500';
 
-        if (isStalledState) {
-            // STALLED: No progress for beyond threshold
-            const minutes = Math.floor(timeSinceProgress / 60);
-            const seconds = timeSinceProgress % 60;
-            progressMsg = `No progress signal for ${minutes}m ${seconds}s — may be stuck.`;
-            progressClass = 'text-orange-600';
-        } else if (isRunningActive) {
-            // RUNNING (active): Show freshness
+        if (status.status === 'RUNNING') {
             if (timeSinceProgress < 10) {
                 progressMsg = timeSinceProgress === 0
                     ? 'Processing is active. System just reported progress.'
                     : `Processing is active. Last progress signal ${timeSinceProgress}s ago.`;
                 progressClass = 'text-green-600';
-            } else if (timeSinceProgress < 30) {
-                progressMsg = `Last progress signal ${timeSinceProgress}s ago.`;
-                progressClass = 'text-gray-500';
-            } else if (timeSinceProgress < 60) {
-                progressMsg = `Last progress signal ${timeSinceProgress}s ago.`;
-                progressClass = 'text-gray-600';
             } else {
                 progressMsg = `Last progress signal ${timeSinceProgress}s ago.`;
-                progressClass = 'text-gray-700';
+                progressClass = 'text-gray-600';
             }
         }
 
@@ -210,9 +192,9 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold">
                         {status.status === 'QUEUED' ? 'Waiting in Queue' :
-                            isStalled ? 'Run Stalled' : 'Processing Run'}
+                            status.is_stalled ? 'Run Stalled' : 'Processing Run'}
                     </h2>
-                    {isStalledState ? (
+                    {status.is_stalled ? (
                         <div className="px-3 py-1 bg-orange-100 text-orange-700 rounded text-sm font-semibold border border-orange-300">
                             STALLED
                         </div>
@@ -227,8 +209,16 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                     <div className="space-y-1">
                         <div className="flex items-center gap-2 text-sm">
                             <span>📄</span>
-                            <span className="font-medium">{status.input_filename || runId}</span>
+                            <span className="font-medium">
+                                {status.input_metadata?.filename || status.input_filename || runId}
+                            </span>
                         </div>
+                        {status.input_metadata?.size_bytes ? (
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <span>💾</span>
+                                <span>{(status.input_metadata.size_bytes / (1024 * 1024)).toFixed(2)} MB</span>
+                            </div>
+                        ) : null}
                         {(() => {
                             const audioDuration = getAudioDuration();
                             return audioDuration !== null ? (
@@ -252,6 +242,67 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                     </div>
                 </div>
 
+                {/* Configuration Block - Uses resolved_config from steps when available */}
+                {(() => {
+                    const asrStep = status.steps?.find((s: any) => s.name === 'asr');
+                    const resolved = asrStep?.resolved_config;
+
+                    return (
+                        <div className="bg-gray-50 border rounded-lg p-4 mb-6">
+                            <h3 className="text-xs font-semibold text-gray-600 mb-2">Execution Configuration</h3>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span className="text-gray-500 text-xs block">ASR Model</span>
+                                    <span className="font-medium text-gray-800">
+                                        {resolved?.model_id ||
+                                            (status.config?.asr?.model_name && status.config.asr.model_name !== 'default'
+                                                ? status.config.asr.model_name
+                                                : <span className="text-orange-600 text-xs">Pending</span>)}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500 text-xs block">Device</span>
+                                    <span className="font-medium text-gray-800">
+                                        {resolved?.device?.toUpperCase() ||
+                                            <span className="text-orange-600 text-xs">Pending</span>}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500 text-xs block">Source</span>
+                                    <span className="font-medium text-gray-800">
+                                        {resolved?.source ||
+                                            <span className="text-orange-600 text-xs">Pending</span>}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500 text-xs block">Language</span>
+                                    <span className="font-medium text-gray-800">
+                                        {resolved?.language ||
+                                            <span className="text-orange-600 text-xs">Pending</span>}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500 text-xs block">Diarization</span>
+                                    <span className="font-medium text-gray-800">
+                                        {status.config?.diarization?.enabled !== false ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                </div>
+                                {status.config?.preprocessing && (
+                                    <div className="col-span-2 border-t pt-2 mt-2">
+                                        <span className="text-gray-500 text-xs block">Preprocessing</span>
+                                        <div className="text-xs text-gray-600 font-mono mt-1">
+                                            {status.config.preprocessing.normalize && 'Normalize '}
+                                            {status.config.preprocessing.trim_silence && 'Trim '}
+                                            {!status.config.preprocessing.normalize && !status.config.preprocessing.trim_silence && 'None'}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })()}
+
+
                 {/* Pipeline visualization */}
                 <div className="bg-white border rounded-lg p-6 mb-6">
                     <h3 className="text-sm font-semibold text-gray-600 mb-3">Pipeline</h3>
@@ -261,7 +312,6 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                             const isCompleted = completedNormalized.includes(step.key)
                                 || (currentIndex >= 0 && idx < currentIndex);
                             const isCurrent = currentNormalized === step.key;
-                            const isPending = !isCompleted && !isCurrent;
 
                             let icon = '○';
                             let textClass = 'text-gray-400';
@@ -282,6 +332,97 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         })}
                     </div>
                 </div>
+
+                {/* Artifacts (Semantic Schema) */}
+                {(() => {
+                    // Collect all artifacts from steps with new schema
+                    const allArtifacts: Array<{ stepName: string; artifact: any }> = [];
+                    status.steps?.forEach((step: any) => {
+                        if (step.artifacts && step.status === 'COMPLETED') {
+                            step.artifacts.forEach((art: any) => {
+                                allArtifacts.push({ stepName: step.name, artifact: art });
+                            });
+                        }
+                    });
+
+                    if (allArtifacts.length === 0) return null;
+
+                    const formatBytes = (bytes: number) => {
+                        if (bytes < 1024) return `${bytes} B`;
+                        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+                        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+                    };
+
+                    return (
+                        <div className="bg-white border rounded-lg p-6 mb-6">
+                            <h3 className="text-sm font-semibold text-gray-600 mb-3">Artifacts</h3>
+                            <div className="space-y-2">
+                                {allArtifacts.map(({ artifact }) => (
+                                    <div key={artifact.id} className="flex items-center justify-between border rounded p-3 bg-gray-50">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-gray-400">📄</span>
+                                            <div>
+                                                <div className="font-medium text-sm text-gray-800">
+                                                    {artifact.filename}
+                                                </div>
+                                                <div className="text-xs text-gray-500">
+                                                    {artifact.role} · {formatBytes(artifact.size_bytes)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            disabled={!artifact.downloadable}
+                                            onClick={() => {
+                                                if (artifact.downloadable) {
+                                                    window.open(`/api/runs/${runId}/artifacts/${artifact.id}`, '_blank');
+                                                }
+                                            }}
+                                            className={`text-xs px-3 py-1 border rounded ${artifact.downloadable
+                                                    ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-pointer'
+                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                }`}
+                                            title={artifact.downloadable ? 'Download artifact' : 'Not downloadable'}
+                                        >
+                                            Download
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
+
+
+                {/* Step-Level Errors (if any step failed while run is still RUNNING) */}
+                {status.steps && status.steps.some((s: any) => s.status === 'FAILED') && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+                        <h3 className="text-sm font-semibold text-red-900 mb-3">Step Failures</h3>
+                        <div className="space-y-3">
+                            {status.steps.filter((s: any) => s.status === 'FAILED').map((step: any) => (
+                                <div key={step.name} className="bg-white border border-red-300 rounded p-3">
+                                    <div className="font-semibold text-red-800 text-sm mb-1">
+                                        ❌ {step.name}
+                                    </div>
+                                    {step.error && (
+                                        <>
+                                            <div className="text-xs text-red-700 font-mono mb-1">
+                                                {step.error.type}
+                                            </div>
+                                            <div className="text-sm text-red-600">
+                                                {step.error.message}
+                                            </div>
+                                        </>
+                                    )}
+                                    {step.duration_ms && (
+                                        <div className="text-xs text-gray-500 mt-2">
+                                            Failed after {(step.duration_ms / 1000).toFixed(1)}s
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Current step details */}
                 {currentStepInfo && (
@@ -334,8 +475,16 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                             {progressMsg}
                         </div>
                     )}
-                    <div className="text-xs text-gray-400 font-mono pt-2 border-t">
-                        Run ID: {runId}
+                    <div className="text-xs text-gray-400 font-mono pt-2 border-t space-y-1">
+                        <div>Run ID: {runId}</div>
+                        {status.updated_at && (
+                            <div>Last update: {new Date(status.updated_at).toLocaleTimeString()}</div>
+                        )}
+                        {status.last_semantic_progress_at && (
+                            <div className="text-blue-600 font-semibold">
+                                Semantic Progress: {new Date(status.last_semantic_progress_at).toLocaleTimeString()}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -351,7 +500,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 </div>
 
                 {/* Dev-only debug overlay */}
-                {process.env.NODE_ENV === 'development' && (
+                {typeof window !== 'undefined' && import.meta.env.DEV && (
                     <details className="mt-4 text-xs font-mono text-gray-500 bg-gray-100 p-3 rounded">
                         <summary className="cursor-pointer font-semibold">Debug (dev only)</summary>
                         <pre className="mt-2 overflow-x-auto">
@@ -363,8 +512,8 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                                 steps_completed: status.steps_completed,
                                 current_step: status.current_step,
                                 derived: {
-                                    secondsSinceProgress,
-                                    isStalledState,
+                                    // secondsSinceProgress, // Removed
+                                    // isStalledState, // Removed
                                 },
                             }, null, 2)}
                         </pre>
@@ -376,7 +525,6 @@ export default function RunDetail({ onBack }: RunDetailProps) {
 
     // 4. Failed (check for partial results but still show failure UI)
     const isFailed = status.status === 'FAILED' || status.status === 'STALE';
-    const hasPartialResults = isFailed && result?.quality_flags.is_partial;
 
     if (isFailed) {
         // Determine which step failed using centralized helper
@@ -416,7 +564,6 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         {PIPELINE_STEPS.map((step) => {
                             const isCompleted = (status.steps_completed || []).includes(step.key);
                             const isFailed = step.key === failedStep;
-                            const isPending = !isCompleted && !isFailed;
 
                             let icon = '⚪';
                             let textClass = 'text-gray-400';

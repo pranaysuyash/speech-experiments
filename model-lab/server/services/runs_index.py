@@ -72,7 +72,7 @@ class RunsIndex:
         return self._reload_transcript(run_id, run, manifest_path, current_mtime)
 
     def _reload_transcript(self, run_id: str, run: Dict, manifest_path: Path, mtime: int) -> Optional[Dict[str, Any]]:
-        logger.info(f"Reloading transcript for {run_id}")
+        logger.debug(f"Reloading transcript for {run_id}")
         try:
             # Re-read manifest to find artifacts
             manifest = json.loads(manifest_path.read_text())
@@ -232,13 +232,13 @@ class RunsIndex:
 
     def _refresh_index(self):
         """Atomic refresh of the index."""
-        logger.info("Refreshing runs index...")
+        logger.debug("Refreshing runs index...")
         runs = self._scan_runs()
         
         # Atomic swap (assignment is atomic in Python)
         self._cache = runs
         self._last_updated = time.time()
-        logger.info(f"Indexed {len(runs)} runs.")
+        logger.debug(f"Indexed {len(runs)} runs.")
 
     def _scan_runs(self) -> List[Dict[str, Any]]:
         """Scans the filesystem for runs. Returns list."""

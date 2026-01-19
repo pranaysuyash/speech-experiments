@@ -5,7 +5,20 @@ import logging
 
 from server.api import runs, results, workbench, experiments, candidates
 
-# Configure logging
+# Configure logging - reduce noise
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s [%(name)s] %(message)s'
+)
+
+# Silence verbose loggers
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # Hide HTTP access logs
+logging.getLogger("uvicorn.error").setLevel(logging.INFO)
+logging.getLogger("multipart").setLevel(logging.WARNING)  # Hide multipart parsing logs
+logging.getLogger("watchfiles").setLevel(logging.WARNING)  # Hide file change detection
+logging.getLogger("server.index").setLevel(logging.WARNING)  # Hide index refresh spam
+
+
 logger = logging.getLogger("server")
 
 app = FastAPI(title="Model Lab Analyst Console", version="0.1.0")
@@ -13,7 +26,7 @@ app = FastAPI(title="Model Lab Analyst Console", version="0.1.0")
 # CORS for Vite dev server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,4 +50,11 @@ def api_health_check():
 
 if __name__ == "__main__":
     # Local dev entry point
-    uvicorn.run("server.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "server.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+        access_log=False  # Disable access logs
+    )

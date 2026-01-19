@@ -80,7 +80,7 @@ class ModelRegistry:
             'hash': hashlib.md5(f"{model_type}:{version}".encode()).hexdigest()[:8]
         }
 
-        logger.info(f"Registered loader: {model_type} v{version} ({status.value}) caps={capabilities} - {description}")
+        logger.debug(f"Registered loader: {model_type} v{version} ({status.value}) caps={capabilities} - {description}")
 
     @classmethod
     def get_model_metadata(cls, model_type: str) -> Optional[Dict[str, Any]]:
@@ -559,9 +559,18 @@ def load_faster_whisper(config: Dict[str, Any], device: str) -> Bundle:
                 audio = audio.cpu().numpy()
             if isinstance(audio, np.ndarray) and audio.dtype != np.float32:
                 audio = audio.astype(np.float32)
+
+            # Pop progress_callback from kwargs if present (not supported by model.transcribe)
+            progress_callback = kwargs.pop("progress_callback", None)
             
-            segments, info = model.transcribe(audio, **kwargs)
-            segments_list = list(segments)
+            segments_generator, info = model.transcribe(audio, **kwargs)
+            
+            segments_list = []
+            for segment in segments_generator:
+                segments_list.append(segment)
+                if progress_callback:
+                    progress_callback()
+                    
             text = " ".join([s.text for s in segments_list])
             
             return {

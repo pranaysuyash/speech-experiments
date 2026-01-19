@@ -57,12 +57,24 @@ def get_run_status(run_id: str):
     # Get full manifest for updated_at and current_step
     from pathlib import Path
     import json
+    import logging
     manifest_path = Path(run["manifest_path"])
-    manifest = json.loads(manifest_path.read_text())
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except FileNotFoundError:
+        # Run exists in index but missing on disk (stale cache)
+        logging.getLogger("server.api").warning(f"Run {run_id} missing on disk. Refreshing index.")
+        get_index().refresh()
+        raise HTTPException(status_code=404, detail="Run not found (deleted)")
     
     status = run["status"]
     current_step = manifest.get("current_step")
     updated_at = manifest.get("updated_at")
+
+    # Extract semantic progress for current step
+    last_semantic_progress_at = None
+    if current_step and "steps" in manifest and current_step in manifest["steps"]:
+         last_semantic_progress_at = manifest["steps"][current_step].get("last_semantic_progress_at")
     
     # Stale detection: if RUNNING but no heartbeat for > 90s, mark as STALE
     STALE_THRESHOLD_SECONDS = 90
@@ -84,6 +96,8 @@ def get_run_status(run_id: str):
                     "steps_completed": run.get("steps_completed", []),
                     "current_step": current_step,
                     "updated_at": updated_at,
+                    "last_semantic_progress_at": last_semantic_progress_at,
+                    "is_stalled": True, # Stale = Stalled
                     "error_code": "STALE_RUN",
                     "error_message": f"No heartbeat in {int(elapsed)}s",
                     "failure_step": manifest.get("failure_step")  # Pass-through verbatim
@@ -91,15 +105,106 @@ def get_run_status(run_id: str):
         except (ValueError, TypeError):
             pass  # If timestamp parsing fails, just return normal status
     
+    # Semantic Stalled Check (Alive but stuck)
+    is_stalled = False
+    if status == "RUNNING" and last_semantic_progress_at:
+        try:
+            last_sem = datetime.fromisoformat(last_semantic_progress_at.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            elapsed_sem = (now - last_sem).total_seconds()
+            # If no semantic progress for 5 minutes, mark as STALLED (but keep status RUNNING)
+            if elapsed_sem > 300:
+                is_stalled = True
+        except (ValueError, TypeError):
+            pass
+    
     # Return minimal status from index cache
+    # Enhance with observability fields
+    input_meta = {
+        "filename": manifest.get("input", {}).get("original_path", "unknown"),
+        "size_bytes": 0
+    }
+    # Best-effort file size
+    try:
+        if "input" in manifest and "original_path" in manifest["input"]:
+            p = Path(manifest["input"]["original_path"])
+            if p.exists():
+                input_meta["size_bytes"] = p.stat().st_size
+    except Exception:
+        pass
+
+    # Extract artifacts availability
+    artifacts = {}
+    if "steps" in manifest:
+        for step_name, step_data in manifest["steps"].items():
+            if "artifacts" in step_data and step_data["artifacts"]:
+                # Just list paths or names
+                # artifacts[step_name] = [a.get("path") for a in step_data["artifacts"]]
+                # Actually, simpler boolean or list is enough for UI "Visibility"
+                artifacts[step_name] = True
+
+    # Extract per-step details with errors
+    steps = []
+    if "steps" in manifest:
+        for step_name, step_data in manifest["steps"].items():
+            step_info = {
+                "name": step_name,
+                "status": step_data.get("status", "PENDING"),
+                "started_at": step_data.get("started_at"),
+                "ended_at": step_data.get("ended_at"),
+                "duration_ms": step_data.get("duration_ms"),
+                "resolved_config": step_data.get("resolved_config"),
+            }
+            
+            # Add artifacts (filter out internal fields like path, content_type)
+            raw_artifacts = step_data.get("artifacts", [])
+            api_artifacts = []
+            for art in raw_artifacts:
+                if "id" in art:
+                    # New semantic schema - expose safe fields only
+                    api_artifacts.append({
+                        "id": art.get("id"),
+                        "filename": art.get("filename"),
+                        "role": art.get("role"),
+                        "produced_by": art.get("produced_by"),
+                        "size_bytes": art.get("size_bytes"),
+                        "downloadable": art.get("downloadable", False),
+                    })
+                # Legacy format artifacts are not exposed to prevent confusion
+            
+            if api_artifacts:
+                step_info["artifacts"] = api_artifacts
+            
+            # Add error details if step failed
+            if step_info["status"] == "FAILED":
+                error_info = {}
+                if "error" in step_data:
+                    error_info["type"] = step_data["error"].get("type", "UnknownError")
+                    error_info["message"] = step_data["error"].get("message", "No error message available")
+                else:
+                    # Fallback if error field missing
+                    error_info["type"] = "UnknownError"
+                    error_info["message"] = "Step failed without error details"
+                step_info["error"] = error_info
+            
+            steps.append(step_info)
+
+
+
     return {
         "run_id": run_id,
         "status": status,
-        "started_at": manifest.get("started_at"),  # Read from manifest, not index cache
+        "started_at": manifest.get("started_at"),
         "steps_completed": run.get("steps_completed", []),
         "current_step": current_step,
         "updated_at": updated_at,
-        "failure_step": manifest.get("failure_step")  # Pass-through verbatim (nullable)
+        "last_semantic_progress_at": last_semantic_progress_at,
+        "is_stalled": is_stalled,
+        "failure_step": manifest.get("failure_step"),
+        "input_metadata": input_meta,
+        "config": manifest.get("config", {}),
+        "artifacts_availability": artifacts,
+        "steps": steps
     }
 
 @router.get("/{run_id}")
@@ -340,3 +445,79 @@ def download_session_bundle_zip(run_id: str):
     """Download the legacy session_bundle.zip if present."""
     path = safe_file_path(run_id, "bundle/session_bundle.zip")
     return FileResponse(path, media_type="application/zip", filename="session_bundle.zip")
+
+
+@router.get("/{run_id}/artifacts/{artifact_id}")
+def download_artifact(run_id: str, artifact_id: str):
+    """
+    Download an artifact by ID.
+    
+    Phase 2.5 invariants (non-negotiable):
+    1. Resolve ONLY via manifest - no filesystem probing
+    2. Path traversal impossible - artifact_id is opaque lookup key
+    3. 404 if artifact not declared in manifest
+    4. 403 if downloadable=false
+    5. Stream via FileResponse with correct Content-Type
+    """
+    import logging
+    logger = logging.getLogger("server.api")
+    
+    # 1. Get run from index
+    run = get_index().get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    # 2. Read manifest to find artifact
+    manifest_path = Path(run["manifest_path"])
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="Manifest not found")
+    
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except Exception as e:
+        logger.error(f"Failed to read manifest for {run_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to read manifest")
+    
+    # 3. Search for artifact by ID across all steps
+    session_dir = manifest_path.parent
+    found_artifact = None
+    
+    for step_name, step_data in manifest.get("steps", {}).items():
+        for art in step_data.get("artifacts", []):
+            # Only new schema artifacts have 'id'
+            if art.get("id") == artifact_id:
+                found_artifact = art
+                break
+        if found_artifact:
+            break
+    
+    if not found_artifact:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    
+    # 4. Check downloadable flag (403 if false)
+    if not found_artifact.get("downloadable", False):
+        raise HTTPException(status_code=403, detail="Artifact not downloadable")
+    
+    # 5. Resolve file path (relative to session_dir, from manifest)
+    relative_path = found_artifact.get("path")
+    if not relative_path:
+        raise HTTPException(status_code=500, detail="Artifact path missing")
+    
+    # Security: ensure path doesn't escape session_dir
+    file_path = (session_dir / relative_path).resolve()
+    if not str(file_path).startswith(str(session_dir.resolve())):
+        logger.warning(f"Path traversal attempt blocked: {relative_path}")
+        raise HTTPException(status_code=403, detail="Invalid artifact path")
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Artifact file not found on disk")
+    
+    # 6. Return file with proper Content-Type
+    content_type = found_artifact.get("content_type", "application/octet-stream")
+    filename = found_artifact.get("filename", file_path.name)
+    
+    return FileResponse(
+        file_path,
+        media_type=content_type,
+        filename=filename
+    )

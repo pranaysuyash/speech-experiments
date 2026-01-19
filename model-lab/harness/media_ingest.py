@@ -145,7 +145,7 @@ def extract_audio_ffmpeg(
             str(tmp_path),
         ]
 
-        logger.info(f"Running ffmpeg: {' '.join(argv)}")
+        logger.debug(f"Running ffmpeg: {' '.join(argv)}")
         subprocess.run(argv, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         atomic_replace(tmp_path, output_wav)
         return argv, ffmpeg_version

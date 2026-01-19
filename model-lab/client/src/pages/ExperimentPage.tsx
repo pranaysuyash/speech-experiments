@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { ComparisonSummary } from '../lib/api';
@@ -47,7 +47,11 @@ export default function ExperimentPage() {
     const [compLoading, setCompLoading] = useState(false);
     const [compError, setCompError] = useState<string | null>(null);
 
-    // ... Sort state ...
+    // Sort state
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
+        key: 'candidate_id',
+        direction: 'asc'
+    });
 
     useEffect(() => {
         if (!experimentId) return;

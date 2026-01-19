@@ -6,6 +6,7 @@ export interface RunSummary {
   run_id: string;
   status: string;
   started_at?: string;
+  updated_at?: string;
   input_filename: string;
   duration?: number;
   steps_completed: string[];
@@ -114,6 +115,35 @@ export interface ResultSummary {
   };
 }
 
+export interface Artifact {
+  id: string;
+  filename: string;
+  role: string;
+  produced_by: string;
+  size_bytes: number;
+  downloadable: boolean;
+}
+
+export interface Step {
+  name: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  started_at?: string;
+  ended_at?: string;
+  duration_ms?: number;
+  error?: {
+    type: string;
+    message: string;
+  };
+  resolved_config?: {
+    model_id: string;
+    source: string;
+    device: string;
+    language: string;
+  };
+  artifacts?: Artifact[];
+}
+
+
 export const api = {
   getRuns: async (refresh = false): Promise<RunSummary[]> => {
     const res = await axios.get(`${API_BASE}/runs`, { params: { refresh } });
@@ -145,9 +175,16 @@ export const api = {
     steps_completed: string[],
     current_step?: string | null,
     updated_at?: string,
+    last_semantic_progress_at?: string,
+    is_stalled?: boolean,
     error_code?: string,
     error_message?: string,
-    failure_step?: string | null  // Optional: step where failure occurred (forward-compatible)
+    failure_step?: string | null,
+    // Observability Fields
+    input_metadata?: { filename: string, size_bytes: number },
+    config?: any,
+    artifacts_availability?: Record<string, boolean>,
+    steps?: Step[]
   }> => {
     const res = await axios.get(`${API_BASE}/runs/${runId}/status`);
     return res.data;

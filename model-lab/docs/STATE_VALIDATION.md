@@ -147,3 +147,19 @@ After implementing validation scaffolding, verify:
 - **Confusing but true** → document, don't fix
 - **Reassuring but false** → stop-the-line bug
 - **No UI hallucination** — state must never advance without backend signal
+
+---
+
+## External User Cold Load Tests (Automated)
+
+### 1. Hard Refresh Torture
+- **Scenario**: 5 rapid refreshes on `RUNNING` and `FAILED` states.
+- **Result**: PASS. UI consistently reconstructed state from API. Status badge remained stable.
+
+### 2. Navigation Consistency
+- **Scenario**: Navigate away (to external site) and return.
+- **Result**: PASS. Run details re-fetched correctly. No regression to "Loading" or "Error" unnecessarily.
+
+### 3. Multi-Tab Access
+- **Scenario**: Open run in multiple tabs simultaneously.
+- **Result**: PASS. State is synchronized via API polling/fetching. No conflicts observed (read-only view).

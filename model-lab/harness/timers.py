@@ -91,7 +91,7 @@ class PerformanceTimer:
 
             result_container['result'] = result
 
-            logger.info(f"⏱️  {operation_name}: {elapsed_time*1000:.1f}ms")
+            logger.debug(f"⏱️  {operation_name}: {elapsed_time*1000:.1f}ms")
             logger.debug(f"  Memory: {memory_before:.1f}MB → {memory_after:.1f}MB (Δ{memory_after-memory_before:.1f}MB)")
 
     def measure_inference(self, func, *args, **kwargs) -> Tuple[Any, TimingResult]:

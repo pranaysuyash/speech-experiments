@@ -26,6 +26,9 @@ class SessionContext:
     
     # Store ingest result here
     ingest: Optional[Dict[str, Any]] = None
+    
+    # Progress callback
+    on_progress: Optional[Callable[[], None]] = None
 
     @property
     def audio_path(self) -> Optional[Path]:
@@ -47,6 +50,54 @@ class StepDef:
     func: Callable[[SessionContext], Dict[str, Any]]
     # Used for resume checks
     artifact_paths: Callable[[Dict[str, Any]], List[Path]]
+
+
+@dataclass
+class ArtifactMetadata:
+    """
+    Semantic artifact metadata. Locked schema for Phase 2.
+    
+    - id: Primary key for download endpoint
+    - filename: User-visible name
+    - role: Semantic purpose (transcript, processed_audio, etc.)
+    - produced_by: Step that created it
+    - path: Internal path relative to session_dir (never exposed to client)
+    - size_bytes: File size from stat()
+    - content_type: MIME type
+    - downloadable: Explicit boolean
+    """
+    id: str
+    filename: str
+    role: str
+    produced_by: str
+    path: str  # Relative to session_dir
+    size_bytes: int
+    content_type: str
+    downloadable: bool = True
+
+    def to_manifest_dict(self) -> Dict[str, Any]:
+        """Full dict for manifest storage."""
+        return {
+            "id": self.id,
+            "filename": self.filename,
+            "role": self.role,
+            "produced_by": self.produced_by,
+            "path": self.path,
+            "size_bytes": self.size_bytes,
+            "content_type": self.content_type,
+            "downloadable": self.downloadable,
+        }
+
+    def to_api_dict(self) -> Dict[str, Any]:
+        """Dict for API exposure (path and content_type hidden)."""
+        return {
+            "id": self.id,
+            "filename": self.filename,
+            "role": self.role,
+            "produced_by": self.produced_by,
+            "size_bytes": self.size_bytes,
+            "downloadable": self.downloadable,
+        }
 
 
 def now_iso() -> str:
@@ -164,12 +215,20 @@ class SessionRunner:
             root.addHandler(file_handler)
 
     def _default_manifest(self) -> Dict[str, Any]:
+        # Get input file size upfront
+        input_size_bytes = 0
+        try:
+            input_size_bytes = self.input_path.stat().st_size
+        except Exception:
+            pass
+        
         return {
             "schema_version": MANIFEST_SCHEMA_VERSION,
             "run_id": self.run_id,
             "input": {
                 "original_path": str(self.input_path),
                 "input_hash": self.input_hash,
+                "size_bytes": input_size_bytes,
             },
             "config": {
                 "steps": self.requested_steps or [],
@@ -524,7 +583,7 @@ class SessionRunner:
              # This assumes ASR runner writes to `artifacts/asr.json`
              # We'll pass ctx.artifacts_dir and let it write there.
              from harness.asr import run_asr
-             return run_asr(ctx.audio_path, ctx.artifacts_dir, config=self.extra_config.get("asr", {}))
+             return run_asr(ctx.audio_path, ctx.artifacts_dir, config=self.extra_config.get("asr", {}), progress_callback=ctx.on_progress)
 
         def asr_artifacts(step_result: Dict[str, Any]) -> List[Path]:
              # Assuming step_result contains path or we know it
@@ -763,12 +822,22 @@ class SessionRunner:
         entry["status"] = "RUNNING"
         entry["started_at"] = now_iso()
         
+        # CRITICAL: Resolve and persist config BEFORE execution
+        # If step fails/hangs, this data is still available for debugging
+        if name == "asr":
+            from harness.asr import resolve_asr_config
+            asr_user_config = self.extra_config.get("asr", {})
+            resolved = resolve_asr_config(asr_user_config)
+            entry["resolved_config"] = resolved.to_dict()
+            logger.info(f"ASR resolved: {resolved.model_id} on {resolved.device}")
+        
         # Update parent manifest with current step and timestamp
         m["current_step"] = name
         m["updated_at"] = now_iso()
-        self._save_manifest(m)
+        self._save_manifest(m)  # MANDATORY FLUSH - resolved_config now persisted
 
         logger.info(f"Running Step: {name}")
+
         t0 = time.time()
         
         # Heartbeat thread to keep updated_at fresh during long steps
@@ -781,7 +850,22 @@ class SessionRunner:
                 if not heartbeat_stop.is_set():
                     m_live = self._load_manifest()
                     m_live["updated_at"] = now_iso()
+                    
+                    # Update semantic progress if available
+                    if progress_state["last_semantic_progress_at"]:
+                        step_entry = m_live["steps"].get(name)
+                        if step_entry:
+                            step_entry["last_semantic_progress_at"] = progress_state["last_semantic_progress_at"]
+                            
                     self._save_manifest(m_live)
+        
+        # Shared state for progress (thread-safe by GIL mostly, but simple dict is fine)
+        progress_state = {"last_semantic_progress_at": None}
+        
+        def on_progress():
+            progress_state["last_semantic_progress_at"] = now_iso()
+            
+        self.ctx.on_progress = on_progress
         
         heartbeat_thread = threading.Thread(target=heartbeat_worker, daemon=True)
         heartbeat_thread.start()
@@ -800,18 +884,46 @@ class SessionRunner:
             if name == "ingest":
                 self.ctx.ingest = result
 
-            # Record artifacts and hashes
+            # Record artifacts with semantic schema (Phase 2)
             artifacts: List[Dict[str, Any]] = []
-            for p in step_def.artifact_paths(result):
-                # Ensure path is recorded relative if possible, or absolute?
-                # User used absolute in skeleton. Stick to absolute for now or normalized.
-                artifacts.append({"path": str(p), "hash": sha256_file(p)})
+            
+            if name == "asr":
+                # Use new semantic artifact schema for ASR
+                for p in step_def.artifact_paths(result):
+                    path_obj = Path(p)
+                    if path_obj.exists():
+                        # Compute relative path from session_dir
+                        try:
+                            rel_path = str(path_obj.relative_to(self.session_dir))
+                        except ValueError:
+                            rel_path = str(path_obj)  # Fallback to absolute if outside
+                        
+                        artifact = ArtifactMetadata(
+                            id="asr_transcript",
+                            filename=path_obj.name,
+                            role="transcript",
+                            produced_by="asr",
+                            path=rel_path,
+                            size_bytes=path_obj.stat().st_size,
+                            content_type="application/json",
+                            downloadable=True
+                        )
+                        artifacts.append(artifact.to_manifest_dict())
+            else:
+                # Legacy format for other steps (to be migrated later)
+                for p in step_def.artifact_paths(result):
+                    artifacts.append({"path": str(p), "hash": sha256_file(p)})
 
             entry["status"] = "COMPLETED"
             entry["ended_at"] = now_iso()
             entry["duration_ms"] = duration_ms
             entry["artifacts"] = artifacts
             entry["result"] = result  # Keep for strict resume checks
+
+            
+            # Persist final semantic progress timestamp
+            if progress_state["last_semantic_progress_at"]:
+                entry["last_semantic_progress_at"] = progress_state["last_semantic_progress_at"]
             
             # Clear current_step on completion
             m["current_step"] = None

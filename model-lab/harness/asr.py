@@ -6,8 +6,9 @@ Exposes `run_asr` for use by SessionRunner and scripts.
 
 import json
 import logging
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, Callable
 
 from harness.audio_io import AudioLoader
 from harness.registry import ModelRegistry
@@ -22,10 +23,101 @@ from harness.preprocess_ops import run_preprocessing_chain
 
 logger = logging.getLogger("asr")
 
+
+@dataclass
+class ResolvedASRConfig:
+    """
+    Ground truth of what WILL execute.
+    Resolved BEFORE model loading, persisted BEFORE execution.
+    """
+    model_id: str      # Exact model name (not alias like "default")
+    source: str        # "local" | "hf" | "api"
+    device: str        # Actual execution device: "cpu" | "cuda" | "mps"
+    language: str      # "auto" | specific language code
+
+    def to_dict(self) -> Dict[str, str]:
+        return asdict(self)
+
+
+def resolve_asr_config(user_config: Optional[Dict[str, Any]] = None) -> ResolvedASRConfig:
+    """
+    Pure resolution function - determines what WILL execute.
+    
+    This function MUST be called BEFORE model loading.
+    The result MUST be persisted BEFORE execution begins.
+    
+    Resolution rules:
+    - model_id: "default" -> actual model name from registry
+    - source: Determined by model type and availability
+    - device: Resolved based on availability (mps/cuda/cpu)
+    - language: "auto" unless forced in config
+    """
+    user_config = user_config or {}
+    
+    # 1. Resolve model_id
+    model_type = user_config.get("model_type", "faster_whisper")
+    model_name = user_config.get("model_name", "default")
+    
+    # Map "default" to actual model name per model type
+    if model_name == "default":
+        default_models = {
+            "faster_whisper": "large-v3",
+            "whisper": "large-v3",
+            "distil_whisper": "distil-whisper/distil-large-v3",
+            "lfm2_5_audio": "LiquidAI/LFM2.5-Audio-1.5B",
+            "seamlessm4t": "facebook/seamless-m4t-v2-large",
+        }
+        model_name = default_models.get(model_type, "large-v3")
+    
+    model_id = f"{model_type}:{model_name}"
+    
+    # 2. Resolve source
+    # For now, simple heuristic based on model type
+    # Could be enhanced to check local cache vs HF download
+    if model_type in ("faster_whisper", "whisper"):
+        source = "hf"  # Downloads from HuggingFace
+    elif model_type == "whisper_cpp":
+        source = "local"  # Uses local ggml file
+    elif model_type in ("lfm2_5_audio", "distil_whisper", "seamlessm4t"):
+        source = "hf"
+    else:
+        source = "unknown"
+    
+    # 3. Resolve device
+    requested_device = user_config.get("device", "cpu")
+    
+    # Apply device mapping rules (same as registry)
+    if model_type == "faster_whisper":
+        # faster_whisper doesn't support MPS
+        if requested_device == "mps":
+            actual_device = "cpu"
+        else:
+            actual_device = requested_device
+    elif model_type == "lfm2_5_audio":
+        # LFM has CUDA bug, prefer MPS or CPU
+        if requested_device == "cuda":
+            actual_device = "cpu"
+        else:
+            actual_device = requested_device
+    else:
+        actual_device = requested_device
+    
+    # 4. Resolve language
+    language = user_config.get("language", "auto")
+    
+    return ResolvedASRConfig(
+        model_id=model_id,
+        source=source,
+        device=actual_device,
+        language=language
+    )
+
+
 def run_asr(
     input_path: Path,
     output_dir: Path,
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None,
+    progress_callback: Optional[Callable[[], None]] = None
 ) -> Dict[str, Any]:
     """
     Run ASR on input media.
@@ -99,6 +191,13 @@ def run_asr(
     
     logger.info(f"Transcribing {ingest_audio_path.name}...")
     try:
+         # Pass progress_callback if supported? 
+         # Bundle Contract v1 doesn't strictly mandate progress_callback in signature, 
+         # but we can pass it in kwargs.
+         result = transcribe_func(audio_data, sr=sr, progress_callback=progress_callback)
+    except TypeError:
+         # Fallback for models not supporting progress_callback
+         logger.warning(f"Model {model_type} does not support progress tracking")
          result = transcribe_func(audio_data, sr=sr)
     except Exception as e:
          raise RuntimeError(f"Transcription failed: {e}")
