@@ -6,13 +6,16 @@ import logging.config
 
 from server.api import runs, results, workbench, experiments, candidates
 
-# Logging configuration - silence noisy loggers
+# Logging configuration - balance visibility with noise reduction
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
         "default": {
             "format": "%(levelname)s [%(name)s] %(message)s",
+        },
+        "access": {
+            "format": "%(levelname)s [access] %(message)s",
         },
     },
     "handlers": {
@@ -23,15 +26,17 @@ LOGGING_CONFIG = {
         },
     },
     "loggers": {
-        # Silence noisy loggers
+        # Silence truly spammy loggers only
         "watchfiles": {"level": "WARNING"},
         "watchfiles.main": {"level": "WARNING"},
-        "server.index": {"level": "WARNING"},
-        "uvicorn.access": {"level": "WARNING"},
-        "multipart": {"level": "WARNING"},
-        # Keep errors visible
+        "server.index": {"level": "WARNING"},  # Hide "Refreshing runs index" spam
+        # Keep user actions visible
+        "uvicorn": {"level": "INFO"},
+        "uvicorn.access": {"level": "INFO"},  # Show API calls
+        "uvicorn.error": {"level": "INFO"},
         "server": {"level": "INFO"},
-        "harness": {"level": "INFO"},
+        "server.api": {"level": "INFO"},  # Show API-level logs
+        "harness": {"level": "INFO"},  # Show run progress
     },
     "root": {
         "handlers": ["default"],
@@ -77,6 +82,6 @@ if __name__ == "__main__":
         port=8000,
         reload=True,
         log_config=LOGGING_CONFIG,  # Pass config to uvicorn
-        access_log=False  # Disable access logs entirely
+        access_log=True  # Show API requests
     )
 

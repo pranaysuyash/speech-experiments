@@ -980,6 +980,10 @@ class SessionRunner:
                 m["log_path"] = str(artifacts_dir.relative_to(self.session_dir))
             
             self._save_manifest(m)
+            # Log the full exception traceback for server logs
+            logger.exception(f"Step '{name}' failed")
+            # We do NOT re-raise here to allow the runner loop to handle the break
+            return
             raise
         
         finally:
@@ -1096,8 +1100,14 @@ class SessionRunner:
                 
                 step_def = self.steps[step_name]
                 self._execute_step(m, step_def)
+                
+                # Check directly if the step failed (it updates the manifest)
+                if m.get("status") == "FAILED":
+                    logger.warning(f"Aborting session loop because step '{step_name}' failed.")
+                    break
 
-            m["status"] = "COMPLETED"
+            if m.get("status") != "FAILED":
+                m["status"] = "COMPLETED"
             m["ended_at"] = now_iso()
             m["duration_ms"] = int((time.time() - t0) * 1000)
             self._save_manifest(m)
