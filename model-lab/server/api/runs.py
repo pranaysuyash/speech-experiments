@@ -85,7 +85,8 @@ def get_run_status(run_id: str):
                     "current_step": current_step,
                     "updated_at": updated_at,
                     "error_code": "STALE_RUN",
-                    "error_message": f"No heartbeat in {int(elapsed)}s"
+                    "error_message": f"No heartbeat in {int(elapsed)}s",
+                    "failure_step": manifest.get("failure_step")  # Pass-through verbatim
                 }
         except (ValueError, TypeError):
             pass  # If timestamp parsing fails, just return normal status
@@ -97,7 +98,8 @@ def get_run_status(run_id: str):
         "started_at": manifest.get("started_at"),  # Read from manifest, not index cache
         "steps_completed": run.get("steps_completed", []),
         "current_step": current_step,
-        "updated_at": updated_at
+        "updated_at": updated_at,
+        "failure_step": manifest.get("failure_step")  # Pass-through verbatim (nullable)
     }
 
 @router.get("/{run_id}")

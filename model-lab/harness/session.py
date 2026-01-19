@@ -183,6 +183,7 @@ class SessionRunner:
             "steps": {},
             "final": {},
             "warnings": [],
+            "failure_step": None,  # Authoritative: step that raised exception
         }
 
     def _load_manifest(self) -> Dict[str, Any]:
@@ -825,6 +826,7 @@ class SessionRunner:
             
             # Add failure fields to manifest
             m["status"] = "FAILED"
+            m["failure_step"] = name  # AUTHORITATIVE: Captured at exception site
             m["error_step"] = name
             m["error_code"] = e.__class__.__name__
             m["error_message"] = str(e)[:200]  # Truncate to 200 chars
@@ -963,6 +965,9 @@ class SessionRunner:
             run_failed = True
             logger.error(f"Session Failed: {e}", exc_info=True)
             m["status"] = "FAILED"
+            # Non-pipeline failure: explicitly set failure_step to None
+            if "failure_step" not in m or m["failure_step"] is None:
+                m["failure_step"] = None  # Pre-pipeline or setup failure
             m["warnings"].append(str(e))
             self._save_manifest(m)
             raise e
