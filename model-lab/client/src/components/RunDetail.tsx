@@ -116,7 +116,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     const handleRepeatRun = () => {
         const params = new URLSearchParams({
             repeat_from: runId,
-            file: status.input_filename || '',
+            file: status.input_metadata?.filename || status.input_filename || '',
         });
         window.location.href = `/lab/workbench?${params}`;
     };
@@ -378,8 +378,8 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                                                 }
                                             }}
                                             className={`text-xs px-3 py-1 border rounded ${artifact.downloadable
-                                                    ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-pointer'
-                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-pointer'
+                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                 }`}
                                             title={artifact.downloadable ? 'Download artifact' : 'Not downloadable'}
                                         >
@@ -535,15 +535,77 @@ export default function RunDetail({ onBack }: RunDetailProps) {
 
         return (
             <div className="p-8 max-w-3xl mx-auto mt-12">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-red-700">Run Failed</h2>
-                    <div className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm font-semibold border border-red-300">
-                        FAILED
+                {/* Input Context Block */}
+                <div className="bg-gray-50 border rounded-lg p-4 mb-6">
+                    <h3 className="text-xs font-semibold text-gray-600 mb-2">Input</h3>
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm">
+                            <span>📄</span>
+                            <span className="font-medium">
+                                {status.input_metadata?.filename || status.input_filename || runId}
+                            </span>
+                        </div>
+                        {status.input_metadata?.size_bytes ? (
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <span>💾</span>
+                                <span>{(status.input_metadata.size_bytes / (1024 * 1024)).toFixed(2)} MB</span>
+                            </div>
+                        ) : null}
+                        {(() => {
+                            const audioDuration = getAudioDuration();
+                            return audioDuration !== null ? (
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <span>⏱</span>
+                                    <span>{formatDuration(audioDuration)} audio</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <span>⏱</span>
+                                    <span>Duration: unknown</span>
+                                </div>
+                            );
+                        })()}
+                        {status.started_at && (
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <span>⬆</span>
+                                <span>Received {relativeTime(status.started_at)}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Error Message (always show for failed runs) */}
+                {/* Step Failures (persist even in FAILED view) */}
+                {status.steps && status.steps.some((s: any) => s.status === 'FAILED') && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+                        <h3 className="text-sm font-semibold text-red-900 mb-3">Step Failures</h3>
+                        <div className="space-y-3">
+                            {status.steps.filter((s: any) => s.status === 'FAILED').map((step: any) => (
+                                <div key={step.name} className="bg-white border border-red-300 rounded p-3">
+                                    <div className="font-semibold text-red-800 text-sm mb-1">
+                                        ❌ {step.name}
+                                    </div>
+                                    {step.error && (
+                                        <>
+                                            <div className="text-xs text-red-700 font-mono mb-1">
+                                                {step.error.type}
+                                            </div>
+                                            <div className="text-sm text-red-600">
+                                                {step.error.message}
+                                            </div>
+                                        </>
+                                    )}
+                                    {step.duration_ms && (
+                                        <div className="text-xs text-gray-500 mt-2">
+                                            Failed after {(step.duration_ms / 1000).toFixed(1)}s
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Error Message Coarse (always show for failed runs) */}
                 {(status.error_message || isUnknown) && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                         {status.error_code && (
@@ -556,6 +618,64 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         </div>
                     </div>
                 )}
+
+                {/* Artifacts (persist even in FAILED view when steps completed) */}
+                {(() => {
+                    const allArtifacts: Array<{ stepName: string; artifact: any }> = [];
+                    status.steps?.forEach((step: any) => {
+                        if (step.artifacts && step.status === 'COMPLETED') {
+                            step.artifacts.forEach((art: any) => {
+                                allArtifacts.push({ stepName: step.name, artifact: art });
+                            });
+                        }
+                    });
+
+                    if (allArtifacts.length === 0) return null;
+
+                    const formatBytes = (bytes: number) => {
+                        if (bytes < 1024) return `${bytes} B`;
+                        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+                        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+                    };
+
+                    return (
+                        <div className="bg-white border rounded-lg p-6 mb-6">
+                            <h3 className="text-sm font-semibold text-gray-600 mb-3">Artifacts</h3>
+                            <div className="space-y-2">
+                                {allArtifacts.map(({ artifact }) => (
+                                    <div key={artifact.id} className="flex items-center justify-between border rounded p-3 bg-gray-50">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-gray-400">📄</span>
+                                            <div>
+                                                <div className="font-medium text-sm text-gray-800">
+                                                    {artifact.filename}
+                                                </div>
+                                                <div className="text-xs text-gray-500">
+                                                    {artifact.role} · {formatBytes(artifact.size_bytes)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            disabled={!artifact.downloadable}
+                                            onClick={() => {
+                                                if (artifact.downloadable) {
+                                                    window.open(`/api/runs/${runId}/artifacts/${artifact.id}`, '_blank');
+                                                }
+                                            }}
+                                            className={`text-xs px-3 py-1 border rounded ${artifact.downloadable
+                                                ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-pointer'
+                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                }`}
+                                            title={artifact.downloadable ? 'Download artifact' : 'Not downloadable'}
+                                        >
+                                            Download
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* Pipeline visualization with failed step */}
                 <div className="bg-white border rounded-lg p-6 mb-4">
