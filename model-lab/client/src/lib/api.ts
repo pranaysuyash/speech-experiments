@@ -146,7 +146,8 @@ export const api = {
     current_step?: string | null,
     updated_at?: string,
     error_code?: string,
-    error_message?: string
+    error_message?: string,
+    failure_step?: string | null  // Optional: step where failure occurred (forward-compatible)
   }> => {
     const res = await axios.get(`${API_BASE}/runs/${runId}/status`);
     return res.data;

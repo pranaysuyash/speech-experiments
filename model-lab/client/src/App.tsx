@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import RunsList from './components/RunsList';
 import RunDetail from './components/RunDetail';
+import { RunDetailErrorBoundary } from './components/RunDetailErrorBoundary';
 import ResultsPage from './pages/ResultsPage';
 import FindingsPage from './pages/FindingsPage';
 import WorkbenchPage from './pages/WorkbenchPage';
@@ -36,7 +37,11 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/lab/runs" replace />} />
           <Route path="/lab/runs" element={<RunsList onSelectRun={(id: string) => window.location.href = `/runs/${id}`} />} />
-          <Route path="/runs/:runId" element={<RunDetail onBack={() => window.location.href = '/lab/runs'} />} />
+          <Route path="/runs/:runId" element={
+            <RunDetailErrorBoundary onBack={() => window.location.href = '/lab/runs'}>
+              <RunDetail onBack={() => window.location.href = '/lab/runs'} />
+            </RunDetailErrorBoundary>
+          } />
 
           <Route path="/lab/workbench" element={<WorkbenchPage />} />
 
