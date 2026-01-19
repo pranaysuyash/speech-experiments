@@ -194,6 +194,27 @@ class SessionRunner:
         # Ideally steps should take config from context.
         
         self.steps: Dict[str, StepDef] = {}
+    
+    def _get_step_artifact(self, step_name: str, extension: str = ".json") -> Optional[Path]:
+        """Get the first artifact path from a completed step's manifest entry.
+        
+        This allows downstream steps to dynamically resolve artifact paths
+        instead of using hardcoded filenames.
+        """
+        manifest = self._load_manifest()
+        step_data = manifest.get("steps", {}).get(step_name, {})
+        
+        if step_data.get("status") != "COMPLETED":
+            return None
+        
+        for art in step_data.get("artifacts", []):
+            path_str = art.get("path") if isinstance(art, dict) else None
+            if path_str and path_str.endswith(extension):
+                full_path = self.session_dir / path_str
+                if full_path.exists():
+                    return full_path
+        
+        return None
 
     def _init_dirs(self) -> None:
         self.session_dir.mkdir(parents=True, exist_ok=True)
@@ -623,15 +644,23 @@ class SessionRunner:
         
         # 4. Alignment
         def alignment_func(ctx: SessionContext) -> Dict[str, Any]:
-            # Needs ASR and Diarization artifacts.
-            # We assume they are in ctx.artifacts_dir with standard names?
-            # Or we fetch them from manifest result?
-            # Ideally step_result should be accessible.
-            # For simplicity, relying on standard file paths in artifacts_dir for now,
-            # but stricter way is to lookup from dependency result (Context enrichment).
-            # But run_alignment currently looks for files.
-            asr_path = ctx.artifacts_dir / "asr.json"
+            # Lookup actual artifact paths from completed steps (not hardcoded)
+            asr_path = self._get_step_artifact("asr", ".json")
+            if not asr_path:
+                # Fallback to legacy path
+                asr_path = ctx.artifacts_dir / "asr.json"
+            
+            # Diarization may not produce a .json, check for directory
             diar_path = ctx.artifacts_dir / "diarization.json"
+            if not diar_path.exists():
+                # Try to find any diarization artifact
+                diar_artifact = self._get_step_artifact("diarization", ".json")
+                if diar_artifact:
+                    diar_path = diar_artifact
+            
+            if not asr_path.exists():
+                raise FileNotFoundError(f"ASR not found: {asr_path}")
+            
             from harness.alignment import run_alignment
             return run_alignment(asr_path, diar_path, ctx.artifacts_dir)
 

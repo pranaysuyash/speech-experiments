@@ -2,23 +2,44 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import logging
+import logging.config
 
 from server.api import runs, results, workbench, experiments, candidates
 
-# Configure logging - reduce noise
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s [%(name)s] %(message)s'
-)
+# Logging configuration - silence noisy loggers
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "%(levelname)s [%(name)s] %(message)s",
+        },
+    },
+    "handlers": {
+        "default": {
+            "formatter": "default",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stderr",
+        },
+    },
+    "loggers": {
+        # Silence noisy loggers
+        "watchfiles": {"level": "WARNING"},
+        "watchfiles.main": {"level": "WARNING"},
+        "server.index": {"level": "WARNING"},
+        "uvicorn.access": {"level": "WARNING"},
+        "multipart": {"level": "WARNING"},
+        # Keep errors visible
+        "server": {"level": "INFO"},
+        "harness": {"level": "INFO"},
+    },
+    "root": {
+        "handlers": ["default"],
+        "level": "INFO",
+    },
+}
 
-# Silence verbose loggers
-logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # Hide HTTP access logs
-logging.getLogger("uvicorn.error").setLevel(logging.INFO)
-logging.getLogger("multipart").setLevel(logging.WARNING)  # Hide multipart parsing logs
-logging.getLogger("watchfiles").setLevel(logging.WARNING)  # Hide file change detection
-logging.getLogger("server.index").setLevel(logging.WARNING)  # Hide index refresh spam
-
-
+logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("server")
 
 app = FastAPI(title="Model Lab Analyst Console", version="0.1.0")
@@ -55,6 +76,7 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        log_level="info",
-        access_log=False  # Disable access logs
+        log_config=LOGGING_CONFIG,  # Pass config to uvicorn
+        access_log=False  # Disable access logs entirely
     )
+
