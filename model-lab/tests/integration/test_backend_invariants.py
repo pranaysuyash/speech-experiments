@@ -10,9 +10,26 @@ from unittest.mock import MagicMock, patch
 
 from harness.session import SessionRunner
 from harness.asr import ResolvedASRConfig
-from server.services.lifecycle import kill_run
+from server.services.lifecycle import kill_run, retry_run
 
 class TestBackendInvariants:
+    
+    @pytest.fixture
+    def mock_env_setup(self, monkeypatch, session_dir):
+        # Set environment for runs root
+        monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(session_dir.parent))
+        
+        # Patch lifecycle dependencies to avoid real subprocess/locks
+        import server.services.lifecycle as lifecycle
+        monkeypatch.setattr(lifecycle, "try_acquire_worker", lambda: True)
+        monkeypatch.setattr(lifecycle, "release_worker", lambda: None)
+        # Mock launch_run_worker to avoid subprocess but return valid structure
+        monkeypatch.setattr(lifecycle, "launch_run_worker", 
+                           lambda runner, data, background=True: {
+                               "run_id": runner.run_id, 
+                               "run_dir": str(runner.session_dir), 
+                               "worker_pid": 99999
+                           })
     
     @pytest.fixture
     def session_dir(self):
@@ -47,6 +64,7 @@ class TestBackendInvariants:
             success, outcome = kill_run("non_existent_id")
             assert not success
             assert outcome == "not_found"
+
 
         # 2. Run exists, no PID file (Simulate forced cancel)
         with patch("server.services.runs_index.get_index") as mock_get_index:
@@ -333,3 +351,55 @@ class TestBackendInvariants:
         assert step_entry["status"] == "CANCELLED" # Step status downgraded
         assert step_entry["result"]["some_result"] == 123 # Data preserved!
         assert step_entry["error"]["type"] == "Cancelled" # Step error reflects outcome
+
+    def test_retry_idempotence(self, session_dir, mock_env_setup):
+        """
+        Verify retry_run:
+        1. Resets terminal status/error fields
+        2. Preserves config
+        3. Is idempotent (doesn't re-spawn if already running)
+        """
+        run_id = "retry_test_run"
+        manifest_path = session_dir / "manifest.json"
+        
+        # 1. Setup Initial Terminal State (FAILED)
+        manifest = {
+            "run_id": run_id,
+            "status": "FAILED",
+            "error": {"message": "oops"},
+            "failure_step": "step_1",
+            "requested_config": {"param": "preserved"},
+            "resolved_config": {"param": "resolved_preserved"},
+            "steps": {
+                "step_1": {"status": "FAILED", "artifacts": []}
+            }
+        }
+        manifest_path.write_text(json.dumps(manifest))
+        
+        # Mock Index
+        with patch("server.services.runs_index.get_index") as mock_get_index:
+            mock_index = MagicMock()
+            mock_get_index.return_value = mock_index
+            mock_index.get_run.return_value = {"manifest_path": str(manifest_path)}
+
+            # 2. First Retry -> Should transition to RUNNING
+            retry_run(run_id)
+            
+            m_retry = json.loads(manifest_path.read_text())
+            assert m_retry["status"] == "RUNNING"
+            assert "error" not in m_retry
+            assert "failure_step" not in m_retry
+            assert m_retry["requested_config"] == {"param": "preserved"}
+            
+            # 3. Idempotence Check -> Should detect already running
+            # Reset mock to ensure next call doesn't register a new launch
+            import server.services.lifecycle as lifecycle
+            if hasattr(lifecycle.launch_run_worker, 'reset_mock'):
+                lifecycle.launch_run_worker.reset_mock()
+            
+            # Use specific mock wrapper to track calls if needed, but here checking return value
+            res = retry_run(run_id)
+            assert res.get("note") == "already_running"
+            # Verify status remains RUNNING
+            m_retry_2 = json.loads(manifest_path.read_text())
+            assert m_retry_2["status"] == "RUNNING"

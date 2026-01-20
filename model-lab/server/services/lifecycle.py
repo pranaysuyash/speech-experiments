@@ -281,6 +281,21 @@ def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
         manifest_path = Path(run["manifest_path"])
         run_dir = manifest_path.parent
         
+        # 1.5 Check if already running (Idempotence)
+        if manifest_path.exists():
+            m_check = json.loads(manifest_path.read_text())
+            if m_check.get("status") == "RUNNING":
+                # Check if PID is alive? For now, simple status check.
+                # If we want to be robust, we could check PID existence.
+                # But contract says: "If a run is RUNNING ... retry should not spawn a new worker."
+                # Returning existing worker info would be ideal, or just success.
+                return {
+                     "run_id": run_id,
+                     "run_dir": str(run_dir),
+                     "worker_pid": m_check.get("worker_pid"),
+                     "note": "already_running"
+                }
+        
         # 2. Update manifest for retry
         m = json.loads(manifest_path.read_text())
         

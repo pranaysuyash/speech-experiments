@@ -505,9 +505,14 @@ def download_artifact(run_id: str, artifact_id: str):
     
     # Security: ensure path doesn't escape session_dir
     file_path = (session_dir / relative_path).resolve()
-    if not str(file_path).startswith(str(session_dir.resolve())):
+    try:
+        file_path.relative_to(session_dir.resolve())
+    except ValueError:
         logger.warning(f"Path traversal attempt blocked: {relative_path}")
         raise HTTPException(status_code=403, detail="Invalid artifact path")
+    
+    # Old check for redundancy/safety, though relative_to is sufficient:
+    # if not str(file_path).startswith(str(session_dir.resolve())): ...
     
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Artifact file not found on disk")
