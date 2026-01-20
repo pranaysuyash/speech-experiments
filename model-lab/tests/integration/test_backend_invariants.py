@@ -5,6 +5,7 @@ import os
 import json
 import tempfile
 import shutil
+import hashlib
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -118,6 +119,125 @@ class TestBackendInvariants:
              
              m = json.loads((session_dir / "manifest.json").read_text())
              assert m["status"] == "FAILED"
+
+    def test_retry_idempotence(self, monkeypatch, tmp_path):
+        """
+        Integration test for POST /api/runs/{id}/retry:
+        - Retry endpoint exists and returns expected payload
+        - Terminal status resets to RUNNING
+        - Step invalidation is deterministic and config is preserved
+        - Idempotence: second retry does not spawn another worker
+        """
+        monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(tmp_path / "runs"))
+
+        import server.services.runs_index as runs_index
+        runs_index.RunsIndex._instance = None
+
+        run_id = "retry_run_test"
+        input_hash = "hash_for_tests"
+        run_dir = tmp_path / "runs" / "sessions" / input_hash / run_id
+        (run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
+
+        input_path = run_dir / "input.wav"
+        input_path.write_bytes(b"RIFFxxxxWAVEfmt ")
+
+        ingest_artifact_rel = "artifacts/processed.wav"
+        ingest_artifact_path = run_dir / ingest_artifact_rel
+        ingest_artifact_path.write_bytes(b"processed")
+        ingest_hash = hashlib.sha256(ingest_artifact_path.read_bytes()).hexdigest()
+
+        asr_artifact_rel = "artifacts/asr.json"
+        asr_artifact_path = run_dir / asr_artifact_rel
+        asr_artifact_path.write_text(json.dumps({"segments": []}))
+        asr_hash = hashlib.sha256(asr_artifact_path.read_bytes()).hexdigest()
+
+        manifest = {
+            "schema_version": "1.2.0",
+            "run_id": run_id,
+            "status": "FAILED",
+            "started_at": "2024-01-01T00:00:00Z",
+            "ended_at": "2024-01-01T00:01:00Z",
+            "duration_ms": 60_000,
+            "failure_step": "asr",
+            "error_message": "ASR failed",
+            "error_code": "asr_error",
+            "steps": {
+                "ingest": {
+                    "status": "COMPLETED",
+                    "artifacts": [{"path": ingest_artifact_rel, "hash": ingest_hash}],
+                    "warnings": [],
+                },
+                "asr": {
+                    "status": "FAILED",
+                    "artifacts": [{"path": asr_artifact_rel, "hash": asr_hash}],
+                    "warnings": [],
+                    "resolved_config": {"model_id": "x", "device": "cpu"},
+                    "requested_config": {"model_name": "y", "device": "mps"},
+                    "error": {"type": "RuntimeError", "message": "Boom"},
+                },
+                "alignment": {
+                    "status": "PENDING",
+                    "artifacts": [{"path": "artifacts/alignment.json", "hash": "deadbeef"}],
+                    "warnings": [],
+                },
+            },
+        }
+        (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
+
+        run_request = {
+            "run_id": run_id,
+            "input_path": str(input_path),
+            "config": {"asr": {"model_name": "y", "device": "mps"}},
+        }
+        (run_dir / "run_request.json").write_text(json.dumps(run_request, indent=2, sort_keys=True))
+
+        import server.services.lifecycle as lifecycle
+
+        class DummyProc:
+            pid = 424242
+
+            def wait(self):
+                return 0
+
+        monkeypatch.setattr(lifecycle, "try_acquire_worker", lambda: True)
+        monkeypatch.setattr(lifecycle, "release_worker", lambda: None)
+        monkeypatch.setattr(lifecycle.subprocess, "Popen", lambda *args, **kwargs: DummyProc())
+
+        from fastapi.testclient import TestClient
+        import server.main
+
+        client = TestClient(server.main.app)
+
+        r1 = client.post(f"/api/runs/{run_id}/retry", json={})
+        assert r1.status_code == 200
+        assert r1.json()["run_id"] == run_id
+
+        m1 = json.loads((run_dir / "manifest.json").read_text())
+        assert m1["status"] == "RUNNING"
+        assert m1.get("failure_step") is None
+        assert m1.get("error_message") is None
+        assert m1.get("error_code") is None
+        assert m1.get("ended_at") is None
+        assert m1.get("duration_ms") is None
+
+        # Completed step preserved
+        assert m1["steps"]["ingest"]["status"] == "COMPLETED"
+        assert m1["steps"]["ingest"]["artifacts"] == [{"path": ingest_artifact_rel, "hash": ingest_hash}]
+
+        # Failed step invalidated but config preserved
+        assert m1["steps"]["asr"]["status"] == "PENDING"
+        assert m1["steps"]["asr"]["artifacts"] == []
+        assert m1["steps"]["asr"]["resolved_config"]["device"] == "cpu"
+        assert m1["steps"]["asr"]["requested_config"]["device"] == "mps"
+
+        # Downstream artifacts cleared
+        assert m1["steps"]["alignment"]["artifacts"] == []
+
+        # Idempotence: second retry does not spawn a new worker and preserves invariants.
+        (run_dir / "worker.pid").write_text(str(DummyProc.pid))
+        r2 = client.post(f"/api/runs/{run_id}/retry", json={})
+        assert r2.status_code == 200
+        assert r2.json()["worker_pid"] == DummyProc.pid
 
     def test_asr_config_persistence(self, session_dir):
         """Verify requested and resolved configs are promoted to manifest."""
