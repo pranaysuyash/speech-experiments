@@ -157,6 +157,11 @@ def run_asr(
     
     device = resolved.device
     model_id = resolved.model_id # type:name
+    if ":" in model_id:
+        _, model_name = model_id.split(":", 1)
+    else:
+        model_name = "unknown"
+    
     # Parse back? Or just rely on config?
     # ModelRegistry needs type/config. 
     # Let's pass 'device' explicitly.
@@ -234,8 +239,9 @@ def run_asr(
     metrics = None
     diagnostics = []
         
-    # 6. Create Artifact
-    artifact_name = f"asr_{model_type}_{model_name}.json"
+    # Sanitize model name for filename
+    safe_model_name = model_name.replace("/", "_").replace("\\", "_")
+    artifact_name = f"asr_{model_type}_{safe_model_name}.json"
     artifact_path = output_dir / artifact_name
     
     # RunContext

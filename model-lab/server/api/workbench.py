@@ -79,6 +79,7 @@ def start_run_from_path(
     candidate_id: Optional[str] = None,
     source_ref: Optional[Dict[str, Any]] = None,
     candidate_snapshot: Optional[Dict[str, Any]] = None,
+    config_overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Start a run from a file path (not multipart upload).
@@ -92,6 +93,7 @@ def start_run_from_path(
         experiment_id: Optional experiment this run belongs to
         candidate_id: Optional candidate ID within experiment
         source_ref: Optional source reference metadata
+        config_overrides: Optional configuration overrides (e.g. device_preference)
     
     Returns:
         {run_id, run_dir, console_url}
@@ -108,7 +110,11 @@ def start_run_from_path(
             raise HTTPException(status_code=400, detail=f"Invalid steps_preset. Available: {list(PRESETS.keys())}")
         
         steps = PRESETS[steps_preset]["steps"]
-        runner = SessionRunner(input_path, _runs_root(), steps=steps)
+        
+        # Merge config overrides
+        run_config = config_overrides or {}
+        
+        runner = SessionRunner(input_path, _runs_root(), steps=steps, config=run_config)
         
         now = datetime.now(timezone.utc)
         
@@ -129,6 +135,7 @@ def start_run_from_path(
             "content_type": None,
             "bytes_uploaded": file_bytes,
             "sha256": sha256_hex,
+            "config": run_config,
         }
         
         if experiment_id:
@@ -183,6 +190,7 @@ async def create_workbench_run(
     file: UploadFile = File(...),
     use_case_id: str = Form(...),
     steps_preset: str = Form("full"),
+    config: Optional[str] = Form(None),
 ) -> JSONResponse:
     """
     Create a run from the UI (multipart upload) and start processing asynchronously.
@@ -191,6 +199,7 @@ async def create_workbench_run(
     - Returns quickly once run dir exists and manifest is RUNNING.
     - Single-worker guardrail: returns 409 RUNNER_BUSY if a run is already active.
     - Writes run_request.json at run root for reproducibility.
+    - Accepts optional 'config' JSON string (e.g. {"device_preference": ["mps", "cpu"]}).
     """
     if not try_acquire_worker():
         return JSONResponse(status_code=409, content={"error_code": "RUNNER_BUSY"})
@@ -210,7 +219,16 @@ async def create_workbench_run(
             raise HTTPException(status_code=400, detail=f"Invalid steps_preset. Available: {list(PRESETS.keys())}")
         
         steps = PRESETS[steps_preset]["steps"]
-        runner = SessionRunner(dest, _runs_root(), steps=steps)
+        
+        # Parse config overrides
+        config_overrides = {}
+        if config:
+            try:
+                config_overrides = json.loads(config)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid config JSON")
+
+        runner = SessionRunner(dest, _runs_root(), steps=steps, config=config_overrides)
 
         # Construct run_request data
         run_request_data = {
@@ -224,6 +242,7 @@ async def create_workbench_run(
             "content_type": file.content_type,
             "bytes_uploaded": bytes_uploaded,
             "sha256": sha256_hex,
+            "config": config_overrides,
         }
         
         # Launch worker
