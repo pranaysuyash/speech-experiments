@@ -11,6 +11,7 @@
 
 ```bash
 cd /Users/pranay/Projects/speech_experiments/model-lab
+uv sync --all-extras --dev
 source .venv/bin/activate
 ```
 
@@ -18,14 +19,14 @@ source .venv/bin/activate
 
 ```bash
 # All models on PRIMARY dataset (163s audio)
-python scripts/run_asr.py --model whisper --dataset primary --device mps
-python scripts/run_asr.py --model faster_whisper --dataset primary --device mps
-python scripts/run_asr.py --model lfm2_5_audio --dataset primary --device mps
+uv run python scripts/run_asr.py --model whisper --dataset primary --device mps
+uv run python scripts/run_asr.py --model faster_whisper --dataset primary --device mps
+uv run python scripts/run_asr.py --model lfm2_5_audio --dataset primary --device mps
 
 # All models on CONVERSATION dataset (944s audio)
-python scripts/run_asr.py --model whisper --dataset conversation --device mps
-python scripts/run_asr.py --model faster_whisper --dataset conversation --device mps
-python scripts/run_asr.py --model lfm2_5_audio --dataset conversation --device mps
+uv run python scripts/run_asr.py --model whisper --dataset conversation --device mps
+uv run python scripts/run_asr.py --model faster_whisper --dataset conversation --device mps
+uv run python scripts/run_asr.py --model lfm2_5_audio --dataset conversation --device mps
 ```
 
 ### View Results:

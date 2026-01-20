@@ -6,10 +6,12 @@
 
 ```bash
 cd model-lab
+# Use the existing UV-managed venv at .venv/ (created automatically if missing)
+uv sync --all-extras --dev
+
+# Optional (for IDEs / running commands without `uv run`)
 source .venv/bin/activate
 
-# Install dependencies
-uv add openai-whisper faster-whisper
 brew install ffmpeg  # For Whisper audio processing
 ```
 
@@ -17,15 +19,15 @@ brew install ffmpeg  # For Whisper audio processing
 
 ```bash
 # Create smoke test dataset
-python scripts/create_smoke_dataset.py
+uv run python scripts/create_smoke_dataset.py
 
 # Run validation tests
-python scripts/run_asr.py --model whisper --dataset smoke
-python scripts/run_asr.py --model faster_whisper --dataset smoke
+uv run python scripts/run_asr.py --model whisper --dataset smoke
+uv run python scripts/run_asr.py --model faster_whisper --dataset smoke
 
 # Run primary tests
-python scripts/run_asr.py --model whisper --dataset primary
-python scripts/run_asr.py --model faster_whisper --dataset primary
+uv run python scripts/run_asr.py --model whisper --dataset primary
+uv run python scripts/run_asr.py --model faster_whisper --dataset primary
 ```
 
 ### **Step 3: Get Decision (2 minutes)**

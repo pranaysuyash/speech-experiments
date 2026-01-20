@@ -41,6 +41,7 @@ model-lab/
 
 ```bash
 cd /Users/pranay/Projects/speech_experiments/model-lab
+uv sync --all-extras --dev
 source .venv/bin/activate
 jupyter lab
 ```
@@ -162,11 +163,11 @@ runs/
 ### **UV Environment**:
 
 ```bash
-# Already configured in pyproject.toml
-uv sync
+# Sync deps into the existing UV-managed venv at .venv/
+uv sync --all-extras --dev
 
-# Install additional dependencies if needed
-uv add openai-whisper  # For Whisper baseline
+# Run commands without activating the venv
+uv run python -m pytest -m "not real_e2e"
 ```
 
 ### **Hardware**:
