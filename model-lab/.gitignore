@@ -13,6 +13,11 @@ downloads/
 eggs/
 .eggs/
 lib/
+!client/src/lib/
+!client/src/lib/*.ts
+client/src/lib/exporters.ts
+client/src/lib/highlights.ts
+client/src/lib/keyboard.ts
 lib64/
 parts/
 sdist/
