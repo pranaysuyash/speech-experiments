@@ -170,3 +170,6 @@ profile_default/
 !data/*/
 !harness/*/
 inputs/
+
+# local repro artifacts
+tmp_repro/

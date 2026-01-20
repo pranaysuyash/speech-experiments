@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any
 from harness.registry import ModelRegistry
 from harness.run_provenance import create_provenance, create_run_context
 from harness.runner_schema import (
-    RunnerArtifact, InputsSchema
+    RunnerArtifact, InputsSchema, QualityMetrics
 )
 from harness.media_ingest import ingest_media
 from harness.preprocess_ops import run_preprocessing_chain
@@ -110,9 +110,10 @@ def run_diarization(
     artifact = RunnerArtifact(
         run_context=run_ctx,
         inputs=inputs,
-        provenance=prov,
+        metrics_quality=QualityMetrics(),
+        metrics_structural={"duration_ms": duration_ms},
+        provenance=prov if isinstance(prov, dict) else {}, # legacy compat
         output=output_data,
-        metrics=None
     )
     
     with open(artifact_path, 'w') as f:

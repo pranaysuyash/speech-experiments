@@ -1,69 +1,74 @@
 #!/bin/bash
+set -euo pipefail
 
-# Definition of ports
 BACKEND_PORT=8000
 FRONTEND_PORT=5174
 
-echo "=================================================="
-echo "      Model Lab: Dev Server Restarter"
-echo "=================================================="
+# Filter shown in terminal (files still get everything)
+FILTER_BACKEND=${FILTER_BACKEND:-"(/api/|RUN|STEP|manifest|FAILED|COMPLETED|CANCEL|Exception|Traceback|ERROR)"}
+FILTER_FRONTEND=${FILTER_FRONTEND:-"(http|ready|error|warn|HMR|compiled|transform)"}
 
-# Function to kill process on a port
 kill_port() {
-    PORT=$1
-    PID=$(lsof -ti:$PORT)
-    if [ -n "$PID" ]; then
-        echo "Killing process $PID on port $PORT..."
-        kill -9 $PID
-    else
-        echo "Port $PORT is free."
-    fi
+  local PORT=$1
+  local PID
+  PID=$(lsof -ti:$PORT || true)
+  if [ -n "${PID:-}" ]; then
+    echo "Stopping PID $PID on port $PORT..."
+    kill -TERM "$PID" 2>/dev/null || true
+    sleep 0.5
+    kill -KILL "$PID" 2>/dev/null || true
+  fi
 }
 
-# 1. Cleanup
+echo "=================================================="
+echo "Model Lab: Dev Server"
+echo "=================================================="
+
 echo "[1/4] Cleaning up ports..."
 kill_port $BACKEND_PORT
 kill_port $FRONTEND_PORT
 
-# 2. Activate Venv (Force existing venv)
 echo "[2/4] Activating Python Environment..."
 if [ -d ".venv" ]; then
-    source .venv/bin/activate
-    echo "Activated .venv"
+  source .venv/bin/activate
+  echo "Activated .venv"
 elif [ -d "venv" ]; then
-    source venv/bin/activate
-    echo "Activated venv"
+  source venv/bin/activate
+  echo "Activated venv"
 else
-    echo "WARNING: No .venv or venv directory found!"
-    echo "Python execution may fail or use system python."
+  echo "WARNING: No .venv or venv directory found!"
 fi
 
-# 3. Start Backend
-echo "[3/4] Starting Backend (Port $BACKEND_PORT)..."
 export PYTHONPATH=$PYTHONPATH:.
-# Running directly with python to ensure we use the activated venv
-python server/main.py > server.log 2>&1 &
+export PYTHONUNBUFFERED=1
+
+echo "[3/4] Starting Backend (Port $BACKEND_PORT)..."
+: > server.log
+python -u server/main.py 2>&1 \
+  | tee -a server.log \
+  | sed -u 's/^/[backend] /' \
+  | grep -E --line-buffered "$FILTER_BACKEND" &
 BACKEND_PID=$!
-echo "Backend PID: $BACKEND_PID (Logs: server.log)"
+echo "Backend PID: $BACKEND_PID"
 
-# 4. Start Frontend
 echo "[4/4] Starting Frontend (Port $FRONTEND_PORT)..."
-cd client
-npm run dev -- --port $FRONTEND_PORT > ../frontend.log 2>&1 &
+: > frontend.log
+(
+  cd client
+  npm run dev -- --port $FRONTEND_PORT 2>&1
+) \
+  | tee -a frontend.log \
+  | sed -u 's/^/[frontend] /' \
+  | grep -E --line-buffered "$FILTER_FRONTEND" &
 FRONTEND_PID=$!
-echo "Frontend PID: $FRONTEND_PID (Logs: frontend.log)"
-cd ..
+echo "Frontend PID: $FRONTEND_PID"
 
-# 5. Wait loop
 echo "=================================================="
-echo "Servers running!"
 echo "Backend:  http://localhost:$BACKEND_PORT"
 echo "Frontend: http://localhost:$FRONTEND_PORT"
 echo "=================================================="
-echo "Press Ctrl+C to stop both servers."
+echo "Ctrl+C to stop"
 
-trap "echo 'Stopping servers...'; kill $BACKEND_PID $FRONTEND_PID; exit" INT
+trap 'echo "Stopping..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null || true; exit 0' INT TERM
 
-echo "Streaming backend logs (server.log)..."
-# Stream logs to console. Ctrl+C will kill tail, triggering the trap to kill servers.
-tail -f server.log
+wait

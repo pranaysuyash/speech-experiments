@@ -185,7 +185,7 @@ def compute_metrics(segments: List[AlignedSegment]) -> AlignmentMetrics:
     )
 
 
-def align_artifacts(asr_path: str, diarization_path: str) -> AlignedTranscript:
+def align_artifacts(asr_path: str, diarization_path: Optional[str]) -> AlignedTranscript:
     """
     Load artifacts and perform alignment.
     """
@@ -193,11 +193,16 @@ def align_artifacts(asr_path: str, diarization_path: str) -> AlignedTranscript:
     asr_view = from_asr_artifact(Path(asr_path))
     
     # Load Diarization
-    with open(diarization_path) as f:
-        diar_artifact = json.load(f)
+    diar_turns = []
+    if diarization_path:
+        try:
+            with open(diarization_path) as f:
+                diar_artifact = json.load(f)
+            diar_turns = diar_artifact.get('output', {}).get('segments', [])
+        except Exception as e:
+            logger.warning(f"Failed to load diarization from {diarization_path}: {e}")
+            diar_turns = []
         
-    diar_turns = diar_artifact.get('output', {}).get('segments', [])
-    
     # Align
     aligned_segments = align_segments(asr_view.segments, diar_turns)
     
@@ -208,7 +213,7 @@ def align_artifacts(asr_path: str, diarization_path: str) -> AlignedTranscript:
         segments=aligned_segments,
         metrics=metrics,
         source_asr_path=str(asr_path),
-        source_diarization_path=str(diarization_path),
+        source_diarization_path=str(diarization_path) if diarization_path else "MISSING",
     )
 
 
@@ -278,11 +283,13 @@ def run_alignment(
     # Check inputs exist
     if not asr_path.exists():
         raise FileNotFoundError(f"ASR not found: {asr_path}")
-    if not diarization_path.exists():
-        raise FileNotFoundError(f"Diarization not found: {diarization_path}")
-        
+    
     # Run Core Logic
-    aligned_transcript = align_artifacts(str(asr_path), str(diarization_path))
+    diar_path_str = str(diarization_path) if diarization_path.exists() else None
+    if not diar_path_str:
+        logger.warning(f"Diarization not found: {diarization_path}. Proceeding without speaker attribution.")
+
+    aligned_transcript = align_artifacts(str(asr_path), diar_path_str)
     
     # Save Artifact
     artifact_name = f"alignment_{asr_path.stem.replace('asr_', '')}.json"
@@ -290,7 +297,7 @@ def run_alignment(
     
     # Compute hashes
     asr_hash = compute_file_hash(asr_path)
-    diar_hash = compute_file_hash(diarization_path)
+    diar_hash = compute_file_hash(diarization_path) if diarization_path.exists() else "MISSING"
     
     # Construct output JSON (wrapping core logic result)
     output_data = {

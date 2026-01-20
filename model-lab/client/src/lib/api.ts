@@ -265,4 +265,13 @@ export const api = {
       const res = await axios.get(`${API_BASE}/runs/${runId}/results`);
       return res.data;
   },
+
+  killRun: async (runId: string): Promise<void> => {
+    await axios.post(`${API_BASE}/runs/${runId}/kill`);
+  },
+
+  retryRun: async (runId: string, fromStep?: string): Promise<{ run_id: string; console_url: string }> => {
+    const res = await axios.post(`${API_BASE}/runs/${runId}/retry`, { from_step: fromStep });
+    return res.data;
+  },
 };

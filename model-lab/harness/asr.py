@@ -33,6 +33,8 @@ class ResolvedASRConfig:
     model_id: str      # Exact model name (not alias like "default")
     source: str        # "local" | "hf" | "api"
     device: str        # Actual execution device: "cpu" | "cuda" | "mps"
+    device: str        # Actual execution device: "cpu" | "cuda" | "mps"
+    reason: str        # Reason for device/model choice
     language: str      # "auto" | specific language code
 
     def to_dict(self) -> Dict[str, str]:
@@ -85,18 +87,21 @@ def resolve_asr_config(user_config: Optional[Dict[str, Any]] = None) -> Resolved
     
     # 3. Resolve device
     requested_device = user_config.get("device", "cpu")
+    reason = "requested"
     
     # Apply device mapping rules (same as registry)
     if model_type == "faster_whisper":
         # faster_whisper doesn't support MPS
         if requested_device == "mps":
             actual_device = "cpu"
+            reason = "mps_unsupported_by_backend"
         else:
             actual_device = requested_device
     elif model_type == "lfm2_5_audio":
         # LFM has CUDA bug, prefer MPS or CPU
         if requested_device == "cuda":
             actual_device = "cpu"
+            reason = "cuda_unsupported_by_backend"
         else:
             actual_device = requested_device
     else:
@@ -109,6 +114,7 @@ def resolve_asr_config(user_config: Optional[Dict[str, Any]] = None) -> Resolved
         model_id=model_id,
         source=source,
         device=actual_device,
+        reason=reason,
         language=language
     )
 
@@ -130,11 +136,22 @@ def run_asr(
     Returns:
         Dictionary containing input/output/artifacts info.
     """
-    config = config or {}
-    model_type = config.get("model_type", "faster_whisper")
-    # model_name might be used by the loader for weights/size
-    model_name = config.get("model_name", "default")
-    device = config.get("device", "cpu")
+    input_path = input_path.resolve()
+    
+    # 0. Resolve Configuration (Crucial for Device/Model Selection)
+    resolved = resolve_asr_config(config)
+    model_type = config.get("model_type", "faster_whisper") # Still need type for loader? resolve_asr_config output has model_id "type:name"
+    # Actually ModelRegistry takes (model_type, config, device).
+    # We should respect resolved values.
+    # User config might have "model_name": "default" -> resolved "large-v3"
+    # User config "device": "mps" -> resolved "cpu" (if fw)
+    
+    device = resolved.device
+    model_id = resolved.model_id # type:name
+    # Parse back? Or just rely on config?
+    # ModelRegistry needs type/config. 
+    # Let's pass 'device' explicitly.
+
     pre_ops = config.get("pre_ops")
     dataset_def = config.get("dataset_def")
     
@@ -269,7 +286,9 @@ def run_asr(
         "artifacts": [
              {"type": "asr_json", "path": str(artifact_path), "hash": sha256_file(artifact_path)}
         ],
-        "result": output_data # Store minimal result if needed
+        "result": output_data,
+        "resolved_config": resolved.to_dict(),
+        "requested_config": config
     }
 
 import time

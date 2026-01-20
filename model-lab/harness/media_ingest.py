@@ -189,6 +189,8 @@ class IngestResult:
     preprocess_hash: str
     audio_fingerprint: str
     
+    duration_s: float
+    
     def to_dict(self) -> Dict[str, Any]:
         return dataclasses.asdict(self)
 
@@ -227,6 +229,13 @@ def ingest_media(
         ffmpeg_version=ffmpeg_version,
     )
 
+    # Compute duration
+    import wave
+    with wave.open(str(processed_audio), 'rb') as f:
+        frames = f.getnframes()
+        rate = f.getframerate()
+        duration_s = frames / float(rate)
+
     return IngestResult(
         source_media_path=str(input_path),
         source_media_hash=source_media_hash,
@@ -237,4 +246,5 @@ def ingest_media(
         audio_content_hash=audio_content_hash,
         preprocess_hash=preprocess_hash,
         audio_fingerprint=audio_fingerprint,
+        duration_s=duration_s,
     ).to_dict()

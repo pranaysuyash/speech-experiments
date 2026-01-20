@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { RunDetail as RunDetailType, ResultSummary } from '../lib/api';
@@ -28,6 +28,91 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     const [detail, setDetail] = useState<RunDetailType | null>(null);
     const [result, setResult] = useState<ResultSummary | null>(null);
 
+    // Guard: runId is required
+    if (!runId) {
+        return <div className="p-8 text-red-600">Error: Run ID is required</div>;
+    }
+
+    const handleKill = useCallback(async () => {
+        if (!confirm("Are you sure you want to stop this run?")) return;
+        try {
+            await api.killRun(runId);
+        } catch (err) {
+            alert("Failed to kill run");
+            console.error(err);
+        }
+    }, [runId]);
+
+    const handleRetry = useCallback(async () => {
+        try {
+            await api.retryRun(runId);
+        } catch (err) {
+            alert("Failed to retry run");
+            console.error(err);
+        }
+    }, [runId]);
+
+    // Repeat run handler (frontend-only, passes context to workbench)
+    const handleRepeatRun = useCallback(() => {
+        const params = new URLSearchParams();
+        params.set('repeat_from', runId);
+        params.set('file', status?.input_metadata?.filename || status?.input_filename || '');
+        window.location.href = `/lab/workbench?${params}`;
+    }, [runId, status]);
+
+    // Unified Actions Renderer
+    const renderActions = (className = "flex items-center gap-2") => {
+        const isRunning = status.status === 'RUNNING' || status.status === 'QUEUED';
+        const isFailed = status.status === 'FAILED' || status.status === 'STALE' || status.status === 'CANCELLED';
+        // Only show meeting pack if we have a result or useful artifacts
+        // For partial failures, we might have artifacts.
+        const showArtifacts = result || (isFailed && status.steps_completed?.length > 0);
+        // Actually api.getMeetingPackZipUrl is always valid URL, but might 404 if no bundle.
+        // We rely on 'result' existence or specific status.
+
+        return (
+            <div className={className}>
+                {/* Back is context dependent, but usually present. In Header it is separate. 
+                    In Running/Failed views it is part of the block. 
+                    Let's allow onBack prop or assume this replaces the block which included Back?
+                    The running/failed blocks had "Back" button. The Success header has Back separately.
+                    Refactor: Header handles Back separately. renderActions handles the Rest.
+                */}
+
+                {isRunning && (
+                    <button onClick={handleKill} className="px-3 py-1.5 border border-red-200 bg-red-50 rounded hover:bg-red-100 text-sm text-red-600 font-semibold flex items-center gap-2">
+                        🛑 Stop
+                    </button>
+                )}
+
+                {isFailed && (
+                    <button onClick={handleRetry} className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold flex items-center gap-2">
+                        🔄 Retry
+                    </button>
+                )}
+
+                <button
+                    onClick={handleRepeatRun}
+                    className="px-3 py-1.5 border border-blue-600 text-blue-600 rounded hover:bg-blue-50 text-sm flex items-center gap-2 bg-white"
+                    title="Start a new run with the same input file"
+                >
+                    🔁 Repeat
+                </button>
+
+                {showArtifacts && (
+                    <a
+                        href={api.getMeetingPackZipUrl(runId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                        <Download size={16} /> Pack
+                    </a>
+                )}
+            </div>
+        );
+    };
+
     // Poll for status until terminal
     useEffect(() => {
         if (!runId) return;
@@ -39,7 +124,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 setStatus(s);
 
                 // Terminal State Handling
-                if (['COMPLETED', 'FAILED', 'STALE'].includes(s.status)) {
+                if (['COMPLETED', 'FAILED', 'STALE', 'CANCELLED'].includes(s.status)) {
                     if (pollTimer) clearInterval(pollTimer);
 
                     // Fetch Semantic Results (Metrics, Flags)
@@ -47,11 +132,13 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         const res = await api.getRunResults(runId);
                         setResult(res);
 
-                        // If useful artifacts exist, load transcript
-                        const shouldLoadArtifacts = s.status === 'COMPLETED' || (s.status === 'FAILED' && res.quality_flags.is_partial);
+                        // Use manifest-derived artifact list to decide if we should load transcript
+                        const hasTranscriptArtifact = s.steps?.some((st: any) =>
+                            st.artifacts?.some((a: any) => a.role === 'transcript')
+                        ) ?? false;
 
                         // Only load detail once
-                        if (shouldLoadArtifacts) {
+                        if (hasTranscriptArtifact) {
                             // Don't await here to avoid blocking status update
                             api.getTranscript(runId)
                                 .then(data => setDetail(data))
@@ -97,13 +184,99 @@ export default function RunDetail({ onBack }: RunDetailProps) {
 
     // Extract audio duration with fallback (tiered: status → results → unknown)
     const getAudioDuration = (): number | null => {
-        // Priority 1: From status (if manifest exposes it)
-        // Priority 2: From results metrics
-        if (result?.metrics?.audio_duration_s != null) {
-            return result.metrics.audio_duration_s;
-        }
-        // Priority 3: Unknown
+        // Priority 0: status input metadata (available during RUNNING once ingest computed it)
+        if (status?.input_metadata?.duration_s != null) return status.input_metadata.duration_s;
+
+        // Priority 1: results metrics (terminal states)
+        if (result?.metrics?.audio_duration_s != null) return result.metrics.audio_duration_s;
+
         return null;
+    };
+
+    const isMeaningful = (v?: string | null) => {
+        if (!v) return false;
+        const s = String(v).trim().toLowerCase();
+        return s !== '' && s !== 'unknown' && s !== 'n/a' && s !== 'null' && s !== 'undefined';
+    };
+
+    const failedSteps = (status?.steps || []).filter((s: any) => s.status === 'FAILED');
+    const hasStepFailures = failedSteps.length > 0;
+
+    const renderStepFailures = () => {
+        if (!hasStepFailures) return null;
+        return (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+                <h3 className="text-sm font-semibold text-red-900 mb-3">Step Failures</h3>
+                <div className="space-y-3">
+                    {failedSteps.map((step: any) => (
+                        <div key={step.name} className="bg-white border border-red-300 rounded p-3">
+                            <div className="font-semibold text-red-800 text-sm mb-1">❌ {step.name}</div>
+                            {step.error && (
+                                <>
+                                    <div className="text-xs text-red-700 font-mono mb-1">{step.error.type}</div>
+                                    <div className="text-sm text-red-600">{step.error.message}</div>
+                                </>
+                            )}
+                            {step.duration_ms && (
+                                <div className="text-xs text-gray-500 mt-2">
+                                    Failed after {(step.duration_ms / 1000).toFixed(1)}s
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderArtifacts = () => {
+        const allArtifacts: Array<{ stepName: string; artifact: any }> = [];
+        status?.steps?.forEach((step: any) => {
+            if (step.artifacts && step.status === 'COMPLETED') {
+                step.artifacts.forEach((art: any) => allArtifacts.push({ stepName: step.name, artifact: art }));
+            }
+        });
+        if (allArtifacts.length === 0) return null;
+
+        const formatBytes = (bytes?: number) => {
+            if (bytes == null) return '?';
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        };
+
+        return (
+            <div className="bg-white border rounded-lg p-6 mb-6">
+                <h3 className="text-sm font-semibold text-gray-600 mb-3">Artifacts</h3>
+                <div className="space-y-2">
+                    {allArtifacts.map(({ artifact }) => (
+                        <div key={artifact.id} className="flex items-center justify-between border rounded p-3 bg-gray-50">
+                            <div className="flex items-center gap-3">
+                                <span className="text-gray-400">📄</span>
+                                <div>
+                                    <div className="font-medium text-sm text-gray-800">
+                                        {artifact.filename || artifact.id || 'unknown'}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                        {artifact.role || 'unknown'} · {formatBytes(artifact.size_bytes)}
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                disabled={!artifact.downloadable}
+                                onClick={() => artifact.downloadable && window.open(`/api/runs/${runId}/artifacts/${artifact.id}`, '_blank')}
+                                className={`text-xs px-3 py-1 border rounded ${artifact.downloadable
+                                    ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-pointer'
+                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    }`}
+                            >
+                                Download
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     };
 
     // 1. Missing ID
@@ -111,15 +284,6 @@ export default function RunDetail({ onBack }: RunDetailProps) {
 
     // 2. Initial Loading
     if (!status) return <div className="p-8 flex items-center gap-2"><Loader2 className="animate-spin" /> Loading run status...</div>;
-
-    // Repeat run handler (frontend-only, passes context to workbench)
-    const handleRepeatRun = () => {
-        const params = new URLSearchParams({
-            repeat_from: runId,
-            file: status.input_metadata?.filename || status.input_filename || '',
-        });
-        window.location.href = `/lab/workbench?${params}`;
-    };
 
     // 3. Queued / Running
     if (status.status === 'QUEUED' || status.status === 'RUNNING') {
@@ -171,7 +335,10 @@ export default function RunDetail({ onBack }: RunDetailProps) {
         let progressClass = 'text-gray-500';
 
         if (status.status === 'RUNNING') {
-            if (timeSinceProgress < 10) {
+            if (hasStepFailures) {
+                progressMsg = 'A step failed. Waiting for run status to finalize.';
+                progressClass = 'text-red-600';
+            } else if (timeSinceProgress < 10) {
                 progressMsg = timeSinceProgress === 0
                     ? 'Processing is active. System just reported progress.'
                     : `Processing is active. Last progress signal ${timeSinceProgress}s ago.`;
@@ -210,7 +377,13 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         <div className="flex items-center gap-2 text-sm">
                             <span>📄</span>
                             <span className="font-medium">
-                                {status.input_metadata?.filename || status.input_filename || runId}
+                                {(() => {
+                                    const inputName =
+                                        (isMeaningful(status.input_metadata?.filename) && status.input_metadata.filename) ||
+                                        (isMeaningful(status.input_filename) && status.input_filename) ||
+                                        runId;
+                                    return inputName;
+                                })()}
                             </span>
                         </div>
                         {status.input_metadata?.size_bytes ? (
@@ -334,95 +507,11 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 </div>
 
                 {/* Artifacts (Semantic Schema) */}
-                {(() => {
-                    // Collect all artifacts from steps with new schema
-                    const allArtifacts: Array<{ stepName: string; artifact: any }> = [];
-                    status.steps?.forEach((step: any) => {
-                        if (step.artifacts && step.status === 'COMPLETED') {
-                            step.artifacts.forEach((art: any) => {
-                                allArtifacts.push({ stepName: step.name, artifact: art });
-                            });
-                        }
-                    });
-
-                    if (allArtifacts.length === 0) return null;
-
-                    const formatBytes = (bytes: number) => {
-                        if (bytes < 1024) return `${bytes} B`;
-                        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-                        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-                    };
-
-                    return (
-                        <div className="bg-white border rounded-lg p-6 mb-6">
-                            <h3 className="text-sm font-semibold text-gray-600 mb-3">Artifacts</h3>
-                            <div className="space-y-2">
-                                {allArtifacts.map(({ artifact }) => (
-                                    <div key={artifact.id} className="flex items-center justify-between border rounded p-3 bg-gray-50">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-gray-400">📄</span>
-                                            <div>
-                                                <div className="font-medium text-sm text-gray-800">
-                                                    {artifact.filename}
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {artifact.role} · {formatBytes(artifact.size_bytes)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button
-                                            disabled={!artifact.downloadable}
-                                            onClick={() => {
-                                                if (artifact.downloadable) {
-                                                    window.open(`/api/runs/${runId}/artifacts/${artifact.id}`, '_blank');
-                                                }
-                                            }}
-                                            className={`text-xs px-3 py-1 border rounded ${artifact.downloadable
-                                                ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-pointer'
-                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                }`}
-                                            title={artifact.downloadable ? 'Download artifact' : 'Not downloadable'}
-                                        >
-                                            Download
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                })()}
+                {renderArtifacts()}
 
 
                 {/* Step-Level Errors (if any step failed while run is still RUNNING) */}
-                {status.steps && status.steps.some((s: any) => s.status === 'FAILED') && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
-                        <h3 className="text-sm font-semibold text-red-900 mb-3">Step Failures</h3>
-                        <div className="space-y-3">
-                            {status.steps.filter((s: any) => s.status === 'FAILED').map((step: any) => (
-                                <div key={step.name} className="bg-white border border-red-300 rounded p-3">
-                                    <div className="font-semibold text-red-800 text-sm mb-1">
-                                        ❌ {step.name}
-                                    </div>
-                                    {step.error && (
-                                        <>
-                                            <div className="text-xs text-red-700 font-mono mb-1">
-                                                {step.error.type}
-                                            </div>
-                                            <div className="text-sm text-red-600">
-                                                {step.error.message}
-                                            </div>
-                                        </>
-                                    )}
-                                    {step.duration_ms && (
-                                        <div className="text-xs text-gray-500 mt-2">
-                                            Failed after {(step.duration_ms / 1000).toFixed(1)}s
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                {renderStepFailures()}
 
                 {/* Current step details */}
                 {currentStepInfo && (
@@ -489,12 +578,11 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 </div>
 
                 {/* Agency */}
-                <div className="mt-6 text-sm text-gray-500 text-center">
-                    You can leave this page safely. This run will stay highlighted in the list.
-                </div>
+                <div className="mt-8 text-center flex flex-col items-center gap-4">
+                    {/* Actions including Stop */}
+                    {renderActions("flex items-center gap-4 justify-center")}
 
-                <div className="mt-4 text-center">
-                    <button onClick={onBack} className="px-4 py-2 border rounded hover:bg-gray-50 text-sm text-gray-600">
+                    <button onClick={onBack} className="mt-2 px-4 py-2 border rounded hover:bg-gray-50 text-sm text-gray-600 bg-white">
                         Back to List
                     </button>
                 </div>
@@ -524,7 +612,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     }
 
     // 4. Failed (check for partial results but still show failure UI)
-    const isFailed = status.status === 'FAILED' || status.status === 'STALE';
+    const isFailed = status.status === 'FAILED' || status.status === 'STALE' || status.status === 'CANCELLED';
 
     if (isFailed) {
         // Determine which step failed using centralized helper
@@ -542,7 +630,13 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         <div className="flex items-center gap-2 text-sm">
                             <span>📄</span>
                             <span className="font-medium">
-                                {status.input_metadata?.filename || status.input_filename || runId}
+                                {(() => {
+                                    const inputName =
+                                        (isMeaningful(status.input_metadata?.filename) && status.input_metadata.filename) ||
+                                        (isMeaningful(status.input_filename) && status.input_filename) ||
+                                        runId;
+                                    return inputName;
+                                })()}
                             </span>
                         </div>
                         {status.input_metadata?.size_bytes ? (
@@ -574,36 +668,10 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                     </div>
                 </div>
 
+                {/* Artifacts (persist even in FAILED view when steps completed) */}
+                {renderArtifacts()}
                 {/* Step Failures (persist even in FAILED view) */}
-                {status.steps && status.steps.some((s: any) => s.status === 'FAILED') && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
-                        <h3 className="text-sm font-semibold text-red-900 mb-3">Step Failures</h3>
-                        <div className="space-y-3">
-                            {status.steps.filter((s: any) => s.status === 'FAILED').map((step: any) => (
-                                <div key={step.name} className="bg-white border border-red-300 rounded p-3">
-                                    <div className="font-semibold text-red-800 text-sm mb-1">
-                                        ❌ {step.name}
-                                    </div>
-                                    {step.error && (
-                                        <>
-                                            <div className="text-xs text-red-700 font-mono mb-1">
-                                                {step.error.type}
-                                            </div>
-                                            <div className="text-sm text-red-600">
-                                                {step.error.message}
-                                            </div>
-                                        </>
-                                    )}
-                                    {step.duration_ms && (
-                                        <div className="text-xs text-gray-500 mt-2">
-                                            Failed after {(step.duration_ms / 1000).toFixed(1)}s
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                {renderStepFailures()}
 
                 {/* Error Message Coarse (always show for failed runs) */}
                 {(status.error_message || isUnknown) && (
@@ -619,63 +687,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                     </div>
                 )}
 
-                {/* Artifacts (persist even in FAILED view when steps completed) */}
-                {(() => {
-                    const allArtifacts: Array<{ stepName: string; artifact: any }> = [];
-                    status.steps?.forEach((step: any) => {
-                        if (step.artifacts && step.status === 'COMPLETED') {
-                            step.artifacts.forEach((art: any) => {
-                                allArtifacts.push({ stepName: step.name, artifact: art });
-                            });
-                        }
-                    });
 
-                    if (allArtifacts.length === 0) return null;
-
-                    const formatBytes = (bytes: number) => {
-                        if (bytes < 1024) return `${bytes} B`;
-                        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-                        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-                    };
-
-                    return (
-                        <div className="bg-white border rounded-lg p-6 mb-6">
-                            <h3 className="text-sm font-semibold text-gray-600 mb-3">Artifacts</h3>
-                            <div className="space-y-2">
-                                {allArtifacts.map(({ artifact }) => (
-                                    <div key={artifact.id} className="flex items-center justify-between border rounded p-3 bg-gray-50">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-gray-400">📄</span>
-                                            <div>
-                                                <div className="font-medium text-sm text-gray-800">
-                                                    {artifact.filename}
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {artifact.role} · {formatBytes(artifact.size_bytes)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button
-                                            disabled={!artifact.downloadable}
-                                            onClick={() => {
-                                                if (artifact.downloadable) {
-                                                    window.open(`/api/runs/${runId}/artifacts/${artifact.id}`, '_blank');
-                                                }
-                                            }}
-                                            className={`text-xs px-3 py-1 border rounded ${artifact.downloadable
-                                                ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-pointer'
-                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                }`}
-                                            title={artifact.downloadable ? 'Download artifact' : 'Not downloadable'}
-                                        >
-                                            Download
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                })()}
 
                 {/* Pipeline visualization with failed step */}
                 <div className="bg-white border rounded-lg p-6 mb-4">
@@ -727,14 +739,10 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 justify-center">
-                    <button
-                        onClick={handleRepeatRun}
-                        className="px-4 py-2 flex items-center gap-2 border border-blue-600 text-blue-600 rounded hover:bg-blue-50"
-                    >
-                        🔁 Repeat run
-                    </button>
-                    <button onClick={onBack} className="px-4 py-2 border rounded hover:bg-gray-50">
+                {/* Actions */}
+                <div className="mt-8 flex flex-col items-center gap-4">
+                    {renderActions("flex items-center gap-4 justify-center")}
+                    <button onClick={onBack} className="mt-2 text-sm text-gray-500 hover:text-gray-700 underline">
                         Back to List
                     </button>
                 </div>
@@ -779,18 +787,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleRepeatRun}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-50"
-                        title="Start a new run with the same input file"
-                    >
-                        🔁 Repeat run
-                    </button>
-                    <a href={api.getMeetingPackZipUrl(runId)} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                        <Download size={16} /> Meeting Pack ZIP
-                    </a>
-                </div>
+                {renderActions("flex gap-2")}
             </header>
 
             {/* Content Scroller */}

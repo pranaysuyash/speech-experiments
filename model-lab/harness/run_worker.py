@@ -100,7 +100,10 @@ def main() -> int:
             input_path, 
             runs_root,
             steps=steps,
-            config={"resume_from": str(run_dir)},
+            config={
+                **request.get("config", {}), # Ingest config from request
+                "resume_from": str(run_dir)
+            },
             resume=True
         )
         

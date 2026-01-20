@@ -144,39 +144,21 @@ class SessionRunner:
         self.embedding_cache_dir = embedding_cache_dir
         self.extra_config = config or {}
 
-        if not self.input_path.exists():
-             raise FileNotFoundError(f"Input file not found: {self.input_path}")
-
-        self.input_hash = sha256_file(self.input_path)
+        self.resume_from = self.extra_config.get("resume_from")
         
-        # If resuming, we might need to find the latest run_id (or provided one)
-        # But per new design, we compute deterministic run_id or use existing logic?
-        # User skeleton uses timestamped run_id. Let's stick to that.
-        # Ideally, passed `resume_from` would override this.
-        # For now, let's implement basic directory structure.
-        
-        # NOTE: logic to find latest run or specific run needs to be here if we want strict resume.
-        # But compute_run_id uses timestamp. So essentially every run is new?
-        # User says: "Resume: skip only when hashes match and artifacts exist."
-        # This implies we are resuming *within* a run directory that is passed?
-        # OR we scan for a matching run?
-        # CLI usually takes --resume-from PATH.
-        # If we just run, we likely create a new run_id.
-        # Wait, if run_id is timestamped, resume is impossible unless we pass the ID.
-        # Let's support `resume_from` via `extra_config` or separate arg if needed later.
-        # For now, adopting user's skeleton which just computes a new ID.
-        # BUT if we want to resume, we probably want to point to an existing dir.
-        
-        # Let's adapt: If the CLI passes a resume path, we use it.
-        # The CLI currently uses --resume-from. We should respect that if passed.
-        # Let's handle it properly.
-        
-        resume_from = self.extra_config.get("resume_from")
-        if resume_from:
-             self.session_dir = Path(resume_from).resolve()
+        if self.resume_from:
+             self.session_dir = Path(self.resume_from).resolve()
              self.run_id = self.session_dir.name
-             # We assume input hash matches path structure? Not strictly required but good hygiene.
+             # If resuming, input might not be at input_path if we passed a placeholder.
+             # We try to hash it if it exists, otherwise use a placeholder hash or None.
+             if self.input_path.exists():
+                 self.input_hash = sha256_file(self.input_path)
+             else:
+                 self.input_hash = "RESUMED_UNKNOWN_HASH"
         else:
+             if not self.input_path.exists():
+                 raise FileNotFoundError(f"Input file not found: {self.input_path}")
+             self.input_hash = sha256_file(self.input_path)
              self.run_id = compute_run_id(self.input_hash)
              self.session_dir = self.base_output_dir / "sessions" / self.input_hash / self.run_id
 
@@ -574,6 +556,51 @@ class SessionRunner:
         return scores
 
     def _save_manifest(self, m: Dict[str, Any]) -> None:
+        # Prevent regression of terminal status and lost updates (Safe Merge)
+        try:
+            if self.manifest_path.exists():
+                disk_m = json.loads(self.manifest_path.read_text())
+                disk_status = disk_m.get("status")
+                local_status = m.get("status")
+                
+                terminal_states = {"CANCELLED", "FAILED", "STALE"}
+                
+                # CONTRACT: If disk is terminal, it is the authority.
+                # We implements a "Disk-First" merge to preserve external metadata (e.g. kill_outcome, cancel_reason).
+                # See tests/integration/test_backend_invariants.py::test_status_regression_prevention_strict
+                if disk_status in terminal_states:
+                    # 1. Start with ANY field present on disk (preserves cancel_reason, kill_outcome, custom_meta, etc.)
+                    merged = disk_m.copy()
+                    
+                    # 2. Overlay runner-owned fields representing progress
+                    # We carefully select what the runner is allowed to update even if dead
+                    runner_fields = [
+                        "steps", "artifacts", "current_step", "updated_at", 
+                        "input_metadata", "config", "process"
+                    ]
+                    for k in runner_fields:
+                        if k in m:
+                            merged[k] = m[k]
+
+                    # 3. Explicitly preserve terminal status and ended_at from disk
+                    merged["status"] = disk_status
+                    if "ended_at" in disk_m:
+                        merged["ended_at"] = disk_m["ended_at"]
+                    
+                    # 4. Preserve error details from disk (don't let runner overwrite "Kill" error with "Success" or other)
+                    for k in ["error", "error_message", "error_code", "failure_step"]:
+                        if k in disk_m:
+                            merged[k] = disk_m[k]
+
+                    # Update the local manifest object to match the merged reality
+                    m.clear()
+                    m.update(merged)
+                    
+                    logger.warning(f"Merge-Safe: Adopted terminal status {disk_status} from disk (Preserved metadata)")
+
+        except Exception:
+            logger.exception("Manifest merge failed")
+        
         atomic_write_json(self.manifest_path, m)
 
     def _register_steps(self) -> None:
@@ -800,6 +827,29 @@ class SessionRunner:
 
         return True
 
+    def invalidate_step_and_downstream(self, m: Dict[str, Any], step_name: str) -> None:
+        """
+        Public method to mutually invalidate step and its dependents.
+        Used by Retry logic.
+        """
+        # 1. Invalidate step itself
+        entry = m["steps"].get(step_name)
+        if entry:
+            self._reset_step_entry(entry)
+            
+        # 2. Invalidate downstream
+        self._invalidate_downstream(m, step_name)
+
+    def _reset_step_entry(self, entry: Dict[str, Any]) -> None:
+        entry["status"] = "PENDING"
+        entry["artifacts"] = []
+        entry.pop("result", None)
+        entry.pop("metrics", None)
+        entry["warnings"] = []
+        entry["ended_at"] = None
+        entry.pop("duration_ms", None)
+        entry.pop("error", None)
+
     def _invalidate_downstream(self, m: Dict[str, Any], step_name: str) -> None:
         # Mark dependents PENDING and drop artifact hashes
         dependents = self._collect_dependents(step_name)
@@ -809,13 +859,7 @@ class SessionRunner:
             entry = m["steps"].get(dep)
             if not entry:
                 continue
-            entry["status"] = "PENDING"
-            entry["artifacts"] = []
-            entry.pop("result", None)
-            entry.pop("metrics", None)
-            entry["warnings"] = []
-            # Also clear ended_at etc?
-            entry["ended_at"] = None
+            self._reset_step_entry(entry)
 
     def _collect_dependents(self, step_name: str) -> List[str]:
         # Simple graph walk
@@ -912,6 +956,10 @@ class SessionRunner:
             # Update context if ingest
             if name == "ingest":
                 self.ctx.ingest = result
+                # Lift duration to top-level input_metadata for UI visibility (Priority 0)
+                if result.get("duration_s"):
+                     if "input_metadata" not in m: m["input_metadata"] = {}
+                     m["input_metadata"]["duration_s"] = result["duration_s"]
 
             # Record artifacts with semantic schema (Phase 2)
             artifacts: List[Dict[str, Any]] = []
@@ -943,11 +991,31 @@ class SessionRunner:
                 for p in step_def.artifact_paths(result):
                     artifacts.append({"path": str(p), "hash": sha256_file(p)})
 
-            entry["status"] = "COMPLETED"
+            # Re-check run status - if merged status is terminal, step cannot be COMPLETED safely if it violates intent
+            # Note: _save_manifest merges RUN status, not STEP status, so we handle step status here explicitly.
+            final_status = "COMPLETED"
+            if self.manifest_path.exists():
+                try:
+                    d = json.loads(self.manifest_path.read_text())
+                    if d.get("status") in ("CANCELLED", "STALE"):
+                         final_status = "CANCELLED"
+                         entry["error"] = {"type": "Cancelled", "message": "Step finished but run was cancelled."}
+                except:
+                    pass
+
+            entry["status"] = final_status
             entry["ended_at"] = now_iso()
             entry["duration_ms"] = duration_ms
             entry["artifacts"] = artifacts
+            entry["artifacts"] = artifacts
             entry["result"] = result  # Keep for strict resume checks
+            
+            # Promote resolved_config if present in result (e.g. from ASR)
+            if isinstance(result, dict):
+                if "resolved_config" in result:
+                    entry["resolved_config"] = result["resolved_config"]
+                if "requested_config" in result:
+                    entry["requested_config"] = result["requested_config"]
 
             
             # Persist final semantic progress timestamp
@@ -1107,7 +1175,17 @@ class SessionRunner:
                     break
 
             if m.get("status") != "FAILED":
-                m["status"] = "COMPLETED"
+                # Check for external termination (e.g. kill_run) before declaring completion
+                try:
+                    disk_m = self._load_manifest()
+                    if disk_m.get("status") in ("CANCELLED", "FAILED", "STALE"):
+                        m["status"] = disk_m["status"]
+                        logger.warning(f"Run completion preempted by external status: {m['status']}")
+                    else:
+                        m["status"] = "COMPLETED"
+                except Exception:
+                     # Fallback if disk read fails
+                     m["status"] = "COMPLETED"
             m["ended_at"] = now_iso()
             m["duration_ms"] = int((time.time() - t0) * 1000)
             self._save_manifest(m)
