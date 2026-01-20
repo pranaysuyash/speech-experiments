@@ -17,6 +17,18 @@ pick_python() {
     return 0
   fi
 
+  # Detect primary worktree venv (portable, no hardcoded paths)
+  if command -v git >/dev/null 2>&1; then
+    primary_wt="$(git worktree list --porcelain 2>/dev/null | awk '
+      $1=="worktree"{wt=$2}
+      $1=="branch" && ($2 ~ /refs\/heads\/(main|master)$/){print wt; exit}
+    ')"
+    if [[ -n "${primary_wt:-}" && -x "${primary_wt}/.venv/bin/python" ]]; then
+      echo "${primary_wt}/.venv/bin/python"
+      return 0
+    fi
+  fi
+
   if [[ -x "../../model-lab/.venv/bin/python" ]]; then
     echo "../../model-lab/.venv/bin/python"
     return 0
