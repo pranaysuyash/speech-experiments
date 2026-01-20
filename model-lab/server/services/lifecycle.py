@@ -268,63 +268,143 @@ def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
     """
     Retry a run.
     """
-    # 1. Acquire lock
+    def _iso_now() -> str:
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Pure-manifest invalidation: keep this lightweight (no model imports).
+    def _reset_step_entry(entry: Dict[str, Any]) -> None:
+        entry["status"] = "PENDING"
+        entry["artifacts"] = []
+        entry["warnings"] = []
+        entry["ended_at"] = None
+        entry.pop("started_at", None)
+        entry.pop("duration_ms", None)
+        entry.pop("result", None)
+        entry.pop("metrics", None)
+        entry.pop("error", None)
+        entry.pop("error_message", None)
+        entry.pop("error_code", None)
+        entry.pop("failure_step", None)
+        entry.pop("resolved_config", None)
+        entry.pop("requested_config", None)
+
+    # Step dependency graph (names only). Mirrors harness.session.SessionRunner._register_steps.
+    _DEPS: Dict[str, List[str]] = {
+        "ingest": [],
+        "asr": ["ingest"],
+        "diarization": ["ingest"],
+        "alignment": ["asr", "diarization"],
+        "chapters": ["alignment"],
+        "summarize_by_speaker": ["alignment"],
+        "action_items_assignee": ["alignment"],
+        "bundle": [
+            "ingest",
+            "asr",
+            "diarization",
+            "alignment",
+            "chapters",
+            "summarize_by_speaker",
+            "action_items_assignee",
+        ],
+    }
+
+    def _collect_dependents(step_name: str) -> List[str]:
+        out: List[str] = []
+        visited: set[str] = set()
+
+        def dfs(s: str) -> None:
+            for name, deps in _DEPS.items():
+                if s in deps and name not in visited:
+                    visited.add(name)
+                    out.append(name)
+                    dfs(name)
+
+        dfs(step_name)
+        return out
+
+    def _invalidate_step_and_downstream(m: Dict[str, Any], step_name: str) -> None:
+        steps = m.setdefault("steps", {})
+
+        entry = steps.get(step_name)
+        if entry and isinstance(entry, dict):
+            _reset_step_entry(entry)
+
+        for dep in _collect_dependents(step_name):
+            d_entry = steps.get(dep)
+            if d_entry and isinstance(d_entry, dict):
+                _reset_step_entry(d_entry)
+
+    from server.services.runs_index import get_index
+    run = get_index().get_run(run_id)
+    if not run:
+        raise ValueError("Run not found")
+
+    manifest_path = Path(run["manifest_path"])
+    run_dir = manifest_path.parent
+
+    if not manifest_path.exists():
+        raise ValueError("Manifest not found")
+
+    m = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    # Idempotence: if already RUNNING with a known PID, do not spawn again.
+    if m.get("status") == "RUNNING":
+        pid = None
+        pid_file = run_dir / "worker.pid"
+        if pid_file.exists():
+            try:
+                pid = int(pid_file.read_text().strip())
+            except Exception:
+                pid = None
+        if pid is None:
+            pid = m.get("worker_pid")
+        if pid is not None:
+            return {"run_id": run_id, "run_dir": str(run_dir), "worker_pid": pid}
+
+    # 1. Acquire lock (only when launching a new worker)
     if not try_acquire_worker():
         raise RunnerBusyError("System busy")
-        
-    try:
-        from server.services.runs_index import get_index
-        run = get_index().get_run(run_id)
-        if not run:
-            raise ValueError("Run not found")
-            
-        manifest_path = Path(run["manifest_path"])
-        run_dir = manifest_path.parent
-        
-        # 2. Update manifest for retry
-        m = json.loads(manifest_path.read_text())
-        
-        # Reset top-level status
-        m["status"] = "RUNNING"
-        m.pop("failure_step", None)
-        m.pop("error", None)
-        m.pop("error_message", None)
-        m.pop("error_code", None)
-        m["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        if from_step:
-            # Initialize temporary runner to access dependency graph logic
-            # input_path must exist for constructor, usage is safe
-            dummy_runner = SessionRunner(
-                input_path=run_dir / "run_request.json", # Just a file that exists
-                output_dir=_runs_root(),
-            )
-            dummy_runner.invalidate_step_and_downstream(m, from_step)
-            
+    try:
+        # 2. Update manifest for retry
+        prior_failure_step = m.get("failure_step")
+
+        m["status"] = "RUNNING"
+        m["updated_at"] = _iso_now()
+        m["ended_at"] = None
+        m["duration_ms"] = None
+        m["current_step"] = None
+        m.pop("worker_pid", None)
+
+        for k in ["failure_step", "error", "error_message", "error_code", "traceback"]:
+            m.pop(k, None)
+
+        step_to_retry = from_step or prior_failure_step
+        if step_to_retry:
+            _invalidate_step_and_downstream(m, step_to_retry)
+
         # Write manifest
         tmp = manifest_path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(m, indent=2, sort_keys=True))
+        tmp.write_text(json.dumps(m, indent=2, sort_keys=True), encoding="utf-8")
         os.replace(tmp, manifest_path)
-        
+
         # 3. Launch
         runner = SessionRunner(
-            input_path=run_dir / "input_file_placeholder", # Path irrelevant for resume?
+            input_path=run_dir / "input_file_placeholder",  # overwritten below
             output_dir=_runs_root(),
             resume=True,
-            config={"resume_from": str(run_dir)}
+            config={"resume_from": str(run_dir)},
         )
         # Correct the input path from manifest/request
         req_path = run_dir / "run_request.json"
         if req_path.exists():
-            req = json.loads(req_path.read_text())
+            req = json.loads(req_path.read_text(encoding="utf-8"))
             if "input_path" in req:
-                 input_candidate = Path(req["input_path"])
-                 if input_candidate.exists():
-                     runner.input_path = input_candidate
-        
-        # Enable access to logs for retry
+                input_candidate = Path(req["input_path"])
+                if input_candidate.exists():
+                    runner.input_path = input_candidate
+
         return launch_run_worker(runner, {}, background=True)
-        
-    except Exception as e:
+    except Exception:
         release_worker()
-        raise e
+        raise
