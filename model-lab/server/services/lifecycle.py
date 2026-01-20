@@ -282,11 +282,6 @@ def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
         entry.pop("result", None)
         entry.pop("metrics", None)
         entry.pop("error", None)
-        entry.pop("error_message", None)
-        entry.pop("error_code", None)
-        entry.pop("failure_step", None)
-        entry.pop("resolved_config", None)
-        entry.pop("requested_config", None)
 
     # Step dependency graph (names only). Mirrors harness.session.SessionRunner._register_steps.
     _DEPS: Dict[str, List[str]] = {
