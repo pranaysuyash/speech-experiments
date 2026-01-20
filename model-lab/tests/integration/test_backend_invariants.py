@@ -229,11 +229,11 @@ class TestBackendInvariants:
         assert m1["steps"]["ingest"]["status"] == "COMPLETED"
         assert m1["steps"]["ingest"]["artifacts"] == [{"path": ingest_artifact_rel, "hash": ingest_hash}]
 
-        # Failed step + downstream invalidated
+        # Failed step + downstream invalidated (configs preserved)
         assert m1["steps"]["asr"]["status"] == "PENDING"
         assert m1["steps"]["asr"]["artifacts"] == []
-        assert "resolved_config" not in m1["steps"]["asr"]
-        assert "requested_config" not in m1["steps"]["asr"]
+        assert m1["steps"]["asr"]["resolved_config"]["device"] == "cpu"
+        assert m1["steps"]["asr"]["requested_config"]["device"] == "mps"
         assert m1["steps"]["alignment"]["artifacts"] == []
         assert m1["steps"]["bundle"]["artifacts"] == []
 
