@@ -38,11 +38,5 @@ jobs:
           cache: "npm"
           cache-dependency-path: model-lab/client/package-lock.json
 
-      - name: Install frontend deps
-        run: npm ci
-        working-directory: model-lab/client
-
-      - name: Build frontend
-        run: npm run build
-        working-directory: model-lab/client
-
+      - name: CI guardrails (invariants + client build)
+        run: bash scripts/ci_guardrails.sh
