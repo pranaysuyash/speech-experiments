@@ -86,26 +86,35 @@ def resolve_asr_config(user_config: Optional[Dict[str, Any]] = None) -> Resolved
         source = "unknown"
     
     # 3. Resolve device
-    requested_device = user_config.get("device", "cpu")
-    reason = "requested"
+    # P4: Device Selection Contract
+    # Priority: device_preference list > device string > default ["cpu"]
+    preference = user_config.get("device_preference")
+    if not preference:
+        preference = [user_config.get("device", "cpu")]
     
-    # Apply device mapping rules (same as registry)
-    if model_type == "faster_whisper":
-        # faster_whisper doesn't support MPS
-        if requested_device == "mps":
-            actual_device = "cpu"
-            reason = "mps_unsupported_by_backend"
-        else:
-            actual_device = requested_device
-    elif model_type == "lfm2_5_audio":
-        # LFM has CUDA bug, prefer MPS or CPU
-        if requested_device == "cuda":
-            actual_device = "cpu"
-            reason = "cuda_unsupported_by_backend"
-        else:
-            actual_device = requested_device
-    else:
-        actual_device = requested_device
+    actual_device = None
+    reason = None
+    
+    for cand in preference:
+        # Check Model-Specific Constraints
+        if model_type == "faster_whisper" and cand == "mps":
+            # Constraint: faster_whisper doesn't support MPS yet
+            continue
+            
+        if model_type == "lfm2_5_audio" and cand == "cuda":
+            # Constraint: LFM has known CUDA issues
+            continue
+            
+        # If we reached here, the device is valid for the model configuration
+        # (We assume system availability is handled by the worker runtime or assumed available if requested)
+        actual_device = cand
+        reason = f"preference_{cand}"
+        break
+    
+    # Final cleanup if loop exhausted without selection (unlikely if 'cpu' in list, but possible)
+    if not actual_device:
+        actual_device = "cpu"
+        reason = "exhausted_preference"
     
     # 4. Resolve language
     language = user_config.get("language", "auto")
