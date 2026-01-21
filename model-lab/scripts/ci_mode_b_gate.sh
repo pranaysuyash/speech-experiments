@@ -29,6 +29,12 @@ echo -n "[2/3] OpenAPI contains /api/runs... "
 if ! curl -sS "${API_BASE}/openapi.json" 2>/dev/null | grep -q '"/api/runs"'; then
   echo "❌"
   echo "FAIL: openapi.json missing /api/runs route (wrong app mounted)"
+  echo ""
+  echo "Debug breadcrumb:"
+  echo "  Listener PID: $(lsof -nP -tiTCP:8000 -sTCP:LISTEN || echo 'none')"
+  echo "  Cmdline: $(ps -p "$(lsof -nP -tiTCP:8000 -sTCP:LISTEN 2>/dev/null || echo 1)" -o args= 2>/dev/null || echo 'N/A')"
+  echo "  OpenAPI snippet:"
+  curl -sS "${API_BASE}/openapi.json" 2>/dev/null | head -c 400 || echo "(unreachable)"
   exit 2
 fi
 echo "✅"

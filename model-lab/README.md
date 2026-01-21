@@ -46,6 +46,16 @@ source .venv/bin/activate
 jupyter lab
 ```
 
+## 🚢 **How We Ship**
+
+| When | What | Command |
+|------|------|---------|
+| Every push | CI gate runs automatically | (pre-push hook) |
+| Before tag/release | Full Mode B verify | `./scripts/mode_b_verify.sh` |
+| Once per release | S4 manual stale check | [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) |
+
+See [docs/USER_TESTING_MODE_B.md](docs/USER_TESTING_MODE_B.md) for full protocol.
+
 ## 📋 **Testing Workflow**
 
 ### **Phase 1: Model Testing**
