@@ -11,6 +11,7 @@ import argparse
 import json
 import logging
 import sys
+import os
 from pathlib import Path
 
 # Add harness to path
@@ -52,7 +53,7 @@ def _emit_run_result(run_id: str, run_dir: str, console_port: int) -> None:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Run deterministic audio session pipeline")
     p.add_argument("--input", required=True, help="Path to input media (audio or video)")
-    p.add_argument("--out-dir", required=True, help="Base output directory")
+    p.add_argument("--out-dir", help="Base output directory (default: $MODEL_LAB_RUNS_ROOT or 'runs')")
     p.add_argument("--force", action="store_true", help="Force recompute steps")
     p.add_argument("--no-resume", action="store_true", help="Disable resume")
     p.add_argument("--steps", nargs="*", default=None, help="Subset of steps to run")
@@ -99,9 +100,12 @@ def main() -> None:
         "resume_from": args.resume_from
     }
 
+    # Default output dir to standard runs root if not specified
+    out_dir_str = args.out_dir or os.environ.get("MODEL_LAB_RUNS_ROOT", "runs")
+    
     runner = SessionRunner(
         input_path=Path(args.input),
-        output_dir=Path(args.out_dir),
+        output_dir=Path(out_dir_str),
         force=args.force,
         resume=not args.no_resume,
         preprocessing=ingest_cfg,

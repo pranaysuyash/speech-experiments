@@ -13,6 +13,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any, Tuple
 from pathlib import Path
+import json
 
 from harness.alignment import AlignedSegment
 

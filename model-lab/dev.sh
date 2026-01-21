@@ -39,12 +39,16 @@ else
   echo "WARNING: No .venv or venv directory found!"
 fi
 
-export PYTHONPATH=$PYTHONPATH:.
+export PYTHONPATH=${PYTHONPATH:-}:.
 export PYTHONUNBUFFERED=1
 
-echo "[3/4] Starting Backend (Port $BACKEND_PORT)..."
+# Make API binding deterministic for scripts and curl.
+# Avoid macOS localhost resolving to ::1.
+BACKEND_HOST="${MODEL_LAB_HOST:-127.0.0.1}"
+
+echo "[3/4] Starting Backend (Port $BACKEND_PORT on $BACKEND_HOST)..."
 : > server.log
-python -u server/main.py 2>&1 \
+python -m uvicorn server.main:app --reload --host "$BACKEND_HOST" --port "$BACKEND_PORT" 2>&1 \
   | tee -a server.log \
   | sed -u 's/^/[backend] /' \
   | grep -E --line-buffered "$FILTER_BACKEND" &

@@ -76,26 +76,56 @@ class RunsIndex:
         try:
             # Re-read manifest to find artifacts
             manifest = json.loads(manifest_path.read_text())
+            try:
+                schema_version = int(manifest.get("manifest_schema_version", 1))
+            except (ValueError, TypeError):
+                schema_version = 1
+                
+            registry = manifest.get("artifacts_by_type", {})
             run_dir = manifest_path.parent
             
             segments = []
-            chapters = [] # TODO: Load chapters if available
+            chapters = [] 
             
-            # Locate ASR artifact
-            asr_step = manifest.get("steps", {}).get("asr", {})
-            asr_artifacts = asr_step.get("artifacts", [])
-            
+            # --- Artifact Resolution (Schema Gating) ---
             asr_path = None
-            for art in asr_artifacts:
-                if isinstance(art, dict) and art.get("path", "").endswith(".json"):
-                    asr_path = art.get("path")
-                    break
             
-            # Fallback path logic
+            if schema_version >= 2:
+                # v2: MUST be in registry
+                candidates = registry.get("asr", []) + registry.get("transcript", []) 
+                # Prefer transcript (alignment) over asr? 
+                # Actually we want 'alignment' result usually for speakers.
+                # Let's check 'alignment' first, then 'asr'.
+                # But logic below parses 'asr.json' format (segments). 
+                # 'alignment' step produces 'alignment.json' which has segments.
+                
+                # Let's look for 'alignment' type first (better quality), then 'asr'.
+                target_candidates = registry.get("alignment", []) or registry.get("asr", [])
+                
+                if not target_candidates:
+                     raise RuntimeError(f"E_ARTIFACT_REGISTRY_MISSING: No 'alignment' or 'asr' artifacts in registry (Schema v{schema_version})")
+                
+                # Sort by mtime descending (latest)
+                target_candidates.sort(key=lambda x: x.get("mtime", 0), reverse=True)
+                asr_path = target_candidates[0].get("path")
+            else:
+                # v1: Step traversal fallback (Legacy)
+                asr_step = manifest.get("steps", {}).get("asr", {})
+                asr_artifacts = asr_step.get("artifacts", [])
+                for art in asr_artifacts:
+                    if isinstance(art, dict) and art.get("path", "").endswith(".json"):
+                        asr_path = art.get("path")
+                        break
+            
+            # Fallback path logic (Legacy filesystem probe - allow for v1 only? or keep for robustness?)
+            # Validating "E_ARTIFACT_REGISTRY_MISSING" for v2 implies we should FAIL if v2 and not in registry.
+            # But the 'target_candidates' check above already ensures that.
+            
             target_file = None
             if asr_path:
                 target_file = run_dir / asr_path
-            else:
+            elif schema_version < 2:
+                # Only probe filesystem in v1
                 fallback = run_dir / "artifacts/asr.json"
                 if fallback.exists():
                     target_file = fallback
@@ -109,11 +139,7 @@ class RunsIndex:
                         end = seg.get("end")
                         text = seg.get("text", "").strip()
                         speaker = seg.get("speaker")
-                        
-                        # Assign stable ID if not present (using index fallback)
-                        # Ideally should use start time or hash, but index is okay for V2 immutable-ish transcripts
                         seg_id = f"seg_{i}" 
-                        
                         segments.append({
                             "id": seg_id,
                             "start_s": start,
@@ -122,21 +148,24 @@ class RunsIndex:
                             "speaker": speaker
                         })
 
-            # Load Chapters
-            chapters_step = manifest.get("steps", {}).get("chapters", {})
-            chapters_artifacts = chapters_step.get("artifacts", [])
-            
+            # Load Chapters (Schema Gated)
             chapters_path = None
-            for art in chapters_artifacts:
-                if isinstance(art, dict) and art.get("path", "").endswith(".json"):
-                    chapters_path = art.get("path")
-                    break
+            if schema_version >= 2:
+                candidates = registry.get("chapters", [])
+                if candidates:
+                    candidates.sort(key=lambda x: x.get("mtime", 0), reverse=True)
+                    chapters_path = candidates[0].get("path")
+            else:
+                 chapters_step = manifest.get("steps", {}).get("chapters", {})
+                 for art in chapters_step.get("artifacts", []):
+                    if isinstance(art, dict) and art.get("path", "").endswith(".json"):
+                        chapters_path = art.get("path")
+                        break
             
-            # Fallback
             chapters_file = None
             if chapters_path:
                 chapters_file = run_dir / chapters_path
-            else:
+            elif schema_version < 2:
                 fallback = run_dir / "artifacts/chapters.json"
                 if fallback.exists():
                     chapters_file = fallback
@@ -186,6 +215,8 @@ class RunsIndex:
             return dto
 
         except Exception as e:
+            if "E_ARTIFACT_REGISTRY_MISSING" in str(e):
+                raise e
             logger.error(f"Failed to load transcript for {run_id}: {e}")
             return None
 

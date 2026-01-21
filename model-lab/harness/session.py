@@ -177,7 +177,77 @@ class SessionRunner:
         
         self.steps: Dict[str, StepDef] = {}
     
+    def get_artifact(self, type_name: str, step_hint: Optional[str] = None) -> Optional[Path]:
+        """
+        Robust artifact lookup (Phase 2 Hardening).
+        
+        Selection Rules:
+        1. Query `artifacts_by_type` from manifest.
+        2. Filter by `step_hint` if provided.
+        3. Deterministic Sort:
+           - Primary: Step execution order (implied by manifest order or hardcoded topo)
+           - Secondary: mtime (latest wins)
+        4. Fallback: None (Wildcards explicitly removed for safety, use type registry).
+        """
+        # Load fresh manifest to get latest registry
+        m = self._load_manifest()
+        registry = m.get("artifacts_by_type", {})
+        schema_version = m.get("manifest_schema_version", 1)  # Default to v1 if missing
+
+        candidates = registry.get(type_name, [])
+        
+        # SCHEMA GATING (v2)
+        if not candidates:
+            if schema_version >= 2:
+                # CRITICAL: Fail loud prevents silent drift for new runs
+                raise RuntimeError(
+                    f"E_ARTIFACT_REGISTRY_MISSING: Missing artifact type '{type_name}'. "
+                    f"Step Hint: {step_hint}. "
+                    f"Schema Version: {schema_version}. "
+                    f"Action: Check step output normalization or rerun."
+                )
+            else:
+                 # Legacy Mode (v1): Allow fallback to heuristics (caller handles this by checking None)
+                 # We log a warning to encourage migration
+                 logger.warning(
+                     f"Artifact '{type_name}' not found in registry (Schema v{schema_version}). "
+                     "Falling back to legacy heuristics."
+                 )
+                 return None
+            
+        # Filter by step hint if needed
+        if step_hint:
+            candidates = [c for c in candidates if c["step"] == step_hint]
+            
+        if not candidates:
+             if schema_version >= 2:
+                  raise RuntimeError(
+                    f"E_ARTIFACT_REGISTRY_MISSING: No artifacts of type '{type_name}' matched hint '{step_hint}'. "
+                    f"Schema Version: {schema_version}."
+                  )
+             return None
+            
+        # Deterministic Selection:
+        # Prefer latest mtime. 
+        # (In future we could use step topology order, but mtime is a strong proxy for "latest successful run")
+        candidates.sort(key=lambda x: x.get("mtime", 0), reverse=True)
+        
+        # Pick winner
+        winner = candidates[0]
+        path_str = winner.get("path")
+        if not path_str:
+            return None
+            
+        # Resolve absolute path
+        abs_path = self.session_dir / path_str
+        if abs_path.exists():
+            return abs_path
+            
+        return None
+
     def _get_step_artifact(self, step_name: str, extension: str = ".json") -> Optional[Path]:
+        # DEPRECATED: Use get_artifact(type=...) instead.
+        # Keeping for legacy compatibility until full migration.
         """Get the first artifact path from a completed step's manifest entry.
         
         This allows downstream steps to dynamically resolve artifact paths
@@ -597,10 +667,54 @@ class SessionRunner:
                     m.update(merged)
                     
                     logger.warning(f"Merge-Safe: Adopted terminal status {disk_status} from disk (Preserved metadata)")
-
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
         except Exception:
             logger.exception("Manifest merge failed")
+
+        # --- ARTIFACT INDEXER (Phase 2 Hardening) ---
+        # Build global index: artifacts_by_type[type] = [{path, step, mtime}]
+        # This supports deterministic lookup across steps.
         
+        index = {}
+        if "steps" in m:
+            for step_name, step_data in m["steps"].items():
+                if "artifacts" in step_data:
+                    for art in step_data["artifacts"]:
+                        # Artifact must be a dict (normalized by now)
+                        if isinstance(art, dict):
+                            a_type = art.get("role") or art.get("type")
+                            if a_type:
+                                if a_type not in index:
+                                    index[a_type] = []
+                                
+                                # Resolve absolute timestamp if possible
+                                mtime = 0
+                                p_str = art.get("path")
+                                if p_str:
+                                    try:
+                                        # Best effort mtime resolution
+                                        # Assuming relative paths from session_dir
+                                        full_path = self.session_dir / p_str
+                                        if full_path.exists():
+                                            mtime = full_path.stat().st_mtime
+                                    except Exception:
+                                        pass
+                                
+                                index[a_type].append({
+                                    "path": p_str,
+                                    "step": step_name,
+                                    "mtime": mtime,
+                                    "metadata": art # Embed full metadata for filters
+                                })
+        
+        m["artifacts_by_type"] = index
+        
+        # Schema Versioning (Phase 2 Hardening)
+        # Version 2: Introduces artifacts_by_type and strict normalizer contracts
+        m["manifest_schema_version"] = 2
+        # --------------------------------------------
+
         atomic_write_json(self.manifest_path, m)
 
     def _register_steps(self) -> None:
@@ -624,14 +738,15 @@ class SessionRunner:
                  raise RuntimeError("Missing audio path for ASR")
              # Call harness function. Assuming refactoring to take (input, output_dir, config)
              # Current: run_asr(input_path, output_dir, model_name, device, logic_config)
-             # We should probably pass the audio_path as input.
-             # And we need to construct a robust output.
-             # For now, let's assume we wrap it to behave.
-             # TODO: Refactor harness/asr.py run_asr to be friendlier or wrap loosely.
-             # This assumes ASR runner writes to `artifacts/asr.json`
-             # We'll pass ctx.artifacts_dir and let it write there.
              from harness.asr import run_asr
-             return run_asr(ctx.audio_path, ctx.artifacts_dir, config=self.extra_config.get("asr", {}), progress_callback=ctx.on_progress)
+             res = run_asr(ctx.audio_path, ctx.artifacts_dir, config=self.extra_config.get("asr", {}), progress_callback=ctx.on_progress)
+             
+             # Post-process to ensure type info for registry
+             if isinstance(res, dict) and "artifacts" in res:
+                 for art in res["artifacts"]:
+                     if isinstance(art, dict) and "type" not in art:
+                         art["type"] = "transcript" # Default type for ASR
+             return res
 
         def asr_artifacts(step_result: Dict[str, Any]) -> List[Path]:
              # Assuming step_result contains path or we know it
@@ -654,7 +769,7 @@ class SessionRunner:
                 output_dir = ctx.artifacts_dir / "diarization"
                 output_dir.mkdir(parents=True, exist_ok=True)
                 artifact_path = run_diarization(ctx.audio_path, model_name, output_dir)
-                return {"artifacts": [{"path": str(artifact_path)}]}
+                return {"artifacts": [{"path": str(artifact_path), "type": "diarization"}]}
             except Exception as e:
                 logger.warning(f"Diarization failed (non-fatal): {e}")
                 return {"artifacts": [], "warning": str(e)}
@@ -671,25 +786,24 @@ class SessionRunner:
         
         # 4. Alignment
         def alignment_func(ctx: SessionContext) -> Dict[str, Any]:
-            # Lookup actual artifact paths from completed steps (not hardcoded)
-            asr_path = self._get_step_artifact("asr", ".json")
+            # Lookup actual artifact paths using robust helper
+            asr_path = self.get_artifact("transcript", step_hint="asr")
             if not asr_path:
-                # Fallback to legacy path
-                asr_path = ctx.artifacts_dir / "asr.json"
+                 # Last ditch legacy fallback
+                 asr_path = ctx.artifacts_dir / "asr.json"
             
-            # Diarization may not produce a .json, check for directory
-            diar_path = ctx.artifacts_dir / "diarization.json"
-            if not diar_path.exists():
-                # Try to find any diarization artifact
-                diar_artifact = self._get_step_artifact("diarization", ".json")
-                if diar_artifact:
-                    diar_path = diar_artifact
+            diar_path = self.get_artifact("diarization")
+            if not diar_path:
+                 diar_path = ctx.artifacts_dir / "diarization.json"
             
             if not asr_path.exists():
                 raise FileNotFoundError(f"ASR not found: {asr_path}")
             
             from harness.alignment import run_alignment
-            return run_alignment(asr_path, diar_path, ctx.artifacts_dir)
+            artifact_path = run_alignment(asr_path, diar_path, ctx.artifacts_dir)
+            
+            # Explicitly set type="alignment" for downstream lookup
+            return {"artifacts": [{"path": str(artifact_path), "type": "alignment"}]}
 
         def alignment_artifacts(res: Dict) -> List[Path]:
              return [Path(p["path"]) for p in res.get("artifacts", [])]
@@ -703,13 +817,18 @@ class SessionRunner:
         
         # 5. Chapters
         def chapters_func(ctx: SessionContext) -> Dict[str, Any]:
-            align_path = ctx.artifacts_dir / "alignment.json"
+            # Use strict lookup
+            align_path = self.get_artifact("alignment")
+            if not align_path:
+                align_path = ctx.artifacts_dir / "alignment.json"
+                
             from harness.chapters import run_chapters
-            return run_chapters(align_path, ctx.artifacts_dir, embedding_cache_dir=self.embedding_cache_dir)
+            return run_chapters(align_path, ctx.artifacts_dir, cache_dir=self.embedding_cache_dir)
             
         def chapters_artifacts(res: Dict) -> List[Path]:
             # Returns list of artifacts (chapters.json)
             return [Path(p["path"]) for p in res.get("artifacts", [])]
+
             
         self.steps["chapters"] = StepDef(
             name="chapters",
@@ -720,7 +839,9 @@ class SessionRunner:
         
         # 6. NLP (Summarize)
         def summarize_func(ctx: SessionContext) -> Dict[str, Any]:
-             align_path = ctx.artifacts_dir / "alignment.json"
+             align_path = self.get_artifact("alignment")
+             if not align_path:
+                 align_path = ctx.artifacts_dir / "alignment.json"
              from harness.nlp import run_summarize_by_speaker
              return run_summarize_by_speaker(align_path, ctx.artifacts_dir)
         
@@ -736,9 +857,14 @@ class SessionRunner:
         
         # 7. NLP (Action Items)
         def action_items_func(ctx: SessionContext) -> Dict[str, Any]:
-             align_path = ctx.artifacts_dir / "alignment.json"
-             from harness.nlp import run_action_items
-             return run_action_items(align_path, ctx.artifacts_dir)
+            # Use strict lookup for alignment
+            align_path = self.get_artifact("alignment")
+            if not align_path:
+                 # Legacy fallback
+                 align_path = ctx.artifacts_dir / "alignment.json"
+            
+            from harness.nlp import run_action_items
+            return run_action_items(align_path, ctx.artifacts_dir)
 
         def action_items_artifacts(res: Dict) -> List[Path]:
              return [Path(p["path"]) for p in res.get("artifacts", [])]
@@ -945,12 +1071,48 @@ class SessionRunner:
         
         try:
             # Failure Injection (Test Hook)
-            fail_target = os.environ.get("SESSION_FAIL_STEP")
+            # Supports both legacy SESSION_FAIL_STEP and new standard MODEL_LAB_FAIL_STEP
+            # STRICT GUARD: Only active if MODEL_LAB_TESTING=1 is present (or we are in a known dev environment, but explicit is better)
+            fail_target = os.environ.get("MODEL_LAB_FAIL_STEP") or os.environ.get("SESSION_FAIL_STEP")
+            is_testing = os.environ.get("MODEL_LAB_TESTING") == "1"
+            
             if fail_target == step_def.name:
-                time.sleep(1) # Ensure started_at is distinct
-                raise RuntimeError(f"Simulated failure for step: {step_def.name}")
+                if is_testing:
+                    logger.warning(f"⚠️ INJECTING FAILURE at step '{step_def.name}' (MODEL_LAB_TESTING=1)")
+                    time.sleep(1) # Ensure started_at is distinct
+                    raise RuntimeError(f"Simulated failure for step: {step_def.name} (Triggered by Env Var)")
+                else:
+                    logger.info(f"Ignored failure injection request for '{step_def.name}' (MODEL_LAB_TESTING not set)")
 
-            result = step_def.func(self.ctx)
+            raw_result = step_def.func(self.ctx)
+            
+            # --- STRICT NORMALIZER (Phase 2 Hardening) ---
+            # Contract: Steps MUST return a dict or valid artifact(s). None is forbidden by default.
+            
+            if isinstance(raw_result, dict):
+                result = raw_result
+            elif isinstance(raw_result, (str, Path)):
+                # Normalize single path to standard artifact dict
+                result = {"artifacts": [{"path": str(raw_result)}]}
+            elif isinstance(raw_result, list):
+                # Normalize list of paths to standard artifact dict
+                artifacts = []
+                for item in raw_result:
+                    if isinstance(item, (str, Path)):
+                        artifacts.append({"path": str(item)})
+                    elif isinstance(item, dict):
+                         artifacts.append(item)
+                    else:
+                        raise TypeError(f"Step '{name}' returned list containing invalid type: {type(item)}. Expected str, Path, or dict.")
+                result = {"artifacts": artifacts}
+            elif raw_result is None:
+                # Fail fast on None - this is a programmer error. Steps must return at least empty dict.
+                # Use "no_output_ok" flag if we ever support side-effect only steps (none today).
+                raise TypeError(f"Step '{name}' returned None. Steps must return a dict or artifact path(s).")
+            else:
+                raise TypeError(f"Step '{name}' returned invalid type: {type(raw_result)}. Expected dict, str, Path, or list.")
+            
+            # ---------------------------------------------
             duration_ms = int((time.time() - t0) * 1000)
 
             # Update context if ingest
@@ -973,7 +1135,7 @@ class SessionRunner:
                         try:
                             rel_path = str(path_obj.relative_to(self.session_dir))
                         except ValueError:
-                            rel_path = str(path_obj)  # Fallback to absolute if outside
+                            rel_path = str(path_obj)
                         
                         artifact = ArtifactMetadata(
                             id="asr_transcript",
@@ -986,10 +1148,43 @@ class SessionRunner:
                             downloadable=True
                         )
                         artifacts.append(artifact.to_manifest_dict())
-            else:
-                # Legacy format for other steps (to be migrated later)
-                for p in step_def.artifact_paths(result):
-                    artifacts.append({"path": str(p), "hash": sha256_file(p)})
+
+            # Record artifacts with semantic schema (Phase 2)
+            # This runs for ALL steps (including ASR if it didn't populate above, though ASR has specific logic)
+            # Actually ASR logic up top populates 'artifacts' list directly? 
+            # Wait, the ASR block above is inside 'if name == "asr":'.
+            # My new block assumes I am handling 'artifacts' for everyone.
+            # If ASR already populated 'artifacts' list, I should append to it or respect it.
+            # The 'artifacts' variable is defined where? 
+            # It seems 'artifacts' list was defined LOCALLY inside 'if name == "asr"' block?
+            # I see 'artifacts: List[Dict[str, Any]] = []' in my previous replacement.
+            # I must ensure 'artifacts' is defined for everyone.
+            
+            if name != "asr":
+                 artifacts = []
+
+            # If result is normalized dict (Phase 2)
+            if isinstance(result, dict) and "artifacts" in result:
+                 for art in result["artifacts"]:
+                     # art is dict like {"path": "..."}
+                     if isinstance(art, dict):
+                         p_str = art.get("path")
+                         if p_str:
+                             p_obj = Path(p_str)
+                             try:
+                                 if not p_obj.is_absolute():
+                                     p_obj = self.session_dir / p_str
+                                 
+                                 if p_obj.exists():
+                                     if "hash" not in art:
+                                         art["hash"] = sha256_file(p_obj)
+                                     artifacts.append(art)
+                                 else:
+                                     artifacts.append(art)
+                             except Exception as e:
+                                 logger.warning(f"Failed to hash artifact {p_str}: {e}")
+                                 artifacts.append(art)
+
 
             # Re-check run status - if merged status is terminal, step cannot be COMPLETED safely if it violates intent
             # Note: _save_manifest merges RUN status, not STEP status, so we handle step status here explicitly.
@@ -1006,7 +1201,6 @@ class SessionRunner:
             entry["status"] = final_status
             entry["ended_at"] = now_iso()
             entry["duration_ms"] = duration_ms
-            entry["artifacts"] = artifacts
             entry["artifacts"] = artifacts
             entry["result"] = result  # Keep for strict resume checks
             

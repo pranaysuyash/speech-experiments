@@ -54,94 +54,142 @@ def get_run_status(run_id: str):
     if not run:
          raise HTTPException(status_code=404, detail="Run not found")
     
-    # Get full manifest for updated_at and current_step
-    from pathlib import Path
-    import json
-    import logging
-    manifest_path = Path(run["manifest_path"])
-    try:
-        manifest = json.loads(manifest_path.read_text())
-    except FileNotFoundError:
-        # Run exists in index but missing on disk (stale cache)
-        logging.getLogger("server.api").warning(f"Run {run_id} missing on disk. Refreshing index.")
-        get_index().refresh()
-        raise HTTPException(status_code=404, detail="Run not found (deleted)")
+    # --- STALE CONTRACT HARDENING (Phase 2) ---
+    # Ensure consistence payload regardless of live/stale status.
+    # Source Logic:
+    # 1. Manifest read success -> "manifest"
+    # 2. Manifest read fail -> "index" (with snapshot_reason="manifest_missing")
     
-    status = run["status"]
+    snapshot_source = "manifest"
+    snapshot_reason = None
+    manifest_mtime = 0
+    
+    try:
+        manifest_path = Path(run["manifest_path"])
+        manifest = json.loads(manifest_path.read_text())
+        manifest_mtime = manifest_path.stat().st_mtime
+    except FileNotFoundError:
+        snapshot_source = "index"
+        snapshot_reason = "manifest_missing"
+        # Fallback to index data (better than 500)
+        # But explicitly mark as degraded
+        manifest = {
+            "status": run["status"],
+            "steps": {k: {"status": "COMPLETED"} for k in run.get("steps_completed", [])},
+            "error": {"type": "SnapshotError", "message": "Run manifest missing on disk"},
+        }
+    except json.JSONDecodeError:
+        snapshot_source = "index"
+        snapshot_reason = "manifest_corrupt"
+         # Fallback to index data
+        manifest = {
+             "status": run["status"],
+             "steps": {k: {"status": "COMPLETED"} for k in run.get("steps_completed", [])},
+             "error": {"type": "SnapshotError", "message": "Run manifest corrupt"},
+        }
+
+    status = manifest.get("status", run["status"])
     current_step = manifest.get("current_step")
     updated_at = manifest.get("updated_at")
 
-    # Extract semantic progress for current step
-    last_semantic_progress_at = None
-    if current_step and "steps" in manifest and current_step in manifest["steps"]:
-         last_semantic_progress_at = manifest["steps"][current_step].get("last_semantic_progress_at")
-    
-    # Stale detection: if RUNNING but no heartbeat for > 90s, mark as STALE
+    # Stale detection based on updated_at
     STALE_THRESHOLD_SECONDS = 90
-    
     if status == "RUNNING" and updated_at:
         try:
-            # Parse ISO timestamp
             last_update = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
             now = datetime.now(timezone.utc)
             elapsed = (now - last_update).total_seconds()
             
             if elapsed > STALE_THRESHOLD_SECONDS:
                 status = "STALE"
-                # Add error fields for frontend display
-                return {
-                    "run_id": run_id,
-                    "status": status,
-                    "started_at": manifest.get("started_at"),  # Read from manifest, not index cache
-                    "steps_completed": run.get("steps_completed", []),
-                    "current_step": current_step,
-                    "updated_at": updated_at,
-                    "last_semantic_progress_at": last_semantic_progress_at,
-                    "is_stalled": True, # Stale = Stalled
-                    "error_code": "STALE_RUN",
-                    "error_message": f"No heartbeat in {int(elapsed)}s",
-                    "failure_step": manifest.get("failure_step")  # Pass-through verbatim
-                }
-        except (ValueError, TypeError):
-            pass  # If timestamp parsing fails, just return normal status
-    
-    # Semantic Stalled Check (Alive but stuck)
-    is_stalled = False
-    if status == "RUNNING" and last_semantic_progress_at:
-        try:
-            last_sem = datetime.fromisoformat(last_semantic_progress_at.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            elapsed_sem = (now - last_sem).total_seconds()
-            # If no semantic progress for 5 minutes, mark as STALLED (but keep status RUNNING)
-            if elapsed_sem > 300:
-                is_stalled = True
-        except (ValueError, TypeError):
+                snapshot_reason = f"no_heartbeat_{int(elapsed)}s"
+                if "error" not in manifest:
+                     manifest["error"] = {
+                         "type": "StaleRun",
+                         "message": f"No heartbeat in {int(elapsed)}s"
+                     }
+        except Exception:
             pass
-    
-    # Return minimal status from index cache
-    # Enhance with observability fields
-    input_meta = {
-        "filename": manifest.get("input", {}).get("original_path", "unknown"),
-        "size_bytes": 0
-    }
-    # Best-effort file size
-    try:
-        if "input" in manifest and "original_path" in manifest["input"]:
-            p = Path(manifest["input"]["original_path"])
-            if p.exists():
-                input_meta["size_bytes"] = p.stat().st_size
-    except Exception:
-        pass
 
-    # Extract artifacts availability
-    artifacts = {}
+    # Authoritative Lists
+    # Use manifest steps keys if available (most accurate)
+    steps_completed = []
     if "steps" in manifest:
-        for step_name, step_data in manifest["steps"].items():
-            if "artifacts" in step_data and step_data["artifacts"]:
-                # Just list paths or names
-                # artifacts[step_name] = [a.get("path") for a in step_data["artifacts"]]
-                # Actually, simpler boolean or list is enough for UI "Visibility"
-                artifacts[step_name] = True
+        # Filter for COMPLETED steps
+        steps_completed = [
+            k for k, v in manifest["steps"].items() 
+            if v.get("status") in ("COMPLETED", "SKIPPED")
+        ]
+    else:
+        # Fallback to index
+        steps_completed = run.get("steps_completed", [])
+
+    return {
+        "run_id": run_id,
+        "status": status,
+        "current_step": current_step,
+        "steps_completed": steps_completed,
+        "failure_step": manifest.get("failure_step"),
+        "error_message": manifest.get("error", {}).get("message"),
+        "input_metadata": manifest.get("input_metadata", {}),
+        "artifacts": manifest.get("artifacts_by_type", {}), # Use new global index
+        "resolved_device": run.get("config", {}).get("resolved_device"), # From index
+        "meta": {
+            "snapshot_source": snapshot_source,
+            "snapshot_reason": snapshot_reason,
+            "manifest_mtime": manifest_mtime
+        }
+    }
+
+@router.get("/{run_id}/details")
+def get_run_details_v2(run_id: str):
+    """Get full manifest for a specific run, with enhanced details."""
+    from datetime import datetime, timezone
+
+    run = get_index().get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found in index (try refresh?)")
+
+    manifest_path = Path(run["manifest_path"])
+    manifest = {}
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        # If manifest is missing or corrupt, we still want to return some info
+        # Fallback to index data for basic status
+        manifest = {
+            "status": run["status"],
+            "steps": {k: {"status": "COMPLETED"} for k in run.get("steps_completed", [])},
+            "error": {"type": "SnapshotError", "message": "Run manifest missing or corrupt"},
+        }
+
+    status = manifest.get("status", run["status"])
+    current_step = manifest.get("current_step")
+    updated_at = manifest.get("updated_at")
+    last_semantic_progress_at = manifest.get("last_semantic_progress_at")
+
+    # Stale detection based on updated_at
+    STALE_THRESHOLD_SECONDS = 90
+    is_stalled = False
+    if status == "RUNNING" and updated_at:
+        try:
+            last_update = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            elapsed = (now - last_update).total_seconds()
+            
+            if elapsed > STALE_THRESHOLD_SECONDS:
+                status = "STALE"
+                is_stalled = True
+        except Exception:
+            pass # Ignore parsing errors for updated_at
+
+    # Input metadata
+    input_meta = manifest.get("input_metadata", {})
+    if not input_meta and run.get("input_metadata"):
+        input_meta = run["input_metadata"] # Fallback to index if manifest is empty
+
+    # Artifacts availability (global index)
+    artifacts = manifest.get("artifacts_by_type", {})
 
     # Extract per-step details with errors
     steps = []
@@ -234,16 +282,17 @@ def get_run_transcript(run_id: str):
     Returns a Normalized Transcript DTO.
     DTO: { "segments": [...], "chapters": [...] }
     """
-    transcript = get_index().get_transcript(run_id)
-    if not transcript:
-         # Could be 404 or just empty if no transcript yet
-         # If run exists but no transcript, return empty structure
-         run = get_index().get_run(run_id)
-         if not run:
+    try:
+        transcript = get_index().get_transcript(run_id)
+        if not transcript:
+             if get_index().get_run(run_id):
+                 return { "run_id": run_id, "segments": [], "chapters": [] }
              raise HTTPException(status_code=404, detail="Run not found")
-         return { "run_id": run_id, "segments": [], "chapters": [] }
-    
-    return transcript
+        return transcript
+    except RuntimeError as e:
+        if "E_ARTIFACT_REGISTRY_MISSING" in str(e):
+             raise HTTPException(status_code=400, detail=str(e))
+        raise e
 
 @router.get("/{run_id}/search")
 def search_run(run_id: str, q: str = Query(..., min_length=2), limit: int = 50):

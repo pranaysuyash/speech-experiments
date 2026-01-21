@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from harness.registry import ModelRegistry
-from harness.run_provenance import create_provenance, create_run_context
+from harness.run_provenance import create_provenance
 from harness.runner_schema import (
-    RunnerArtifact, InputsSchema, QualityMetrics
+    RunnerArtifact, InputsSchema, QualityMetrics, create_run_context
 )
 from harness.media_ingest import ingest_media
 from harness.preprocess_ops import run_preprocessing_chain
@@ -91,6 +91,9 @@ def run_diarization(
     artifact_path = output_dir / artifact_name
     
     run_ctx = create_run_context(
+        task="diarization",
+        model_id=model_name,
+        grade="adhoc",
         device=device,
         model_version=model_name,
     )

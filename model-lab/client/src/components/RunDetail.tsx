@@ -1,13 +1,46 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { RunDetail as RunDetailType, ResultSummary } from '../lib/api';
 import { Loader2, ArrowLeft, Download } from 'lucide-react';
 // import { deriveProgressSignal, isStalled } from '../lib/runProgress'; // Removed client-side heuristics
-import { getFailureStep } from '../lib/failureDetection';
+import { deriveRunDetailViewModel } from '../lib/viewModel';
 
 interface RunDetailProps {
     onBack?: () => void;
+}
+
+import { DebugPanel } from './DebugPanel';
+
+// Helper for actionable error messages
+function getActionableError(step: string | null, msg: string | null): { title: string, action: string } | null {
+    if (!step && !msg) return null;
+
+    if (msg?.includes("E_ARTIFACT_REGISTRY_MISSING")) {
+        return {
+            title: "Artifact Registry Error (Schema v2)",
+            action: "Critical Data Gap: A required artifact is missing from the registry. This usually means a step failed to return the expected normalized output. Rerun the step or check the backend norms."
+        };
+    }
+
+    if (msg?.includes("Simulated failure")) {
+        return {
+            title: "Simulated Test Failure",
+            action: "This failure was injected for testing purposes. Reset the environment or check MODEL_LAB_FAIL_STEP."
+        };
+    }
+
+    if (step === "ingest") {
+        return {
+            title: "Ingest Failed",
+            action: "Check input file format and FFmpeg availability."
+        };
+    }
+
+    return {
+        title: `Step '${step}' Failed`,
+        action: "Review logs for stack trace. Attempt retry if transient."
+    };
 }
 
 // Pipeline definition: canonical order and labels (exported for helper functions)
@@ -27,6 +60,11 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     const [status, setStatus] = useState<any>(null); // TODO: strict typing
     const [detail, setDetail] = useState<RunDetailType | null>(null);
     const [result, setResult] = useState<ResultSummary | null>(null);
+
+    const vm = useMemo(() => {
+        if (!status) return null;
+        return deriveRunDetailViewModel(status);
+    }, [status]);
 
     // Guard: runId is required
     if (!runId) {
@@ -62,8 +100,8 @@ export default function RunDetail({ onBack }: RunDetailProps) {
 
     // Unified Actions Renderer
     const renderActions = (className = "flex items-center gap-2") => {
-        const isRunning = status.status === 'RUNNING' || status.status === 'QUEUED';
-        const isFailed = status.status === 'FAILED' || status.status === 'STALE' || status.status === 'CANCELLED';
+        const isRunning = vm ? (vm.overallStatus === 'RUNNING' || vm.overallStatus === 'QUEUED') : false;
+        const isFailed = vm ? (vm.overallStatus === 'FAILED' || vm.overallStatus === 'CANCELLED') : false;
         // Only show meeting pack if we have a result or useful artifacts
         // For partial failures, we might have artifacts.
         const showArtifacts = result || (isFailed && status.steps_completed?.length > 0);
@@ -286,7 +324,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     if (!status) return <div className="p-8 flex items-center gap-2"><Loader2 className="animate-spin" /> Loading run status...</div>;
 
     // 3. Queued / Running
-    if (status.status === 'QUEUED' || status.status === 'RUNNING') {
+    if (vm?.overallStatus === 'QUEUED' || vm?.overallStatus === 'RUNNING') {
         // Step descriptions (inline, not exported)
         const STEP_DESCRIPTIONS: Record<string, string> = {
             'ingest': 'Preparing audio file for processing',
@@ -299,20 +337,8 @@ export default function RunDetail({ onBack }: RunDetailProps) {
             'bundle': 'Packaging final outputs'
         };
 
-        // Normalize current step (handle aliases)
-        const normalizeStep = (s: string) => {
-            const lower = s.toLowerCase();
-            if (lower === 'transcription') return 'asr';
-            if (lower === 'vad') return 'ingest';
-            if (lower === 'metrics') return 'bundle';
-            return lower;
-        };
-
-        const currentNormalized = status.current_step ? normalizeStep(status.current_step) : null;
-        const completedNormalized = (status.steps_completed || []).map(normalizeStep);
-
-        // Find current step index for causal completion logic
-        const currentIndex = currentNormalized ? PIPELINE_STEPS.findIndex(s => s.key === currentNormalized) : -1;
+        const currentStepVM = vm.pipelineSteps.find(s => s.status === 'RUNNING') || vm.pipelineSteps.find(s => s.status === 'PENDING');
+        const currentNormalized = currentStepVM?.key || null;
 
         // Elapsed time since start
         let elapsed = '';
@@ -350,7 +376,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
         }
 
         // Find current step details for description
-        const currentStepInfo = PIPELINE_STEPS.find(s => s.key === currentNormalized);
+        const currentStepInfo = currentStepVM;
         const currentStepDesc = currentNormalized ? STEP_DESCRIPTIONS[currentNormalized] : null;
 
         return (
@@ -358,15 +384,22 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold">
-                        {status.status === 'QUEUED' ? 'Waiting in Queue' :
-                            status.is_stalled ? 'Run Stalled' : 'Processing Run'}
+                        {vm.overallStatus === 'QUEUED' ? 'Waiting in Queue' :
+                            vm.isStale ? 'Run Stalled' : 'Processing Run'}
                     </h2>
-                    {status.is_stalled ? (
+                    {vm.isStale ? (
                         <div className="px-3 py-1 bg-orange-100 text-orange-700 rounded text-sm font-semibold border border-orange-300">
-                            STALLED
+                            STALLED (No Heartbeat)
                         </div>
                     ) : (
-                        <Loader2 className="animate-spin text-blue-600" size={28} />
+                        <div className="flex flex-col items-end">
+                            <Loader2 className="animate-spin text-blue-600" size={28} />
+                            {vm.secondaryReason && (
+                                <div className="mt-2 text-xs font-medium text-orange-700 bg-orange-50 px-2 py-1 rounded border border-orange-200">
+                                    ⚠️ {vm.secondaryReason}
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
 
@@ -436,7 +469,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                                 <div>
                                     <span className="text-gray-500 text-xs block">Device</span>
                                     <span className="font-medium text-gray-800">
-                                        {resolved?.device?.toUpperCase() ||
+                                        {(vm.resolvedDevice || resolved?.device)?.toUpperCase() ||
                                             <span className="text-orange-600 text-xs">Pending</span>}
                                     </span>
                                 </div>
@@ -480,20 +513,22 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 <div className="bg-white border rounded-lg p-6 mb-6">
                     <h3 className="text-sm font-semibold text-gray-600 mb-3">Pipeline</h3>
                     <div className="space-y-2">
-                        {PIPELINE_STEPS.map((step, idx) => {
-                            // Step is completed if: explicitly in steps_completed OR before current_step
-                            const isCompleted = completedNormalized.includes(step.key)
-                                || (currentIndex >= 0 && idx < currentIndex);
-                            const isCurrent = currentNormalized === step.key;
-
+                        {vm.pipelineSteps.map((step) => {
                             let icon = '○';
                             let textClass = 'text-gray-400';
-                            if (isCompleted) {
+
+                            if (step.status === 'COMPLETED') {
                                 icon = '✓';
                                 textClass = 'text-green-600';
-                            } else if (isCurrent) {
+                            } else if (step.status === 'FAILED') {
+                                icon = '❌';
+                                textClass = 'text-red-600 font-semibold';
+                            } else if (step.status === 'RUNNING') {
                                 icon = '→';
                                 textClass = 'text-blue-600 font-semibold';
+                            } else if (step.status === 'NOT_RUN') {
+                                icon = '○';
+                                textClass = 'text-gray-300';
                             }
 
                             return (
@@ -615,14 +650,38 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     const isFailed = status.status === 'FAILED' || status.status === 'STALE' || status.status === 'CANCELLED';
 
     if (isFailed) {
-        // Determine which step failed using centralized helper
-        const { step: failedStep, isInferred, isUnknown } = getFailureStep(
-            status.failure_step,
-            status.steps_completed
-        );
+        // VM has already determined the failure state
+        const failedStepVM = vm.pipelineSteps.find(s => s.status === 'FAILED');
+        const failedStep = failedStepVM?.key;
+        const actionError = getActionableError(status.failed_step, status.error_message);
 
         return (
             <div className="p-8 max-w-3xl mx-auto mt-12">
+                {/* Mode B Error Surface */}
+                <div className="bg-red-900/10 border-l-4 border-red-500 p-4 mb-6 rounded-r shadow-sm">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h3 className="font-bold text-red-600">
+                                {actionError?.title || "Run Failed"}
+                            </h3>
+                            <p className="text-red-800 mt-1 font-mono text-sm leading-relaxed">
+                                {status.error_message || "Unknown error occurred"}
+                            </p>
+                            {actionError && (
+                                <div className="mt-3 bg-red-50 px-3 py-2 rounded text-sm text-red-700 flex items-center gap-2 border border-red-100">
+                                    <span>👉</span>
+                                    <span className="font-semibold">{actionError.action}</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="text-right">
+                            <span className="text-xs font-mono text-red-500 bg-red-100 px-2 py-1 rounded border border-red-200">
+                                Step: {status.failed_step || "N/A"}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Input Context Block */}
                 <div className="bg-gray-50 border rounded-lg p-4 mb-6">
                     <h3 className="text-xs font-semibold text-gray-600 mb-2">Input</h3>
@@ -674,7 +733,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 {renderStepFailures()}
 
                 {/* Error Message Coarse (always show for failed runs) */}
-                {(status.error_message || isUnknown) && (
+                {(vm.primaryReason || vm.secondaryReason) && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                         {status.error_code && (
                             <div className="text-sm font-semibold text-red-900 mb-1">
@@ -682,8 +741,13 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                             </div>
                         )}
                         <div className="text-sm text-red-700">
-                            {status.error_message || 'Run failed without detailed error message.'}
+                            {vm.primaryReason}
                         </div>
+                        {vm.secondaryReason && (
+                            <div className="text-sm text-red-600 mt-1 italic">
+                                {vm.secondaryReason}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -693,43 +757,41 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 <div className="bg-white border rounded-lg p-6 mb-4">
                     <h3 className="text-sm font-semibold text-gray-600 mb-3">Pipeline</h3>
                     <div className="space-y-2">
-                        {PIPELINE_STEPS.map((step) => {
-                            const isCompleted = (status.steps_completed || []).includes(step.key);
-                            const isFailed = step.key === failedStep;
+                        <div className="space-y-2">
+                            {vm.pipelineSteps.map((step) => {
+                                let icon = '○';
+                                let textClass = 'text-gray-400';
 
-                            let icon = '⚪';
-                            let textClass = 'text-gray-400';
-                            if (isCompleted) {
-                                icon = '✅';
-                                textClass = 'text-green-600';
-                            } else if (isFailed) {
-                                icon = '❌';
-                                textClass = 'text-red-600 font-semibold';
-                            }
+                                if (step.status === 'COMPLETED') {
+                                    icon = '✓';
+                                    textClass = 'text-green-600';
+                                } else if (step.status === 'FAILED') {
+                                    icon = '❌';
+                                    textClass = 'text-red-600 font-semibold';
+                                } else if (step.status === 'RUNNING') {
+                                    icon = '→';
+                                    textClass = 'text-blue-600 font-semibold';
+                                } else if (step.status === 'NOT_RUN') {
+                                    icon = '○';
+                                    textClass = 'text-gray-300';
+                                }
 
-                            return (
-                                <div key={step.key} className={`flex items-start gap-2 ${textClass}`}>
-                                    <span className="text-lg leading-none mt-0.5">{icon}</span>
-                                    <span className="text-sm">{step.label}</span>
-                                </div>
-                            );
-                        })}
+                                return (
+                                    <div key={step.key} className={`flex items-start gap-2 ${textClass}`}>
+                                        <span className="text-lg leading-none mt-0.5">{icon}</span>
+                                        <span className="text-sm">{step.label}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
-                {/* Disclaimer for inferred failures */}
-                {isInferred && (
-                    <div className="text-sm text-gray-600 italic mb-6">
-                        Failed step inferred from completed steps.
-                    </div>
-                )}
-
                 {/* Explicit unknown state */}
-                {isUnknown && (
-                    <div className="text-sm text-gray-600 italic mb-6">
-                        Failed (step unknown)
-                    </div>
-                )}
+                {/* 
+                  VM handles all states. No need for inference disclaimer.
+                  If UNKNOWN, it shows as gray circle.
+                */}
 
                 {/* Metadata */}
                 <div className="bg-gray-50 rounded-lg p-4 mb-6">
@@ -795,34 +857,53 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-sm border p-8 min-h-[50vh]">
                     {!detail ? (
                         <div className="flex items-center gap-2 text-gray-500">
-                            <Loader2 className="animate-spin" size={20} /> Loading transcript...
+                            <Loader2 className="animate-spin" size={20} />
+                            Loading transcript details...
                         </div>
                     ) : (
-                        <div className="space-y-6">
-                            {(detail.segments || []).length === 0 && (
-                                <div className="text-gray-400 text-center italic">No transcript segments found.</div>
-                            )}
-
-                            {detail.segments.map((seg, idx) => (
-                                <div key={idx} className="flex gap-4 group">
-                                    {/* Timestamp */}
-                                    <div className="w-16 flex-shrink-0 text-xs text-gray-400 font-mono mt-1 select-none">
-                                        {seg.start_s != null ? formatTime(seg.start_s) : '--:--'}
-                                    </div>
-
-                                    {/* Content */}
-                                    <div className="flex-1">
-                                        {seg.speaker && <div className="font-bold text-xs text-gray-600 mb-0.5">{seg.speaker}</div>}
-                                        <p className="text-gray-800 leading-relaxed text-lg">
-                                            {seg.text}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
+                        <div>
+                            {/* Transcript View - Rendered here */}
+                            {/* ... detail view ... */}
+                            <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700">
+                                {detail.text || "No text available."}
+                            </pre>
                         </div>
                     )}
                 </div>
+
+                <DebugPanel run={status} />
             </div>
         </div>
+    );
+}
+<Loader2 className="animate-spin" size={20} /> Loading transcript...
+                        </div >
+                    ) : (
+    <div className="space-y-6">
+        {(detail.segments || []).length === 0 && (
+            <div className="text-gray-400 text-center italic">No transcript segments found.</div>
+        )}
+
+        {detail.segments.map((seg, idx) => (
+            <div key={idx} className="flex gap-4 group">
+                {/* Timestamp */}
+                <div className="w-16 flex-shrink-0 text-xs text-gray-400 font-mono mt-1 select-none">
+                    {seg.start_s != null ? formatTime(seg.start_s) : '--:--'}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1">
+                    {seg.speaker && <div className="font-bold text-xs text-gray-600 mb-0.5">{seg.speaker}</div>}
+                    <p className="text-gray-800 leading-relaxed text-lg">
+                        {seg.text}
+                    </p>
+                </div>
+            </div>
+        ))}
+    </div>
+)}
+                </div >
+            </div >
+        </div >
     );
 }
