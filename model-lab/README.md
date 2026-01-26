@@ -46,6 +46,21 @@ source .venv/bin/activate
 jupyter lab
 ```
 
+## 🎬 **Quick demo** (1-command) ✅
+Start both the backend and frontend and tail logs (useful for a 60s recording/demo):
+
+```bash
+# Make executable (once)
+chmod +x scripts/start_demo.sh
+# Start demo (press Ctrl-C to stop and kill servers)
+./scripts/start_demo.sh
+```
+
+- Backend: http://127.0.0.1:8000 (health: `/health`)
+- Frontend: http://localhost:5173/
+
+Use this script when recording the short video demo — it boots both servers and tails logs for a clean recording workflow.
+
 ## 🚢 **How We Ship**
 
 | When | What | Command |
