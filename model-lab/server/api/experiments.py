@@ -114,11 +114,9 @@ def _load_experiment(experiment_id: str) -> Optional[Dict[str, Any]]:
 async def create_experiment(
     file: UploadFile = File(...),
     use_case_id: str = Form(...),
-    candidate_ids: str = Form(...),  # comma-separated
+    candidate_ids: Optional[str] = Form(None),  # comma-separated, optional
+    config: Optional[str] = Form(None),  # JSON config overrides
 ) -> JSONResponse:
-    
-    # DEBUG: Force print
-    print(f"DEBUG: START create_experiment candidate_ids='{candidate_ids}'")
     
     # Parse candidate_ids if provided
     parsed_candidate_ids = None

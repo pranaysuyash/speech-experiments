@@ -59,7 +59,17 @@ chmod +x scripts/start_demo.sh
 - Backend: http://127.0.0.1:8000 (health: `/health`)
 - Frontend: http://localhost:5173/
 
-Use this script when recording the short video demo — it boots both servers and tails logs for a clean recording workflow.
+<p align="left">
+  <a href="./scripts/start_demo.sh">
+    <img alt="Demo badge" src="/assets/demo-badge.svg" width="320" />
+  </a>
+  &nbsp;
+  <a href="./scripts/start_demo.sh">
+    <img alt="Run demo" src="/assets/usage-badge.svg" width="140" />
+  </a>
+</p>
+
+Use this script when recording the short video demo — it boots both servers and tails logs for a clean recording workflow. The animated badge above is small and safe to embed in the README for visibility; you can also link to the demo script in social posts so folks can reproduce your demo in one command.
 
 ## 🚢 **How We Ship**
 
