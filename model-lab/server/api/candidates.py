@@ -68,6 +68,24 @@ USE_CASES: Dict[str, UseCase] = {
         description="Speaker identification accuracy evaluation",
         supported_steps_presets=["full"],
     ),
+    "asr_model_comparison": UseCase(
+        use_case_id="asr_model_comparison",
+        title="ASR Model Comparison",
+        description="Compare different ASR models (Whisper vs Faster-Whisper) on the same input",
+        supported_steps_presets=["fast_asr_only"],
+    ),
+    "tts_quality": UseCase(
+        use_case_id="tts_quality",
+        title="TTS Quality Test",
+        description="Test text-to-speech generation quality with LFM2.5-Audio",
+        supported_steps_presets=["ingest"],
+    ),
+    "latency_test": UseCase(
+        use_case_id="latency_test",
+        title="Real-time Latency Test",
+        description="Measure RTF and latency for voice assistant use cases",
+        supported_steps_presets=["fast_asr_only"],
+    ),
 }
 
 CANDIDATES: Dict[str, Candidate] = {
@@ -123,6 +141,63 @@ CANDIDATES: Dict[str, Candidate] = {
         params={},
         expected_artifacts=["bundle/diarization.json"],
         description="Speaker diarization with default model",
+    ),
+    # ASR Model Comparison candidates
+    "asr_whisper_base": Candidate(
+        candidate_id="asr_whisper_base",
+        label="Whisper (base)",
+        use_case_id="asr_model_comparison",
+        steps_preset="fast_asr_only",
+        params={"asr": {"engine": "whisper", "model_size": "base", "language": "en"}},
+        expected_artifacts=["artifacts/asr.json"],
+        description="OpenAI Whisper base model",
+    ),
+    "asr_faster_whisper_base": Candidate(
+        candidate_id="asr_faster_whisper_base",
+        label="Faster-Whisper (base)",
+        use_case_id="asr_model_comparison",
+        steps_preset="fast_asr_only",
+        params={"asr": {"engine": "faster_whisper", "model_size": "base", "language": "en"}},
+        expected_artifacts=["artifacts/asr.json"],
+        description="CTranslate2 optimized Whisper",
+    ),
+    "asr_whisper_large": Candidate(
+        candidate_id="asr_whisper_large",
+        label="Whisper (large-v3)",
+        use_case_id="asr_model_comparison",
+        steps_preset="fast_asr_only",
+        params={"asr": {"engine": "whisper", "model_size": "large-v3", "language": "en"}},
+        expected_artifacts=["artifacts/asr.json"],
+        description="OpenAI Whisper large-v3 model (most accurate)",
+    ),
+    # TTS Quality candidates
+    "tts_lfm_default": Candidate(
+        candidate_id="tts_lfm_default",
+        label="LFM2.5-Audio TTS",
+        use_case_id="tts_quality",
+        steps_preset="ingest",
+        params={"tts": {"engine": "lfm2_5_audio"}},
+        expected_artifacts=["artifacts/tts_output.wav"],
+        description="LiquidAI LFM2.5 text-to-speech",
+    ),
+    # Latency Test candidates
+    "latency_whisper_tiny": Candidate(
+        candidate_id="latency_whisper_tiny",
+        label="Whisper (tiny) - Fastest",
+        use_case_id="latency_test",
+        steps_preset="fast_asr_only",
+        params={"asr": {"engine": "whisper", "model_size": "tiny", "language": "en"}},
+        expected_artifacts=["artifacts/asr.json"],
+        description="Fastest model for latency testing",
+    ),
+    "latency_faster_whisper_tiny": Candidate(
+        candidate_id="latency_faster_whisper_tiny",
+        label="Faster-Whisper (tiny) - Optimized",
+        use_case_id="latency_test",
+        steps_preset="fast_asr_only",
+        params={"asr": {"engine": "faster_whisper", "model_size": "tiny", "language": "en"}},
+        expected_artifacts=["artifacts/asr.json"],
+        description="CTranslate2 optimized for minimum latency",
     ),
 }
 

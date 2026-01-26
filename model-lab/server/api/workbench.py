@@ -45,11 +45,26 @@ PRESETS = {
         "description": "Fast preprocessing: normalize audio and create bundle structure",
         "steps": ["ingest"]
     },
+    "fast_asr_only": {
+        "label": "Fast ASR",
+        "description": "Quick transcription without diarization or summarization",
+        "steps": ["ingest", "asr"]
+    },
+    "asr_with_diarization": {
+        "label": "ASR + Diarization",
+        "description": "Transcription with speaker identification",
+        "steps": ["ingest", "asr", "diarization", "alignment"]
+    },
+    "diarization_focus": {
+        "label": "Diarization Focus",
+        "description": "Speaker analysis without LLM-based summarization",
+        "steps": ["ingest", "asr", "diarization", "alignment"]
+    },
     "full": {
         "label": "Full Pipeline",
-        "description": "Complete pipeline: ASR, diarization, alignment, and summary generation",
+        "description": "Complete pipeline with transcription, diarization, summarization and action items",
         "steps": None  # None means all steps
-    }
+    },
 }
 
 
@@ -67,6 +82,21 @@ def get_presets() -> list[dict]:
             "description": meta.get("description")
         }
         for key, meta in PRESETS.items()
+    ]
+
+
+@router.get("/steps")
+def get_available_steps() -> list[dict]:
+    """Return available pipeline steps with descriptions."""
+    return [
+        {"name": "ingest", "deps": [], "description": "Audio normalization and preprocessing"},
+        {"name": "asr", "deps": ["ingest"], "description": "Speech-to-text transcription"},
+        {"name": "diarization", "deps": ["ingest"], "description": "Speaker identification"},
+        {"name": "alignment", "deps": ["asr", "diarization"], "description": "Merge ASR with speaker labels"},
+        {"name": "chapters", "deps": ["alignment"], "description": "Topic segmentation"},
+        {"name": "summarize_by_speaker", "deps": ["alignment"], "description": "Per-speaker summary (LLM)"},
+        {"name": "action_items_assignee", "deps": ["alignment"], "description": "Extract action items (LLM)"},
+        {"name": "bundle", "deps": ["all"], "description": "Package as Meeting Pack"},
     ]
 
 

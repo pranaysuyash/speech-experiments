@@ -101,7 +101,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     // Unified Actions Renderer
     const renderActions = (className = "flex items-center gap-2") => {
         const isRunning = vm ? (vm.overallStatus === 'RUNNING' || vm.overallStatus === 'QUEUED') : false;
-        const isFailed = vm ? (vm.overallStatus === 'FAILED' || vm.overallStatus === 'CANCELLED') : false;
+        const isFailed = vm ? (vm.overallStatus === 'FAILED') : false;
         // Only show meeting pack if we have a result or useful artifacts
         // For partial failures, we might have artifacts.
         const showArtifacts = result || (isFailed && status.steps_completed?.length > 0);
@@ -198,12 +198,6 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     }, [runId]);
 
     // Format Helpers
-    const formatTime = (s: number) => {
-        const mins = Math.floor(s / 60);
-        const secs = Math.floor(s % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
     const formatDuration = (seconds: number) => {
         const m = Math.floor(seconds / 60);
         const s = Math.floor(seconds % 60);
@@ -649,10 +643,10 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     // 4. Failed (check for partial results but still show failure UI)
     const isFailed = status.status === 'FAILED' || status.status === 'STALE' || status.status === 'CANCELLED';
 
-    if (isFailed) {
+    if (isFailed && vm) {
         // VM has already determined the failure state
-        const failedStepVM = vm.pipelineSteps.find(s => s.status === 'FAILED');
-        const failedStep = failedStepVM?.key;
+        // Note: failedStepVM computed but may be used for future enhancements
+        void vm.pipelineSteps.find(s => s.status === 'FAILED');
         const actionError = getActionableError(status.failed_step, status.error_message);
 
         return (
@@ -733,7 +727,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 {renderStepFailures()}
 
                 {/* Error Message Coarse (always show for failed runs) */}
-                {(vm.primaryReason || vm.secondaryReason) && (
+                {vm && (vm.primaryReason || vm.secondaryReason) && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                         {status.error_code && (
                             <div className="text-sm font-semibold text-red-900 mb-1">
@@ -754,6 +748,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
 
 
                 {/* Pipeline visualization with failed step */}
+                {vm && (
                 <div className="bg-white border rounded-lg p-6 mb-4">
                     <h3 className="text-sm font-semibold text-gray-600 mb-3">Pipeline</h3>
                     <div className="space-y-2">
@@ -786,6 +781,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         </div>
                     </div>
                 </div>
+                )}
 
                 {/* Explicit unknown state */}
                 {/* 
@@ -861,12 +857,23 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                             Loading transcript details...
                         </div>
                     ) : (
-                        <div>
+                        <div className="space-y-4">
                             {/* Transcript View - Rendered here */}
-                            {/* ... detail view ... */}
-                            <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700">
-                                {detail.text || "No text available."}
-                            </pre>
+                            {(detail.segments || []).length === 0 ? (
+                                <div className="text-gray-400 text-center italic">No transcript segments found.</div>
+                            ) : (
+                                detail.segments.map((seg, idx) => (
+                                    <div key={idx} className="flex gap-4">
+                                        <div className="w-16 flex-shrink-0 text-xs text-gray-400 font-mono mt-1">
+                                            {seg.start_s != null ? `${Math.floor(seg.start_s / 60)}:${String(Math.floor(seg.start_s % 60)).padStart(2, '0')}` : '--:--'}
+                                        </div>
+                                        <div className="flex-1">
+                                            {seg.speaker && <div className="font-bold text-xs text-gray-600 mb-0.5">{seg.speaker}</div>}
+                                            <p className="text-gray-800 leading-relaxed">{seg.text}</p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     )}
                 </div>
@@ -874,36 +881,5 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 <DebugPanel run={status} />
             </div>
         </div>
-    );
-}
-<Loader2 className="animate-spin" size={20} /> Loading transcript...
-                        </div >
-                    ) : (
-    <div className="space-y-6">
-        {(detail.segments || []).length === 0 && (
-            <div className="text-gray-400 text-center italic">No transcript segments found.</div>
-        )}
-
-        {detail.segments.map((seg, idx) => (
-            <div key={idx} className="flex gap-4 group">
-                {/* Timestamp */}
-                <div className="w-16 flex-shrink-0 text-xs text-gray-400 font-mono mt-1 select-none">
-                    {seg.start_s != null ? formatTime(seg.start_s) : '--:--'}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1">
-                    {seg.speaker && <div className="font-bold text-xs text-gray-600 mb-0.5">{seg.speaker}</div>}
-                    <p className="text-gray-800 leading-relaxed text-lg">
-                        {seg.text}
-                    </p>
-                </div>
-            </div>
-        ))}
-    </div>
-)}
-                </div >
-            </div >
-        </div >
     );
 }

@@ -19,6 +19,20 @@ interface UseCase {
   title: string;
 }
 
+interface Preset {
+  steps_preset: string;
+  label: string;
+  description?: string;
+}
+
+interface ModelConfig {
+  asr: {
+    model_size: string;
+    language: string;
+  };
+  device_preference: string[];
+}
+
 export default function WorkbenchPage() {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
@@ -30,6 +44,15 @@ export default function WorkbenchPage() {
   const [candidateIdA, setCandidateIdA] = useState('');    // Compare
   const [candidateIdB, setCandidateIdB] = useState('');    // Compare
 
+  // Model configuration
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [selectedPreset, setSelectedPreset] = useState('full');
+  const [modelConfig, setModelConfig] = useState<ModelConfig>({
+    asr: { model_size: 'base', language: 'en' },
+    device_preference: ['mps', 'cpu']
+  });
+
   // Data
   const [useCases, setUseCases] = useState<UseCase[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -39,13 +62,18 @@ export default function WorkbenchPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. Initial Load: Use Cases
+  // 1. Initial Load: Use Cases + Presets
   useEffect(() => {
     (async () => {
       try {
-        const ucs = await api.getUseCases();
+        const [ucs, prsts] = await Promise.all([
+          api.getUseCases(),
+          api.getPresets()
+        ]);
         setUseCases(ucs);
+        setPresets(prsts);
         if (ucs.length > 0) setUseCaseId(ucs[0].use_case_id);
+        if (prsts.length > 0) setSelectedPreset(prsts.find(p => p.steps_preset === 'full')?.steps_preset || prsts[0].steps_preset);
       } catch (e) {
         setError("Failed to load use cases");
       } finally {
@@ -100,7 +128,14 @@ export default function WorkbenchPage() {
 
       // 1. Create Experiment (The container for everything)
       // Note: backend expects candidate_ids mainly for snapshotting
-      const exp = await api.createExperiment(file, useCaseId, candsToRun);
+      // Pass config overrides when advanced options are enabled
+      const configOverrides = showAdvanced ? {
+        asr: modelConfig.asr,
+        device_preference: modelConfig.device_preference,
+        steps_preset: selectedPreset,
+      } : undefined;
+      
+      const exp = await api.createExperiment(file, useCaseId, candsToRun, configOverrides);
       const expId = exp.experiment_id;
 
       if (mode === 'single') {
@@ -248,6 +283,105 @@ export default function WorkbenchPage() {
                   ))}
                 </select>
               </label>
+            </div>
+          )}
+        </div>
+
+        {/* Row 4: Advanced Configuration */}
+        <div className="border-t pt-4">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {showAdvanced ? '▼ Hide Advanced Options' : '▶ Show Advanced Options'}
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-4 space-y-4 p-4 bg-gray-50 rounded-lg">
+              {/* Pipeline Preset */}
+              <label className="block">
+                <span className="block font-semibold mb-1 text-sm">Pipeline Preset</span>
+                <select
+                  value={selectedPreset}
+                  onChange={(e) => setSelectedPreset(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full border p-2 rounded text-sm"
+                >
+                  {presets.map(p => (
+                    <option key={p.steps_preset} value={p.steps_preset}>
+                      {p.label} - {p.description}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {/* Model Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <label className="block">
+                  <span className="block font-semibold mb-1 text-sm">Model Size</span>
+                  <select
+                    value={modelConfig.asr.model_size}
+                    onChange={(e) => setModelConfig({
+                      ...modelConfig,
+                      asr: { ...modelConfig.asr, model_size: e.target.value }
+                    })}
+                    disabled={isSubmitting}
+                    className="w-full border p-2 rounded text-sm"
+                  >
+                    <option value="tiny">Tiny (fastest)</option>
+                    <option value="base">Base</option>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large-v3">Large-v3 (most accurate)</option>
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="block font-semibold mb-1 text-sm">Language</span>
+                  <select
+                    value={modelConfig.asr.language}
+                    onChange={(e) => setModelConfig({
+                      ...modelConfig,
+                      asr: { ...modelConfig.asr, language: e.target.value }
+                    })}
+                    disabled={isSubmitting}
+                    className="w-full border p-2 rounded text-sm"
+                  >
+                    <option value="en">English</option>
+                    <option value="auto">Auto-detect</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="zh">Chinese</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="hi">Hindi</option>
+                    <option value="pt">Portuguese</option>
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="block font-semibold mb-1 text-sm">Device</span>
+                  <select
+                    value={modelConfig.device_preference[0]}
+                    onChange={(e) => setModelConfig({
+                      ...modelConfig,
+                      device_preference: [e.target.value, 'cpu']
+                    })}
+                    disabled={isSubmitting}
+                    className="w-full border p-2 rounded text-sm"
+                  >
+                    <option value="mps">Apple Silicon (MPS)</option>
+                    <option value="cuda">NVIDIA GPU (CUDA)</option>
+                    <option value="cpu">CPU</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="text-xs text-gray-500 mt-2">
+                These settings override the candidate defaults. Model size affects accuracy vs speed tradeoff.
+              </div>
             </div>
           )}
         </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { deriveStatusFingerprint, computeFingerprintHash, HelperStatusPayload } from '../lib/statusFingerprint';
+import { deriveStatusFingerprint, computeFingerprintHash } from '../lib/statusFingerprint';
+import type { HelperStatusPayload } from '../lib/statusFingerprint';
 
 interface DebugPanelProps {
     run: any; // Using any for flexibility with raw API payloads

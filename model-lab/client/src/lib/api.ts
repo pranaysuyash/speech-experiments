@@ -203,12 +203,15 @@ export const api = {
     `${API_BASE}/runs/${runId}/meeting-pack/artifacts/${encodeURIComponent(name)}/preview?max_bytes=${maxBytes}`,
 
   // Experiments
-  createExperiment: async (file: File, use_case_id: string, candidate_ids?: string[]): Promise<any> => {
+  createExperiment: async (file: File, use_case_id: string, candidate_ids?: string[], config?: Record<string, unknown>): Promise<any> => {
     const form = new FormData();
     form.append('file', file);
     form.append('use_case_id', use_case_id);
     if (candidate_ids && candidate_ids.length >= 1) {
       form.append('candidate_ids', candidate_ids.join(','));
+    }
+    if (config) {
+      form.append('config', JSON.stringify(config));
     }
     const res = await axios.post(`${API_BASE}/experiments`, form);
     return res.data;

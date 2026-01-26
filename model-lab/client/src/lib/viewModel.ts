@@ -53,6 +53,7 @@ export interface ApiRunStatus {
     heartbeat_age_s?: number; // Depending on what the API actually returns, often calculated client side or present
     // Helper to accept the raw status object we saw in RunDetail
     is_stalled?: boolean;
+    current_step?: string | null;
 }
 
 // Helper to normalize step names to pipeline keys
