@@ -123,25 +123,47 @@ class RunsIndex:
             
             target_file = None
             if asr_path:
-                target_file = run_dir / asr_path
+                candidate_path = Path(asr_path)
+                target_file = candidate_path if candidate_path.is_absolute() else run_dir / asr_path
             elif schema_version < 2:
                 # Only probe filesystem in v1
                 fallback = run_dir / "artifacts/asr.json"
                 if fallback.exists():
                     target_file = fallback
             
-            if target_file and target_file.exists():
+            bundle_transcript = run_dir / "bundle" / "transcript.json"
+            if bundle_transcript.exists():
+                raw_bundle = json.loads(bundle_transcript.read_text())
+                bundle_segments = raw_bundle.get("segments", [])
+                if isinstance(bundle_segments, list) and bundle_segments:
+                    for i, seg in enumerate(bundle_segments):
+                        start = seg.get("start_s") if seg.get("start_s") is not None else seg.get("start")
+                        end = seg.get("end_s") if seg.get("end_s") is not None else seg.get("end")
+                        text = seg.get("text", "").strip()
+                        speaker = seg.get("speaker")
+                        segments.append({
+                            "id": f"bundle_seg_{i}",
+                            "start_s": start,
+                            "end_s": end,
+                            "text": text,
+                            "speaker": speaker
+                        })
+            elif target_file and target_file.exists():
                 raw_asr = json.loads(target_file.read_text())
-                if "segments" in raw_asr:
-                    # Normalize
-                    for i, seg in enumerate(raw_asr["segments"]):
+                segment_list = raw_asr.get("segments")
+                if not segment_list:
+                    segment_list = (raw_asr.get("output") or {}).get("segments")
+                if not segment_list:
+                    segment_list = (raw_asr.get("result") or {}).get("segments")
+
+                if isinstance(segment_list, list):
+                    for i, seg in enumerate(segment_list):
                         start = seg.get("start")
                         end = seg.get("end")
                         text = seg.get("text", "").strip()
                         speaker = seg.get("speaker")
-                        seg_id = f"seg_{i}" 
                         segments.append({
-                            "id": seg_id,
+                            "id": f"seg_{i}",
                             "start_s": start,
                             "end_s": end,
                             "text": text,

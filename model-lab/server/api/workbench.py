@@ -96,7 +96,7 @@ def get_available_steps() -> list[dict]:
         {"name": "chapters", "deps": ["alignment"], "description": "Topic segmentation"},
         {"name": "summarize_by_speaker", "deps": ["alignment"], "description": "Per-speaker summary (LLM)"},
         {"name": "action_items_assignee", "deps": ["alignment"], "description": "Extract action items (LLM)"},
-        {"name": "bundle", "deps": ["all"], "description": "Package as Meeting Pack"},
+        {"name": "bundle", "deps": ["ingest", "asr", "diarization", "alignment", "chapters", "summarize_by_speaker", "action_items_assignee"], "description": "Package as Meeting Pack"},
     ]
 
 

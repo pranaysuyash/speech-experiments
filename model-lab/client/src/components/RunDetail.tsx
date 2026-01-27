@@ -155,6 +155,24 @@ export default function RunDetail({ onBack }: RunDetailProps) {
     useEffect(() => {
         if (!runId) return;
         let pollTimer: ReturnType<typeof setInterval>;
+        let isActive = true;
+
+        const loadTranscript = () => {
+            api.getTranscript(runId)
+                .then(data => {
+                    if (!isActive) return;
+                    setDetail(data);
+                })
+                .catch(err => {
+                    console.error("Failed to load transcript", err);
+                    if (!isActive) return;
+                    setDetail({
+                        run_id: runId,
+                        segments: [],
+                        chapters: []
+                    });
+                });
+        };
 
         const checkStatus = async () => {
             try {
@@ -170,18 +188,8 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         const res = await api.getRunResults(runId);
                         setResult(res);
 
-                        // Use manifest-derived artifact list to decide if we should load transcript
-                        const hasTranscriptArtifact = s.steps?.some((st: any) =>
-                            st.artifacts?.some((a: any) => a.role === 'transcript')
-                        ) ?? false;
-
-                        // Only load detail once
-                        if (hasTranscriptArtifact) {
-                            // Don't await here to avoid blocking status update
-                            api.getTranscript(runId)
-                                .then(data => setDetail(data))
-                                .catch(err => console.error("Failed to load transcript", err));
-                        }
+                        // Trigger transcript load regardless of artifact list (backend will return empty if none)
+                        loadTranscript();
                     } catch (err) {
                         console.error("Failed to load results", err);
                     }
@@ -194,7 +202,10 @@ export default function RunDetail({ onBack }: RunDetailProps) {
         checkStatus();
         pollTimer = setInterval(checkStatus, 2000);
 
-        return () => clearInterval(pollTimer);
+        return () => {
+            isActive = false;
+            if (pollTimer) clearInterval(pollTimer);
+        };
     }, [runId]);
 
     // Format Helpers

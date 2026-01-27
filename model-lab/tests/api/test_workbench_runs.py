@@ -16,19 +16,31 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
     # Patch SessionRunner.run to avoid real processing while preserving the contract:
     # create run dir + RUNNING manifest, then block briefly so worker remains busy.
     import harness.session
+    import server.services.lifecycle as lifecycle
+    import server.api.workbench as workbench
 
-    real_run = harness.session.SessionRunner.run
-
-    def fake_run(self):
-        self._init_dirs()
-        m = self._default_manifest()
-        m["status"] = "RUNNING"
-        m["started_at"] = "now"
-        m["updated_at"] = "now"
-        self._save_manifest(m)
-        return m
-
-    monkeypatch.setattr(harness.session.SessionRunner, "run", fake_run)
+    # Reset worker count to ensure test starts fresh
+    lifecycle._ACTIVE_RUNS_COUNT = 0
+    
+    # Mock launch_run_worker to avoid subprocess spawning
+    def mock_launch(runner, run_request_data, background=True):
+        runner.session_dir.mkdir(parents=True, exist_ok=True)
+        runner.manifest_path.write_text(json.dumps({
+            "run_id": runner.run_id,
+            "status": "RUNNING",
+            "started_at": "now",
+            "updated_at": "now",
+        }))
+        # Write run_request.json like the real function does
+        request_path = runner.session_dir / "run_request.json"
+        run_request_data["run_id"] = runner.run_id
+        run_request_data["input_path"] = str(runner.input_path)
+        request_path.write_text(json.dumps(run_request_data, indent=2))
+        # Release worker since we're not actually launching a subprocess
+        lifecycle.release_worker()
+        return {"worker_pid": 12345}
+    
+    monkeypatch.setattr(workbench, "launch_run_worker", mock_launch)
 
     from fastapi.testclient import TestClient
     import server.main
@@ -56,9 +68,6 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
     assert manifest_path.exists()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["status"] == "RUNNING"
-
-    # Restore
-    monkeypatch.setattr(harness.session.SessionRunner, "run", real_run)
 
 
 def test_create_workbench_run_busy_returns_409(monkeypatch, tmp_path):

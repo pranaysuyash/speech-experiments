@@ -45,6 +45,38 @@ def refresh_runs():
     """Force a refresh of the runs index."""
     return get_index().refresh()
 
+def _derive_status_config(manifest: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a status-friendly config payload populated from manifest + step metadata."""
+    config_source = manifest.get("config") or {}
+    config: Dict[str, Any] = dict(config_source)
+    steps = manifest.get("steps", {}) or {}
+
+    asr_step = steps.get("asr", {}) or {}
+    resolved_asr = asr_step.get("resolved_config") or {}
+    asr_config = dict(config.get("asr") or {})
+
+    if resolved_asr:
+        if resolved_asr.get("model_id"):
+            asr_config.setdefault("model_id", resolved_asr["model_id"])
+        if resolved_asr.get("model_name"):
+            asr_config.setdefault("model_name", resolved_asr["model_name"])
+        elif resolved_asr.get("model_id"):
+            asr_config.setdefault("model_name", resolved_asr["model_id"])
+
+        for field in ("source", "device", "language"):
+            if resolved_asr.get(field):
+                asr_config[field] = resolved_asr[field]
+
+    config["asr"] = asr_config
+
+    diarization_config = dict(config.get("diarization") or {})
+    if diarization_config.get("enabled") is None:
+        diarization_config["enabled"] = "diarization" in steps
+    config["diarization"] = diarization_config
+
+    return config
+
+
 @router.get("/{run_id}/status")
 def get_run_status(run_id: str):
     """Get lightweight status for a run with stale detection."""
@@ -124,6 +156,8 @@ def get_run_status(run_id: str):
         # Fallback to index
         steps_completed = run.get("steps_completed", [])
 
+    status_config = _derive_status_config(manifest)
+
     return {
         "run_id": run_id,
         "status": status,
@@ -132,6 +166,7 @@ def get_run_status(run_id: str):
         "failure_step": manifest.get("failure_step"),
         "error_message": manifest.get("error", {}).get("message"),
         "input_metadata": manifest.get("input_metadata", {}),
+        "config": status_config,
         "artifacts": manifest.get("artifacts_by_type", {}), # Use new global index
         "resolved_device": run.get("config", {}).get("resolved_device"), # From index
         "meta": {
