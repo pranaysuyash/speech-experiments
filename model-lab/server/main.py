@@ -4,7 +4,7 @@ import uvicorn
 import logging
 import logging.config
 
-from server.api import runs, results, workbench, experiments, candidates, lifecycle
+from server.api import runs, results, workbench, experiments, candidates, lifecycle, pipelines
 
 # Logging configuration - balance visibility with noise reduction
 LOGGING_CONFIG = {
@@ -65,6 +65,7 @@ app.include_router(workbench.router)
 app.include_router(experiments.router)
 app.include_router(candidates.router)
 app.include_router(lifecycle.router)
+app.include_router(pipelines.router)
 
 @app.get("/health")
 def health_check():

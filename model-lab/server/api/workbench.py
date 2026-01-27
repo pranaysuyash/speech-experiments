@@ -12,6 +12,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from harness.session import SessionRunner
+from server.api.pipelines import build_pipeline_config
 from server.services.lifecycle import (
     try_acquire_worker,
     release_worker,
@@ -36,6 +37,13 @@ def _safe_filename(name: str) -> str:
         return "upload"
     name = name.replace("\\", "_").replace("/", "_")
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in name)[:120] or "upload"
+
+
+def _parse_csv(value: Optional[str]) -> list[str]:
+    """Parse a comma-separated string into a list of non-empty, stripped items."""
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 # Preset registry - source of truth for available step presets
@@ -221,6 +229,9 @@ async def create_workbench_run(
     use_case_id: str = Form(...),
     steps_preset: str = Form("full"),
     config: Optional[str] = Form(None),
+    steps: Optional[str] = Form(None),
+    preprocessing: Optional[str] = Form(None),
+    pipeline_template: Optional[str] = Form(None),
 ) -> JSONResponse:
     """
     Create a run from the UI (multipart upload) and start processing asynchronously.
@@ -230,6 +241,13 @@ async def create_workbench_run(
     - Single-worker guardrail: returns 409 RUNNER_BUSY if a run is already active.
     - Writes run_request.json at run root for reproducibility.
     - Accepts optional 'config' JSON string (e.g. {"device_preference": ["mps", "cpu"]}).
+    
+    Dynamic Pipeline Selection:
+    - steps: Comma-separated list of steps (e.g., "ingest,asr,diarization")
+    - preprocessing: Comma-separated preprocessing ops (e.g., "trim_silence,normalize_loudness")
+    - pipeline_template: Name of a built-in template (overrides steps_preset)
+    
+    Priority: steps > pipeline_template > steps_preset
     """
     if not try_acquire_worker():
         return JSONResponse(status_code=409, content={"error_code": "RUNNER_BUSY"})
@@ -248,7 +266,7 @@ async def create_workbench_run(
         if steps_preset not in PRESETS:
             raise HTTPException(status_code=400, detail=f"Invalid steps_preset. Available: {list(PRESETS.keys())}")
         
-        steps = PRESETS[steps_preset]["steps"]
+        preset_steps = PRESETS[steps_preset]["steps"]
         
         # Parse config overrides
         config_overrides = {}
@@ -257,9 +275,31 @@ async def create_workbench_run(
                 config_overrides = json.loads(config)
             except json.JSONDecodeError:
                 raise HTTPException(status_code=400, detail="Invalid config JSON")
+        
+        # Dynamic pipeline selection: steps > pipeline_template > steps_preset
+        custom_steps = _parse_csv(steps)
+        preprocessing_ops = _parse_csv(preprocessing)
+        pipeline_template_name = pipeline_template.strip() if pipeline_template else None
 
-        runner = SessionRunner(dest, _runs_root(), steps=steps, config=config_overrides)
+        resolved_steps = preset_steps
+        pipeline_config_payload = None
 
+        if custom_steps or pipeline_template_name or preprocessing_ops:
+            try:
+                pipeline_cfg = build_pipeline_config(
+                    template=pipeline_template_name,
+                    steps=custom_steps or None,
+                    preprocessing=preprocessing_ops or None,
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            resolved_steps = pipeline_cfg.resolve_dependencies()
+            pipeline_config_payload = pipeline_cfg.to_dict()
+
+        steps_for_runner = resolved_steps
+
+        runner = SessionRunner(dest, _runs_root(), steps=steps_for_runner, config=config_overrides)
         # Construct run_request data
         run_request_data = {
             "schema_version": "1",
@@ -267,16 +307,25 @@ async def create_workbench_run(
             "source": "workbench",
             "use_case_id": use_case_id,
             "steps_preset": steps_preset,
-            "steps_requested": steps,
+            "steps_requested": steps_for_runner,
             "filename_original": file.filename or "unknown",
             "content_type": file.content_type,
             "bytes_uploaded": bytes_uploaded,
             "sha256": sha256_hex,
             "config": config_overrides,
         }
+
+        # Attach dynamic pipeline details for reproducibility
+        if pipeline_config_payload is not None:
+            run_request_data["pipeline_template"] = pipeline_template_name
+            run_request_data["steps_custom"] = custom_steps or None
+            run_request_data["preprocessing"] = preprocessing_ops or None
+            run_request_data["pipeline_config"] = pipeline_config_payload
         
         # Launch worker
         launch_run_worker(runner, run_request_data, background=True)
+
+
 
         # Write UI metadata without mutating the run manifest (multi-agent safe).
         try:
