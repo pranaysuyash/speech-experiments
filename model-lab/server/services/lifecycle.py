@@ -78,12 +78,27 @@ def launch_run_worker(
     manifest_path = runner.manifest_path
     if not manifest_path.exists():
         initial_manifest = {
+            "schema_version": run_request_data.get("schema_version", "1"),
             "run_id": runner.run_id,
             "status": "RUNNING",
+            "requested_at": run_request_data.get("requested_at"),
             "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "source": run_request_data.get("source"),
+            "use_case_id": run_request_data.get("use_case_id"),
+            "pipeline": {
+                "steps_preset": run_request_data.get("steps_preset"),
+                "steps_requested": run_request_data.get("steps_requested", []),
+                "steps_custom": run_request_data.get("steps_custom"),
+                "pipeline_template": run_request_data.get("pipeline_template"),
+                "preprocessing": run_request_data.get("preprocessing"),
+                "pipeline_config": run_request_data.get("pipeline_config"),
+                "config_overrides": run_request_data.get("config"),
+            },
             "input_metadata": {
                 "filename": run_request_data.get("filename_original", "upload"),
                 "size_bytes": run_request_data.get("bytes_uploaded"),
+                "content_type": run_request_data.get("content_type"),
+                "sha256": run_request_data.get("sha256"),
             },
             "steps_completed": [],
             "steps": {},
