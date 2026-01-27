@@ -321,11 +321,84 @@ class Resample(Operator):
         return resampled.astype(np.float32), target_sr, metrics
 
 
+class NormalizeVolume(Operator):
+    """Peak normalization to target dBFS."""
+    name = "normalize_volume"
+
+    def process(self, audio: np.ndarray, sr: int, target_dbfs: float = -1.0, **kwargs):
+        peak = float(np.max(np.abs(audio))) + 1e-12
+        target_linear = 10 ** (target_dbfs / 20)
+        gain = target_linear / peak
+        out = (audio * gain).astype(np.float32)
+        metrics = {
+            "peak_before_db": round(20 * np.log10(peak), 1),
+            "peak_after_db": round(20 * np.log10(float(np.max(np.abs(out))) + 1e-12), 1),
+            "gain_db": round(20 * np.log10(gain), 1),
+            "target_dbfs": target_dbfs,
+        }
+        return out, sr, metrics
+
+
+class ExtractChannel(Operator):
+    """Extract single channel from multichannel audio."""
+    name = "extract_channel"
+
+    def process(self, audio: np.ndarray, sr: int, channel: int = 0, **kwargs):
+        if audio.ndim == 1:
+            return audio, sr, {"no_op": True, "reason": "already_mono"}
+        c = audio.shape[1] if audio.ndim == 2 else 1
+        if channel < 0 or channel >= c:
+            raise ValueError(f"channel out of range: {channel}, available=0..{c-1}")
+        out = audio[:, channel].astype(np.float32)
+        return out, sr, {"channels_in": c, "channel_selected": channel}
+
+
+class Denoise(Operator):
+    """Background noise reduction using noisereduce (optional dependency)."""
+    name = "denoise"
+
+    def process(self, audio: np.ndarray, sr: int, prop_decrease: float = 1.0, **kwargs):
+        try:
+            import noisereduce as nr
+        except ImportError:
+            logger.warning("noisereduce not installed, skipping denoise")
+            return audio, sr, {"skipped": True, "reason": "noisereduce_not_installed"}
+
+        out = nr.reduce_noise(y=audio, sr=sr, prop_decrease=prop_decrease)
+        return out.astype(np.float32), sr, {"skipped": False, "prop_decrease": prop_decrease}
+
+
+class SpeedAdjust(Operator):
+    """Adjust playback speed without pitch change (optional librosa dependency)."""
+    name = "speed"
+
+    def process(self, audio: np.ndarray, sr: int, factor: float = 1.0, **kwargs):
+        if abs(factor - 1.0) < 0.01:
+            return audio, sr, {"no_op": True, "factor": factor}
+        try:
+            import librosa
+            out = librosa.effects.time_stretch(audio, rate=factor)
+            new_duration = len(out) / sr
+            orig_duration = len(audio) / sr
+            return out.astype(np.float32), sr, {
+                "factor": factor,
+                "duration_before_s": round(orig_duration, 2),
+                "duration_after_s": round(new_duration, 2),
+            }
+        except ImportError:
+            logger.warning("librosa not installed, skipping speed adjustment")
+            return audio, sr, {"skipped": True, "reason": "librosa_not_installed"}
+
+
 # Operator registry
 OPERATORS: Dict[str, Operator] = {
     'trim_silence': TrimSilence(),
     'normalize_loudness': NormalizeLoudness(),
+    'normalize_volume': NormalizeVolume(),
     'resample': Resample(),
+    'extract_channel': ExtractChannel(),
+    'denoise': Denoise(),
+    'speed': SpeedAdjust(),
 }
 
 

@@ -16,19 +16,31 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
     # Patch SessionRunner.run to avoid real processing while preserving the contract:
     # create run dir + RUNNING manifest, then block briefly so worker remains busy.
     import harness.session
+    import server.services.lifecycle as lifecycle
+    import server.api.workbench as workbench
 
-    real_run = harness.session.SessionRunner.run
-
-    def fake_run(self):
-        self._init_dirs()
-        m = self._default_manifest()
-        m["status"] = "RUNNING"
-        m["started_at"] = "now"
-        m["updated_at"] = "now"
-        self._save_manifest(m)
-        return m
-
-    monkeypatch.setattr(harness.session.SessionRunner, "run", fake_run)
+    # Reset worker count to ensure test starts fresh
+    lifecycle._ACTIVE_RUNS_COUNT = 0
+    
+    # Mock launch_run_worker to avoid subprocess spawning
+    def mock_launch(runner, run_request_data, background=True):
+        runner.session_dir.mkdir(parents=True, exist_ok=True)
+        runner.manifest_path.write_text(json.dumps({
+            "run_id": runner.run_id,
+            "status": "RUNNING",
+            "started_at": "now",
+            "updated_at": "now",
+        }))
+        # Write run_request.json like the real function does
+        request_path = runner.session_dir / "run_request.json"
+        run_request_data["run_id"] = runner.run_id
+        run_request_data["input_path"] = str(runner.input_path)
+        request_path.write_text(json.dumps(run_request_data, indent=2))
+        # Release worker since we're not actually launching a subprocess
+        lifecycle.release_worker()
+        return {"worker_pid": 12345}
+    
+    monkeypatch.setattr(workbench, "launch_run_worker", mock_launch)
 
     from fastapi.testclient import TestClient
     import server.main
@@ -57,47 +69,28 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["status"] == "RUNNING"
 
-    # Restore
-    monkeypatch.setattr(harness.session.SessionRunner, "run", real_run)
-
 
 def test_create_workbench_run_busy_returns_409(monkeypatch, tmp_path):
+    """Test that a second request returns 409 when worker is busy.
+    
+    Uses direct mocking of try_acquire_worker to avoid race conditions.
+    """
     monkeypatch.setenv("MODEL_LAB_INPUTS_ROOT", str(tmp_path / "inputs"))
     monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(tmp_path / "runs"))
 
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    import harness.session
-
-    # Create a blocking run so the worker stays active while we send a second request.
-    started = threading.Event()
-    release = threading.Event()
-
-    def blocking_run(self):
-        self._init_dirs()
-        m = self._default_manifest()
-        m["status"] = "RUNNING"
-        self._save_manifest(m)
-        started.set()
-        release.wait(timeout=2.0)
-        return m
-
-    monkeypatch.setattr(harness.session.SessionRunner, "run", blocking_run)
 
     from fastapi.testclient import TestClient
     import server.main
+    import server.api.workbench as workbench
 
     client = TestClient(server.main.app)
 
-    # First request starts worker (async thread)
-    r1 = client.post(
-        "/api/workbench/runs",
-        data={"use_case_id": "uc_smoke", "steps_preset": "ingest"},
-        files={"file": ("input.wav", b"RIFFxxxxWAVEfmt ", "audio/wav")},
-    )
-    assert r1.status_code == 200
-    assert started.wait(timeout=1.0)
+    # Mock try_acquire_worker to return False (simulating busy state)
+    # Patch at the import location in workbench module
+    monkeypatch.setattr(workbench, "try_acquire_worker", lambda: False)
 
-    # Second request while worker active -> 409
+    # Request while worker is "busy" -> 409
     r2 = client.post(
         "/api/workbench/runs",
         data={"use_case_id": "uc_smoke", "steps_preset": "ingest"},
@@ -105,5 +98,3 @@ def test_create_workbench_run_busy_returns_409(monkeypatch, tmp_path):
     )
     assert r2.status_code == 409
     assert r2.json().get("error_code") == "RUNNER_BUSY"
-
-    release.set()

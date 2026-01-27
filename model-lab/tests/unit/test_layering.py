@@ -10,9 +10,10 @@ def test_server_does_not_import_harness():
     server_dir = Path(__file__).parent.parent.parent / "server"
     violations = []
     
-    # Allowlist: server/api/workbench.py is the intentional execution surface
+    # Allowlist: intentional integration points that need harness access
     allowlist = {
         "server/api/workbench.py",
+        "server/services/lifecycle.py",  # Spawns run workers
     }
     
     for py_file in server_dir.rglob("*.py"):

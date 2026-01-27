@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { deriveRunDetailViewModel, ApiRunStatus } from './viewModel';
+import { deriveRunDetailViewModel } from './viewModel';
+import type { ApiRunStatus } from './viewModel';
 
 describe('deriveRunDetailViewModel', () => {
     
@@ -155,7 +156,8 @@ describe('deriveRunDetailViewModel', () => {
         // For a generic global failure, we probably want to see what finished.
         
         const ingest = vm.pipelineSteps.find(s => s.key === 'ingest');
-        const asr = vm.pipelineSteps.find(s => s.key === 'asr');
+        // Note: asr computed for potential future assertions
+        void vm.pipelineSteps.find(s => s.key === 'asr');
         
         expect(ingest?.status).toBe('COMPLETED');
         // ASR not in completed, so 'PENDING' by default block?

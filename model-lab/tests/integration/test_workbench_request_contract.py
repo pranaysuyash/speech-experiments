@@ -50,6 +50,7 @@ def test_run_request_json_written_with_correct_schema():
         mock_runner.run_id = "test_run_123"
         mock_runner.session_dir = tmpdir_path / "runs" / "sessions" / "test" / "test_run_123"
         mock_runner.manifest_path = mock_runner.session_dir / "manifest.json"
+        mock_runner.input_path = tmpdir_path / "inputs" / "test.wav"
         
         # Create session dir and manifest
         mock_runner.session_dir.mkdir(parents=True, exist_ok=True)
@@ -58,12 +59,20 @@ def test_run_request_json_written_with_correct_schema():
             "status": "RUNNING"
         }))
         
-        def mock_run():
-            pass
+        # Capture run_request_data passed to launch_run_worker
+        captured_request_data = {}
         
-        mock_runner.run = mock_run
+        def mock_launch(runner, run_request_data, background=True):
+            captured_request_data.update(run_request_data)
+            # Write run_request.json like the real function does
+            request_path = runner.session_dir / "run_request.json"
+            run_request_data["run_id"] = runner.run_id
+            run_request_data["input_path"] = str(runner.input_path)
+            request_path.write_text(json.dumps(run_request_data, indent=2))
+            return {"worker_pid": 12345}
         
-        with patch.object(workbench, "SessionRunner", return_value=mock_runner):
+        with patch.object(workbench, "SessionRunner", return_value=mock_runner), \
+             patch.object(workbench, "launch_run_worker", side_effect=mock_launch):
             client = TestClient(server.main.app)
             
             response = client.post(
@@ -87,7 +96,7 @@ def test_run_request_json_written_with_correct_schema():
             assert request_data["steps_preset"] == "ingest"
             assert request_data["filename_original"] == "test.wav"
             assert request_data["content_type"] == "audio/wav"
-            assert request_data["bytes"] == len(wav_bytes)
+            assert request_data["bytes_uploaded"] == len(wav_bytes)
             assert request_data["sha256"] == wav_sha256, f"SHA256 mismatch: {request_data['sha256']} != {wav_sha256}"
             assert "requested_at" in request_data
 
@@ -116,6 +125,7 @@ def test_run_request_sha256_matches_upload():
         mock_runner.run_id = "test_sha_456"
         mock_runner.session_dir = tmpdir_path / "runs" / "sessions" / "test" / "test_sha_456"
         mock_runner.manifest_path = mock_runner.session_dir / "manifest.json"
+        mock_runner.input_path = tmpdir_path / "inputs" / "larger.wav"
         
         mock_runner.session_dir.mkdir(parents=True, exist_ok=True)
         mock_runner.manifest_path.write_text(json.dumps({
@@ -123,9 +133,15 @@ def test_run_request_sha256_matches_upload():
             "status": "RUNNING"
         }))
         
-        mock_runner.run = lambda: None
+        def mock_launch(runner, run_request_data, background=True):
+            request_path = runner.session_dir / "run_request.json"
+            run_request_data["run_id"] = runner.run_id
+            run_request_data["input_path"] = str(runner.input_path)
+            request_path.write_text(json.dumps(run_request_data, indent=2))
+            return {"worker_pid": 12345}
         
-        with patch.object(workbench, "SessionRunner", return_value=mock_runner):
+        with patch.object(workbench, "SessionRunner", return_value=mock_runner), \
+             patch.object(workbench, "launch_run_worker", side_effect=mock_launch):
             client = TestClient(server.main.app)
             
             response = client.post(
@@ -140,4 +156,4 @@ def test_run_request_sha256_matches_upload():
             request_data = json.loads(request_path.read_text())
             
             assert request_data["sha256"] == expected_sha
-            assert request_data["bytes"] == len(wav_bytes)
+            assert request_data["bytes_uploaded"] == len(wav_bytes)

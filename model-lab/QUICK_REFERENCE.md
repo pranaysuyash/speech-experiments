@@ -7,14 +7,21 @@
 
 ## ⚡ Quick Commands
 
-### Activate Environment:
+### Activate Environment (always use the project venv and `uv`):
 
 ```bash
 cd /Users/pranay/Projects/speech_experiments/model-lab
-uv sync --all-extras --dev
-source .venv/bin/activate
-```
 
+# Ensure the project venv exists and activate it (preferred)
+python -m venv .venv   # only if .venv is missing
+source .venv/bin/activate
+
+# Use `uv` from the venv when possible (preferred):
+# after activating: `uv sync --all-extras --dev`
+# or call the venv binary directly: `.venv/bin/uv sync --all-extras --dev`
+
+# NOTE: when staging changes, use `git add -A` to include all modified/removed files
+```
 ### Run Tests (MPS):
 
 ```bash
