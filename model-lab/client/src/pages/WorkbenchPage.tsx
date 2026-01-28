@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 
@@ -6,6 +6,7 @@ const ACCEPTED_FORMATS = 'audio/*, video/*, .wav, .mp3, .m4a, .mp4, .mov, .avi';
 const SIZE_WARNING_BYTES = 500 * 1024 * 1024; // 500MB
 
 type Mode = 'single' | 'compare';
+type PipelineMode = 'preset' | 'template' | 'custom';
 
 interface Candidate {
   candidate_id: string;
@@ -25,12 +26,40 @@ interface Preset {
   description?: string;
 }
 
+interface PipelineStep {
+  name: string;
+  deps: string[];
+  description: string;
+  produces: string[];
+  duration_estimate_s: number;
+  config_schema?: Record<string, unknown>;
+}
+
+interface PipelineTemplate {
+  name: string;
+  description: string;
+  steps: string[];
+  preprocessing: string[];
+}
+
+interface PreprocessingOp {
+  name: string;
+  description: string;
+}
+
 interface ModelConfig {
   asr: {
     model_size: string;
     language: string;
   };
   device_preference: string[];
+}
+
+interface UserTemplate {
+  name: string;
+  steps: string[];
+  preprocessing: string[];
+  createdAt: string;
 }
 
 export default function WorkbenchPage() {
@@ -53,6 +82,21 @@ export default function WorkbenchPage() {
     device_preference: ['mps', 'cpu']
   });
 
+  // Pipeline configuration
+  const [pipelineMode, setPipelineMode] = useState<PipelineMode>('preset');
+  const [pipelineSteps, setPipelineSteps] = useState<PipelineStep[]>([]);
+  const [pipelineTemplates, setPipelineTemplates] = useState<PipelineTemplate[]>([]);
+  const [preprocessingOps, setPreprocessingOps] = useState<PreprocessingOp[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [selectedSteps, setSelectedSteps] = useState<string[]>(['ingest', 'asr']);
+  const [selectedPreprocessing, setSelectedPreprocessing] = useState<string[]>([]);
+  const [resolvedSteps, setResolvedSteps] = useState<string[]>([]);
+  
+  // User-defined pipeline templates (localStorage)
+  const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+
   // Data
   const [useCases, setUseCases] = useState<UseCase[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -62,25 +106,90 @@ export default function WorkbenchPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. Initial Load: Use Cases + Presets
+  // 1. Initial Load: Use Cases + Presets + Pipeline Config + User Templates
   useEffect(() => {
     (async () => {
       try {
-        const [ucs, prsts] = await Promise.all([
+        const [ucs, prsts, steps, templates, prepOps] = await Promise.all([
           api.getUseCases(),
-          api.getPresets()
+          api.getPresets(),
+          api.getPipelineSteps(),
+          api.getPipelineTemplates(),
+          api.getPipelinePreprocessing(),
         ]);
         setUseCases(ucs);
         setPresets(prsts);
+        setPipelineSteps(steps);
+        setPipelineTemplates(templates);
+        setPreprocessingOps(prepOps);
         if (ucs.length > 0) setUseCaseId(ucs[0].use_case_id);
         if (prsts.length > 0) setSelectedPreset(prsts.find(p => p.steps_preset === 'full')?.steps_preset || prsts[0].steps_preset);
+        if (templates.length > 0) setSelectedTemplate(templates[0].name);
+        
+        // Load user templates from localStorage
+        try {
+          const saved = localStorage.getItem('modellab_user_templates');
+          if (saved) {
+            setUserTemplates(JSON.parse(saved));
+          }
+        } catch {
+          console.warn('Failed to load user templates from localStorage');
+        }
       } catch (e) {
-        setError("Failed to load use cases");
+        setError("Failed to load configuration");
       } finally {
         setLoadingConfig(false);
       }
     })();
   }, []);
+
+  // Save user template
+  const saveUserTemplate = () => {
+    if (!newTemplateName.trim()) return;
+    
+    const template: UserTemplate = {
+      name: newTemplateName.trim(),
+      steps: selectedSteps,
+      preprocessing: selectedPreprocessing,
+      createdAt: new Date().toISOString(),
+    };
+    
+    const updated = [...userTemplates.filter(t => t.name !== template.name), template];
+    setUserTemplates(updated);
+    localStorage.setItem('modellab_user_templates', JSON.stringify(updated));
+    setShowSaveDialog(false);
+    setNewTemplateName('');
+  };
+
+  // Delete user template
+  const deleteUserTemplate = (name: string) => {
+    const updated = userTemplates.filter(t => t.name !== name);
+    setUserTemplates(updated);
+    localStorage.setItem('modellab_user_templates', JSON.stringify(updated));
+  };
+
+  // Load user template
+  const loadUserTemplate = (template: UserTemplate) => {
+    setSelectedSteps(template.steps);
+    setSelectedPreprocessing(template.preprocessing);
+    setPipelineMode('custom');
+  };
+
+  // Resolve dependencies when custom steps change
+  useEffect(() => {
+    if (pipelineMode !== 'custom' || selectedSteps.length === 0) {
+      setResolvedSteps([]);
+      return;
+    }
+    (async () => {
+      try {
+        const result = await api.resolvePipelineSteps(selectedSteps);
+        setResolvedSteps(result.resolved_steps);
+      } catch (e) {
+        console.error("Failed to resolve steps", e);
+      }
+    })();
+  }, [pipelineMode, selectedSteps]);
 
   // 2. Load Candidates when Use Case changes
   useEffect(() => {
@@ -110,6 +219,24 @@ export default function WorkbenchPage() {
     ? `Warning: Large file (${(file.size / (1024 * 1024)).toFixed(0)}MB). Upload may take time.`
     : null;
 
+  // Calculate estimated duration based on selected steps
+  const estimatedDuration = useMemo(() => {
+    const stepsToUse = pipelineMode === 'custom' && resolvedSteps.length > 0 
+      ? resolvedSteps 
+      : selectedSteps;
+    
+    const totalSeconds = stepsToUse.reduce((acc, stepName) => {
+      const step = pipelineSteps.find(s => s.name === stepName);
+      return acc + (step?.duration_estimate_s || 5);
+    }, 0);
+    
+    // Return formatted string (per minute of audio)
+    if (totalSeconds < 60) {
+      return `~${totalSeconds}s per min`;
+    }
+    return `~${Math.round(totalSeconds / 60)}m per min`;
+  }, [pipelineMode, resolvedSteps, selectedSteps, pipelineSteps]);
+
   async function onStart() {
     if (!file || isSubmitting) return;
     setError(null);
@@ -126,16 +253,30 @@ export default function WorkbenchPage() {
         throw new Error("Invariant Violation: Compare mode requires exactly 2 selected candidates.");
       }
 
-      // 1. Create Experiment (The container for everything)
-      // Note: backend expects candidate_ids mainly for snapshotting
-      // Pass config overrides when advanced options are enabled
+      // Build config overrides
       const configOverrides = showAdvanced ? {
         asr: modelConfig.asr,
         device_preference: modelConfig.device_preference,
-        steps_preset: selectedPreset,
       } : undefined;
-      
-      const exp = await api.createExperiment(file, useCaseId, candsToRun, configOverrides);
+
+      // For simple single runs with custom pipeline, use direct workbench API
+      if (mode === 'single' && showAdvanced && pipelineMode !== 'preset') {
+        const result = await api.createWorkbenchRun(file, useCaseId, {
+          stepsPreset: selectedPreset,
+          steps: pipelineMode === 'custom' ? selectedSteps : undefined,
+          preprocessing: selectedPreprocessing.length > 0 ? selectedPreprocessing : undefined,
+          pipelineTemplate: pipelineMode === 'template' ? selectedTemplate : undefined,
+          config: configOverrides,
+        });
+        navigate(`/runs/${result.run_id}`);
+        return;
+      }
+
+      // For experiment-based runs (compare mode or preset mode)
+      const exp = await api.createExperiment(file, useCaseId, candsToRun, {
+        ...configOverrides,
+        steps_preset: selectedPreset,
+      });
       const expId = exp.experiment_id;
 
       if (mode === 'single') {
@@ -299,22 +440,192 @@ export default function WorkbenchPage() {
 
           {showAdvanced && (
             <div className="mt-4 space-y-4 p-4 bg-gray-50 rounded-lg">
-              {/* Pipeline Preset */}
-              <label className="block">
-                <span className="block font-semibold mb-1 text-sm">Pipeline Preset</span>
-                <select
-                  value={selectedPreset}
-                  onChange={(e) => setSelectedPreset(e.target.value)}
-                  disabled={isSubmitting}
-                  className="w-full border p-2 rounded text-sm"
-                >
-                  {presets.map(p => (
-                    <option key={p.steps_preset} value={p.steps_preset}>
-                      {p.label} - {p.description}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* Pipeline Mode Selection */}
+              <div>
+                <span className="block font-semibold mb-2 text-sm">Pipeline Configuration</span>
+                <div className="flex rounded bg-gray-200 p-1 mb-3">
+                  <button
+                    className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors ${pipelineMode === 'preset' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                    onClick={() => setPipelineMode('preset')}
+                    disabled={isSubmitting}
+                  >
+                    Preset
+                  </button>
+                  <button
+                    className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors ${pipelineMode === 'template' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                    onClick={() => setPipelineMode('template')}
+                    disabled={isSubmitting}
+                  >
+                    Template
+                  </button>
+                  <button
+                    className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors ${pipelineMode === 'custom' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}
+                    onClick={() => setPipelineMode('custom')}
+                    disabled={isSubmitting}
+                  >
+                    Custom Steps
+                  </button>
+                </div>
+
+                {/* Preset Mode */}
+                {pipelineMode === 'preset' && (
+                  <select
+                    value={selectedPreset}
+                    onChange={(e) => setSelectedPreset(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full border p-2 rounded text-sm"
+                  >
+                    {presets.map(p => (
+                      <option key={p.steps_preset} value={p.steps_preset}>
+                        {p.label} - {p.description}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Template Mode */}
+                {pipelineMode === 'template' && (
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full border p-2 rounded text-sm"
+                  >
+                    {pipelineTemplates.map(t => (
+                      <option key={t.name} value={t.name}>
+                        {t.name} - {t.description}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Custom Mode */}
+                {pipelineMode === 'custom' && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {pipelineSteps.filter(s => s.name !== 'bundle').map(step => (
+                        <label
+                          key={step.name}
+                          title={`${step.description} (~${step.duration_estimate_s}s/min)`}
+                          className={`flex items-center gap-2 p-2 rounded border cursor-pointer text-xs ${
+                            selectedSteps.includes(step.name)
+                              ? 'bg-blue-50 border-blue-300'
+                              : 'bg-white border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedSteps.includes(step.name)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedSteps([...selectedSteps, step.name]);
+                              } else {
+                                setSelectedSteps(selectedSteps.filter(s => s !== step.name));
+                              }
+                            }}
+                            disabled={isSubmitting || step.name === 'ingest'}
+                            className="rounded"
+                          />
+                          <div className="flex flex-col">
+                            <span className="font-medium">{step.name}</span>
+                            <span className="text-gray-400 text-[10px]">{step.duration_estimate_s}s/min</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    {resolvedSteps.length > 0 && (
+                      <div className="text-xs text-gray-600 bg-white p-2 rounded border flex justify-between items-center">
+                        <div>
+                          <span className="font-medium">Execution order:</span>{' '}
+                          {resolvedSteps.join(' → ')}
+                        </div>
+                        <span className="text-blue-600 font-medium">{estimatedDuration}</span>
+                      </div>
+                    )}
+                    
+                    {/* User Templates */}
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+                      <span className="text-xs text-gray-500">My Pipelines:</span>
+                      {userTemplates.map(t => (
+                        <div key={t.name} className="flex items-center gap-1 bg-purple-50 border border-purple-200 rounded px-2 py-1 text-xs">
+                          <button
+                            onClick={() => loadUserTemplate(t)}
+                            className="font-medium text-purple-700 hover:text-purple-900"
+                            title={`Steps: ${t.steps.join(', ')}`}
+                          >
+                            {t.name}
+                          </button>
+                          <button
+                            onClick={() => deleteUserTemplate(t.name)}
+                            className="text-purple-400 hover:text-red-500 ml-1"
+                            title="Delete"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      {showSaveDialog ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={newTemplateName}
+                            onChange={(e) => setNewTemplateName(e.target.value)}
+                            placeholder="Pipeline name..."
+                            className="border rounded px-2 py-1 text-xs w-32"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && saveUserTemplate()}
+                          />
+                          <button onClick={saveUserTemplate} className="text-green-600 hover:text-green-800 text-xs font-medium">Save</button>
+                          <button onClick={() => setShowSaveDialog(false)} className="text-gray-400 hover:text-gray-600 text-xs">Cancel</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowSaveDialog(true)}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          disabled={selectedSteps.length < 2}
+                        >
+                          + Save Current
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Preprocessing Operators (for template/custom modes) */}
+              {pipelineMode !== 'preset' && (
+                <div>
+                  <span className="block font-semibold mb-2 text-sm">Preprocessing</span>
+                  <div className="flex flex-wrap gap-2">
+                    {preprocessingOps.map(op => (
+                      <label
+                        key={op.name}
+                        className={`flex items-center gap-1 px-2 py-1 rounded border cursor-pointer text-xs ${
+                          selectedPreprocessing.includes(op.name)
+                            ? 'bg-green-50 border-green-300'
+                            : 'bg-white border-gray-200 hover:border-gray-300'
+                        }`}
+                        title={op.description}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPreprocessing.includes(op.name)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedPreprocessing([...selectedPreprocessing, op.name]);
+                            } else {
+                              setSelectedPreprocessing(selectedPreprocessing.filter(o => o !== op.name));
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="rounded"
+                        />
+                        <span>{op.name.replace(/_/g, ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Model Configuration */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

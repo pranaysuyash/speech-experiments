@@ -277,4 +277,57 @@ export const api = {
     const res = await axios.post(`${API_BASE}/runs/${runId}/retry`, { from_step: fromStep });
     return res.data;
   },
+
+  // Pipeline Configuration
+  getPipelineSteps: async (): Promise<{ name: string; deps: string[]; description: string; produces: string[]; config_schema?: Record<string, unknown>; duration_estimate_s: number }[]> => {
+    const res = await axios.get(`${API_BASE}/pipelines/steps`);
+    return res.data;
+  },
+
+  getPipelinePreprocessing: async (): Promise<{ name: string; description: string; params: Record<string, unknown> }[]> => {
+    const res = await axios.get(`${API_BASE}/pipelines/preprocessing`);
+    return res.data;
+  },
+
+  getPipelineTemplates: async (): Promise<{ name: string; description: string; steps: string[]; preprocessing: string[] }[]> => {
+    const res = await axios.get(`${API_BASE}/pipelines/templates`);
+    return res.data;
+  },
+
+  resolvePipelineSteps: async (steps: string[]): Promise<{ requested_steps: string[]; resolved_steps: string[]; added_dependencies: string[] }> => {
+    const res = await axios.post(`${API_BASE}/pipelines/resolve`, { steps });
+    return res.data;
+  },
+
+  // Workbench with dynamic pipeline
+  createWorkbenchRun: async (
+    file: File,
+    useCaseId: string,
+    options?: {
+      stepsPreset?: string;
+      steps?: string[];
+      preprocessing?: string[];
+      pipelineTemplate?: string;
+      config?: Record<string, unknown>;
+    }
+  ): Promise<{ run_id: string; run_dir: string; console_url: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('use_case_id', useCaseId);
+    form.append('steps_preset', options?.stepsPreset || 'full');
+    if (options?.steps?.length) {
+      form.append('steps', options.steps.join(','));
+    }
+    if (options?.preprocessing?.length) {
+      form.append('preprocessing', options.preprocessing.join(','));
+    }
+    if (options?.pipelineTemplate) {
+      form.append('pipeline_template', options.pipelineTemplate);
+    }
+    if (options?.config) {
+      form.append('config', JSON.stringify(options.config));
+    }
+    const res = await axios.post(`${API_BASE}/workbench/runs`, form);
+    return res.data;
+  },
 };
