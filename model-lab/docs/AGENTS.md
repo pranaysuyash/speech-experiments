@@ -1,20 +1,28 @@
 # Agent Instructions
 
 ## Worktrees
-- Gemini works in its own worktree (do not create or modify it).
-- Codex works only in: ../model-lab-codex (relative to repo root).
-- Never edit files directly in the primary worktree.
+- All work happens in the primary worktree on master branch.
+- No separate worktrees needed.
 
-## Codex branch
-- Use branch: codex/hardening-followups (rebased on origin/master).
-- Keep diffs small. Tests first, then code, then tooling/CI.
+## Branch
+- Use branch: master
+- Keep diffs comprehensive but tested. Include regression checks.
 
-## Non-negotiable verification before merging to master
-From ../model-lab-codex/model-lab:
+## Non-negotiable verification before pushing to master
+In the workspace:
 - PYTHONPATH=. pytest -q tests/integration/test_backend_invariants.py
 - PYTHONPATH=. pytest -q tests/api/test_artifact_download_security.py
 - cd client && npm run build
-- git status --porcelain must be empty
+- git status --porcelain must be empty (after commit)
+- For commits with >10% LOC changes in existing files, review diff for improvements
+
+## Regression Check Process
+- git add -A to stage all changes
+- Check git diff --cached --stat for LOC changes
+- For files with significant changes (>10% of total lines), review diff to ensure better/comprehensive/updated
+- If not satisfactory, update code before committing
+- Commit with descriptive message
+- Push if approved
 
 ## Do not change
 - docs/CHANGELOG.md must not be modified or removed.
