@@ -167,6 +167,17 @@ export interface Step {
   artifacts?: Artifact[];
 }
 
+export interface StepProgress {
+  name: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+  progress_pct: number;
+  message?: string;
+  duration_ms?: number;
+  estimated_remaining_s?: number;
+  started_at?: string;
+  ended_at?: string;
+}
+
 
 export const api = {
   getRuns: async (refresh = false): Promise<RunSummary[]> => {
@@ -197,6 +208,7 @@ export const api = {
     status: string,
     started_at?: string,
     steps_completed: string[],
+    steps_progress?: StepProgress[],
     current_step?: string | null,
     updated_at?: string,
     last_semantic_progress_at?: string,
@@ -205,7 +217,7 @@ export const api = {
     error_message?: string,
     failure_step?: string | null,
     // Observability Fields
-    input_metadata?: { filename: string, size_bytes: number },
+    input_metadata?: { filename: string, size_bytes: number, duration_s?: number },
     config?: any,
     artifacts_availability?: Record<string, boolean>,
     steps?: Step[]

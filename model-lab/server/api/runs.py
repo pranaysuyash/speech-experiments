@@ -431,6 +431,7 @@ def get_run_status(run_id: str):
         "failure_step": manifest.get("failure_step"),
         "error_message": manifest.get("error", {}).get("message"),
         "input_metadata": manifest.get("input_metadata", {}),
+        "input_hash": run.get("input_hash"),  # For run history linking
         "config": status_config,
         "artifacts": manifest.get("artifacts_by_type", {}), # Use new global index
         "resolved_device": run.get("config", {}).get("resolved_device"), # From index

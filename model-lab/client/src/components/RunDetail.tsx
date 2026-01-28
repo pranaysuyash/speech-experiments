@@ -1,16 +1,32 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { RunDetail as RunDetailType, ResultSummary } from '../lib/api';
+import type { RunDetail as RunDetailType, ResultSummary, StepProgress as ApiStepProgress } from '../lib/api';
 import { Loader2, ArrowLeft, Download } from 'lucide-react';
 // import { deriveProgressSignal, isStalled } from '../lib/runProgress'; // Removed client-side heuristics
 import { deriveRunDetailViewModel } from '../lib/viewModel';
+import { PipelineProgress, type StepProgressData } from './PipelineProgress';
+import RunHistory from './RunHistory';
 
 interface RunDetailProps {
     onBack?: () => void;
 }
 
 import { DebugPanel } from './DebugPanel';
+
+function convertStepsProgress(apiSteps?: ApiStepProgress[]): StepProgressData[] {
+    if (!apiSteps) return [];
+    return apiSteps.map(step => ({
+        name: step.name,
+        status: step.status.toLowerCase() as StepProgressData['status'],
+        progressPct: step.progress_pct,
+        message: step.message,
+        durationMs: step.duration_ms,
+        estimatedRemainingS: step.estimated_remaining_s,
+        startedAt: step.started_at,
+        endedAt: step.ended_at,
+    }));
+}
 
 // Helper for actionable error messages
 function getActionableError(step: string | null, msg: string | null): { title: string, action: string } | null {
@@ -514,37 +530,45 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 })()}
 
 
-                {/* Pipeline visualization */}
-                <div className="bg-white border rounded-lg p-6 mb-6">
-                    <h3 className="text-sm font-semibold text-gray-600 mb-3">Pipeline</h3>
-                    <div className="space-y-2">
-                        {vm.pipelineSteps.map((step) => {
-                            let icon = '○';
-                            let textClass = 'text-gray-400';
+                {/* Pipeline Progress - Enhanced real-time tracking */}
+                {status.steps_progress && status.steps_progress.length > 0 ? (
+                    <PipelineProgress 
+                        steps={convertStepsProgress(status.steps_progress)} 
+                        className="mb-6"
+                    />
+                ) : (
+                    /* Fallback to VM-based visualization if steps_progress not available */
+                    <div className="bg-white border rounded-lg p-6 mb-6">
+                        <h3 className="text-sm font-semibold text-gray-600 mb-3">Pipeline</h3>
+                        <div className="space-y-2">
+                            {vm.pipelineSteps.map((step) => {
+                                let icon = '○';
+                                let textClass = 'text-gray-400';
 
-                            if (step.status === 'COMPLETED') {
-                                icon = '✓';
-                                textClass = 'text-green-600';
-                            } else if (step.status === 'FAILED') {
-                                icon = '❌';
-                                textClass = 'text-red-600 font-semibold';
-                            } else if (step.status === 'RUNNING') {
-                                icon = '→';
-                                textClass = 'text-blue-600 font-semibold';
-                            } else if (step.status === 'NOT_RUN') {
-                                icon = '○';
-                                textClass = 'text-gray-300';
-                            }
+                                if (step.status === 'COMPLETED') {
+                                    icon = '✓';
+                                    textClass = 'text-green-600';
+                                } else if (step.status === 'FAILED') {
+                                    icon = '❌';
+                                    textClass = 'text-red-600 font-semibold';
+                                } else if (step.status === 'RUNNING') {
+                                    icon = '→';
+                                    textClass = 'text-blue-600 font-semibold';
+                                } else if (step.status === 'NOT_RUN') {
+                                    icon = '○';
+                                    textClass = 'text-gray-300';
+                                }
 
-                            return (
-                                <div key={step.key} className={`flex items-start gap-2 ${textClass}`}>
-                                    <span className="text-lg leading-none mt-0.5">{icon}</span>
-                                    <span className="text-sm">{step.label}</span>
-                                </div>
-                            );
-                        })}
+                                return (
+                                    <div key={step.key} className={`flex items-start gap-2 ${textClass}`}>
+                                        <span className="text-lg leading-none mt-0.5">{icon}</span>
+                                        <span className="text-sm">{step.label}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Artifacts (Semantic Schema) */}
                 {renderArtifacts()}
@@ -888,6 +912,17 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                         </div>
                     )}
                 </div>
+
+                {/* Run History Panel */}
+                {status?.input_hash && (
+                    <div className="max-w-3xl mx-auto mt-6">
+                        <RunHistory
+                            currentRunId={runId}
+                            inputHash={status.input_hash}
+                            onSelectRun={(id) => window.location.href = `/runs/${id}`}
+                        />
+                    </div>
+                )}
 
                 <DebugPanel run={status} />
             </div>

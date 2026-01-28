@@ -8,6 +8,7 @@ import WorkbenchPage from './pages/WorkbenchPage';
 import ExperimentPage from './pages/ExperimentPage';
 import CandidatesPage from './pages/CandidatesPage';
 import ExperimentsOpenPage from './pages/ExperimentsOpenPage';
+import ComparePage from './pages/ComparePage';
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
           <Route path="/lab/candidates" element={<CandidatesPage />} />
           <Route path="/lab/results" element={<ResultsPage />} />
           <Route path="/lab/findings" element={<FindingsPage />} />
+          <Route path="/compare" element={<ComparePage />} />
         </Routes>
       </div>
     </BrowserRouter>
