@@ -16,6 +16,32 @@ logger = logging.getLogger("session")
 
 Status = str  # "PENDING" | "RUNNING" | "COMPLETED" | "FAILED"
 
+
+@dataclass
+class StepProgress:
+    """Real-time progress tracking for a pipeline step."""
+    step_name: str
+    status: str  # PENDING | RUNNING | COMPLETED | FAILED | SKIPPED
+    progress_pct: int  # 0-100
+    message: Optional[str] = None
+    started_at: Optional[str] = None
+    estimated_remaining_s: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "step_name": self.step_name,
+            "status": self.status,
+            "progress_pct": self.progress_pct,
+        }
+        if self.message:
+            d["message"] = self.message
+        if self.started_at:
+            d["started_at"] = self.started_at
+        if self.estimated_remaining_s is not None:
+            d["estimated_remaining_s"] = self.estimated_remaining_s
+        return d
+
+
 @dataclass
 class SessionContext:
     input_path: Path
@@ -176,6 +202,52 @@ class SessionRunner:
         # Ideally steps should take config from context.
         
         self.steps: Dict[str, StepDef] = {}
+        
+        # Progress tracking state
+        self._last_progress_write: float = 0.0
+        self._progress_debounce_s: float = 1.0  # Max 1 write per second
+    
+    def update_step_progress(
+        self,
+        step_name: str,
+        progress_pct: int,
+        message: Optional[str] = None,
+        estimated_remaining_s: Optional[int] = None,
+    ) -> None:
+        """
+        Update progress for a running step (debounced to max 1 write/sec).
+        
+        Args:
+            step_name: The step being updated
+            progress_pct: Progress percentage (0-100)
+            message: Optional progress message (e.g., "Transcribing...")
+            estimated_remaining_s: Optional estimated time remaining
+        """
+        now = time.time()
+        
+        # Debounce: skip if last write was less than debounce interval ago
+        if now - self._last_progress_write < self._progress_debounce_s:
+            return
+        
+        self._last_progress_write = now
+        
+        try:
+            m = self._load_manifest()
+            step_entry = m.get("steps", {}).get(step_name)
+            if not step_entry:
+                return
+            
+            # Update progress fields
+            step_entry["progress_pct"] = max(0, min(100, progress_pct))
+            if message:
+                step_entry["progress_message"] = message
+            if estimated_remaining_s is not None:
+                step_entry["estimated_remaining_s"] = estimated_remaining_s
+            
+            m["updated_at"] = now_iso()
+            self._save_manifest(m)
+        except Exception as e:
+            logger.warning(f"Failed to update progress for {step_name}: {e}")
     
     def get_artifact(self, type_name: str, step_hint: Optional[str] = None) -> Optional[Path]:
         """

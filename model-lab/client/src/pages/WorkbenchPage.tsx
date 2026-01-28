@@ -58,10 +58,6 @@ interface ModelConfig {
   device_preference: string[];
 }
 
-interface StepConfig {
-  [stepName: string]: Record<string, string | number | boolean>;
-}
-
 interface UserTemplate {
   name: string;
   steps: string[];
@@ -93,7 +89,6 @@ export default function WorkbenchPage() {
   });
   
   // Per-step configuration (for custom mode)
-  const [stepConfigs] = useState<StepConfig>({});
   const [showStepConfig, setShowStepConfig] = useState(false);
 
   // Pipeline configuration
@@ -280,7 +275,6 @@ export default function WorkbenchPage() {
         asr: modelConfig.asr,
         diarization: modelConfig.diarization,
         device_preference: modelConfig.device_preference,
-        ...stepConfigs, // Merge per-step overrides
       } : undefined;
 
       // For simple single runs with custom pipeline, use direct workbench API

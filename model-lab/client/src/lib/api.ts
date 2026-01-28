@@ -124,6 +124,30 @@ export interface Artifact {
   downloadable: boolean;
 }
 
+export interface RunComparison {
+  runs: {
+    a: {
+      run_id: string;
+      status: string;
+      started_at?: string;
+      input_filename?: string;
+      config: Record<string, unknown>;
+    };
+    b: {
+      run_id: string;
+      status: string;
+      started_at?: string;
+      input_filename?: string;
+      config: Record<string, unknown>;
+    };
+  };
+  config_diff: {
+    steps: { a: string[]; b: string[] };
+    preprocessing: { a: string[]; b: string[] };
+  };
+  metrics_comparison: Record<string, { a: number | null; b: number | null; diff: number | null }>;
+}
+
 export interface Step {
   name: string;
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
@@ -275,6 +299,22 @@ export const api = {
 
   retryRun: async (runId: string, fromStep?: string): Promise<{ run_id: string; console_url: string }> => {
     const res = await axios.post(`${API_BASE}/runs/${runId}/retry`, { from_step: fromStep });
+    return res.data;
+  },
+
+  // Run History & Comparison
+  getRunsByInput: async (inputHash: string): Promise<RunSummary[]> => {
+    const res = await axios.get(`${API_BASE}/runs/by-input/${inputHash}`);
+    return res.data;
+  },
+
+  compareRuns: async (runA: string, runB: string): Promise<RunComparison> => {
+    const res = await axios.get(`${API_BASE}/runs/compare`, { params: { run_a: runA, run_b: runB } });
+    return res.data;
+  },
+
+  rerunPipeline: async (runId: string, configOverrides?: Record<string, unknown>): Promise<{ run_id: string; parent_run_id: string; console_url: string }> => {
+    const res = await axios.post(`${API_BASE}/runs/${runId}/rerun`, configOverrides ? { config_overrides: configOverrides } : undefined);
     return res.data;
   },
 

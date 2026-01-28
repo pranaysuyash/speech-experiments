@@ -32,6 +32,18 @@ class IngestConfig:
     denoise_strength: float = 0.5  # 0.0-1.0
     # Speed adjustment
     speed: float = 1.0  # 1.0 = normal, 0.5 = half speed, 2.0 = double speed
+    # Peak normalization
+    peak_normalize: bool = False
+    peak_target_db: float = -1.0
+    # Dynamic range compression
+    compress_dynamics: bool = False
+    compress_threshold_db: float = -20.0
+    compress_ratio: float = 4.0
+    # Noise gate
+    gate_noise: bool = False
+    gate_threshold_db: float = -40.0
+    # Mono mix
+    mono_mix: bool = False
 
     def to_json_obj(self) -> Dict[str, Any]:
         return dataclasses.asdict(self)
@@ -123,6 +135,26 @@ def build_ffmpeg_filter_chain(cfg: IngestConfig) -> Optional[str]:
                 speed = speed / 2.0
             if speed != 1.0:
                 filters.append(f"atempo={speed}")
+
+    # Peak normalization using dynaudnorm
+    if getattr(cfg, 'peak_normalize', False):
+        target_db = getattr(cfg, 'peak_target_db', -1.0)
+        filters.append(f"dynaudnorm=p={10 ** (target_db / 20):.4f}")
+
+    # Stereo to mono downmix
+    if getattr(cfg, 'mono_mix', False):
+        filters.append("pan=mono|c0=0.5*c0+0.5*c1")
+
+    # Dynamic range compression
+    if getattr(cfg, 'compress_dynamics', False):
+        threshold_db = getattr(cfg, 'compress_threshold_db', -20.0)
+        ratio = getattr(cfg, 'compress_ratio', 4.0)
+        filters.append(f"acompressor=threshold={threshold_db}dB:ratio={ratio}")
+
+    # Noise gate
+    if getattr(cfg, 'gate_noise', False):
+        threshold_db = getattr(cfg, 'gate_threshold_db', -40.0)
+        filters.append(f"agate=threshold={threshold_db}dB")
 
     if not filters:
         return None

@@ -4,8 +4,15 @@ import logging
 from typing import List, Dict, Any, Optional
 import time
 import os
+import hashlib
 
 logger = logging.getLogger("server.index")
+
+
+def _compute_config_hash(config: Dict[str, Any]) -> str:
+    """Compute a stable hash of pipeline config for grouping similar runs."""
+    config_str = json.dumps(config, sort_keys=True, default=str)
+    return hashlib.sha256(config_str.encode()).hexdigest()[:16]
 
 def _runs_root() -> Path:
     return Path(os.environ.get("MODEL_LAB_RUNS_ROOT", "runs")).resolve()
@@ -307,17 +314,51 @@ class RunsIndex:
                 # But typically manifests are small enough.
                 data = json.loads(p.read_text())
                 
+                # Extract input hash from run_request.json if available
+                input_hash = None
+                run_request_path = p.parent / "run_request.json"
+                pipeline_config = {}
+                preprocessing_ops: List[str] = []
+                custom_steps: Optional[List[str]] = None
+                template_used: Optional[str] = None
+                
+                if run_request_path.exists():
+                    try:
+                        run_request = json.loads(run_request_path.read_text())
+                        input_hash = run_request.get("sha256")
+                        pipeline_config = run_request.get("pipeline_config", {})
+                        preprocessing_ops = run_request.get("preprocessing", []) or []
+                        custom_steps = run_request.get("steps_custom")
+                        template_used = run_request.get("pipeline_template")
+                    except Exception:
+                        pass
+                
+                # Compute pipeline config hash for grouping
+                config_for_hash = {
+                    "steps": data.get("steps_requested") or list(data.get("steps", {}).keys()),
+                    "preprocessing": preprocessing_ops,
+                    "config": data.get("config", {}),
+                }
+                pipeline_config_hash = _compute_config_hash(config_for_hash)
+                
                 # Extract summary fields
                 run_summary = {
                     "run_id": data.get("run_id", p.parent.name),
                     "status": data.get("status", "UNKNOWN"),
                     "started_at": data.get("started_at"),
+                    "created_at": data.get("started_at"),  # Alias for sorting
                     "input_filename": Path(data.get("input_path", "")).name, # Extract filename only
                     "duration": data.get("duration_s"),
                     "steps_completed": list(data.get("steps", {}).keys()),
                     "manifest_path": str(p),
                     # We might store absolute path to root for safe_files optimization
-                    "root_path": str(p.parent)
+                    "root_path": str(p.parent),
+                    # New fields for run history & comparison
+                    "input_hash": input_hash,
+                    "preprocessing_ops": preprocessing_ops,
+                    "custom_steps": custom_steps,
+                    "template_used": template_used,
+                    "pipeline_config_hash": pipeline_config_hash,
                 }
                 runs.append(run_summary)
             except Exception as e:

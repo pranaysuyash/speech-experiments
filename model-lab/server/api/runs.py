@@ -45,6 +45,266 @@ def refresh_runs():
     """Force a refresh of the runs index."""
     return get_index().refresh()
 
+
+@router.get("/by-input/{input_hash}")
+def get_runs_by_input(input_hash: str):
+    """Returns all runs for a given input file hash, sorted by created_at desc."""
+    runs = get_index().list_runs()
+    matching = [r for r in runs if r.get("input_hash") == input_hash]
+    return sorted(matching, key=lambda r: r.get("created_at", ""), reverse=True)
+
+
+@router.get("/compare")
+def compare_runs(run_a: str = Query(...), run_b: str = Query(...)):
+    """Compare two runs side by side."""
+    index = get_index()
+    
+    run_a_data = index.get_run(run_a)
+    run_b_data = index.get_run(run_b)
+    
+    if not run_a_data:
+        raise HTTPException(status_code=404, detail=f"Run A not found: {run_a}")
+    if not run_b_data:
+        raise HTTPException(status_code=404, detail=f"Run B not found: {run_b}")
+    
+    # Load full manifests for config comparison
+    manifest_a = {}
+    manifest_b = {}
+    
+    try:
+        manifest_a = json.loads(Path(run_a_data["manifest_path"]).read_text())
+    except Exception:
+        pass
+    
+    try:
+        manifest_b = json.loads(Path(run_b_data["manifest_path"]).read_text())
+    except Exception:
+        pass
+    
+    # Compute metrics from results
+    metrics_a = _get_run_metrics(run_a)
+    metrics_b = _get_run_metrics(run_b)
+    
+    # Build metrics comparison
+    metrics_comparison = {}
+    all_metric_keys = set(metrics_a.keys()) | set(metrics_b.keys())
+    for key in all_metric_keys:
+        val_a = metrics_a.get(key)
+        val_b = metrics_b.get(key)
+        diff = None
+        if val_a is not None and val_b is not None:
+            try:
+                diff = val_b - val_a
+            except (TypeError, ValueError):
+                diff = None
+        metrics_comparison[key] = {"a": val_a, "b": val_b, "diff": diff}
+    
+    # Config diff
+    steps_a = run_a_data.get("steps_completed", [])
+    steps_b = run_b_data.get("steps_completed", [])
+    preprocessing_a = run_a_data.get("preprocessing_ops", [])
+    preprocessing_b = run_b_data.get("preprocessing_ops", [])
+    
+    return {
+        "runs": {
+            "a": {
+                "run_id": run_a,
+                "status": run_a_data.get("status"),
+                "started_at": run_a_data.get("started_at"),
+                "input_filename": run_a_data.get("input_filename"),
+                "config": manifest_a.get("config", {}),
+            },
+            "b": {
+                "run_id": run_b,
+                "status": run_b_data.get("status"),
+                "started_at": run_b_data.get("started_at"),
+                "input_filename": run_b_data.get("input_filename"),
+                "config": manifest_b.get("config", {}),
+            }
+        },
+        "config_diff": {
+            "steps": {"a": steps_a, "b": steps_b},
+            "preprocessing": {"a": preprocessing_a, "b": preprocessing_b},
+        },
+        "metrics_comparison": metrics_comparison,
+    }
+
+
+def _get_run_metrics(run_id: str) -> Dict[str, Any]:
+    """Extract key metrics from a run for comparison."""
+    try:
+        result = compute_result_v1(run_id)
+        if result and "metrics" in result:
+            return {
+                "transcript_word_count": result["metrics"].get("word_count"),
+                "segment_count": result["metrics"].get("segment_count"),
+                "duration_s": result["metrics"].get("duration_s"),
+                "audio_duration_s": result["metrics"].get("audio_duration_s"),
+            }
+    except Exception:
+        pass
+    return {}
+
+
+@router.post("/{run_id}/rerun")
+def rerun_pipeline(run_id: str, config_overrides: Optional[Dict[str, Any]] = None):
+    """Re-run a pipeline with optional config changes."""
+    from server.services.lifecycle import try_acquire_worker, release_worker, launch_run_worker, RunnerBusyError
+    from harness.session import SessionRunner
+    
+    index = get_index()
+    run_data = index.get_run(run_id)
+    
+    if not run_data:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    # Load run_request.json to get original input file
+    run_request_path = Path(run_data["root_path"]) / "run_request.json"
+    if not run_request_path.exists():
+        raise HTTPException(status_code=400, detail="Cannot rerun: run_request.json missing")
+    
+    try:
+        run_request = json.loads(run_request_path.read_text())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read run request: {e}")
+    
+    # Find original input file - check manifest for input_path
+    manifest_path = Path(run_data["manifest_path"])
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to read manifest")
+    
+    input_path_str = manifest.get("input_path")
+    if not input_path_str:
+        raise HTTPException(status_code=400, detail="Cannot rerun: original input path not found")
+    
+    input_path = Path(input_path_str)
+    if not input_path.exists():
+        raise HTTPException(status_code=400, detail=f"Cannot rerun: input file missing: {input_path}")
+    
+    # Get original configuration
+    original_steps = run_request.get("steps_requested")
+    original_config = run_request.get("config", {})
+    preprocessing = run_request.get("preprocessing", [])
+    
+    # Merge config overrides
+    merged_config = {**original_config, **(config_overrides or {})}
+    
+    # Acquire worker
+    if not try_acquire_worker():
+        raise HTTPException(status_code=409, detail="Runner is busy with another job")
+    
+    try:
+        runs_root = Path(os.environ.get("MODEL_LAB_RUNS_ROOT", "runs")).resolve()
+        runner = SessionRunner(
+            input_path,
+            runs_root,
+            steps=original_steps,
+            config=merged_config,
+        )
+        
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        # Create new run_request with parent reference
+        new_run_request = {
+            "schema_version": "1",
+            "requested_at": now.isoformat(),
+            "source": "rerun",
+            "parent_run_id": run_id,
+            "use_case_id": run_request.get("use_case_id", "rerun"),
+            "steps_preset": run_request.get("steps_preset", "custom"),
+            "steps_requested": original_steps,
+            "filename_original": input_path.name,
+            "sha256": run_request.get("sha256"),
+            "config": merged_config,
+            "preprocessing": preprocessing,
+        }
+        
+        result = launch_run_worker(runner, new_run_request, background=True)
+        
+        return {
+            "run_id": runner.run_id,
+            "parent_run_id": run_id,
+            "console_url": f"/runs/{runner.run_id}",
+            "worker_pid": result.get("worker_pid"),
+        }
+    except Exception:
+        release_worker()
+        raise
+
+# Canonical pipeline step order for progress display
+PIPELINE_STEP_ORDER = [
+    "ingest",
+    "asr",
+    "diarization",
+    "alignment",
+    "chapters",
+    "summarize_by_speaker",
+    "action_items_assignee",
+    "bundle",
+]
+
+
+def _build_steps_progress(manifest: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Build ordered steps_progress array from manifest.
+    
+    Returns list of step progress dicts with:
+    - name: step key
+    - status: PENDING | RUNNING | COMPLETED | FAILED | SKIPPED
+    - progress_pct: 0-100
+    - message: optional progress message
+    - duration_ms: for completed steps
+    - estimated_remaining_s: for running steps
+    """
+    manifest_steps = manifest.get("steps", {})
+    steps_requested = manifest.get("steps_requested", [])
+    
+    # Use steps_requested if available, otherwise use canonical order
+    if steps_requested:
+        ordered_steps = steps_requested
+    else:
+        # Use manifest steps keys in canonical order, falling back to alphabetical
+        ordered_steps = [s for s in PIPELINE_STEP_ORDER if s in manifest_steps]
+        # Add any remaining steps not in canonical order
+        for s in sorted(manifest_steps.keys()):
+            if s not in ordered_steps:
+                ordered_steps.append(s)
+    
+    result = []
+    for step_name in ordered_steps:
+        step_data = manifest_steps.get(step_name, {})
+        step_status = step_data.get("status", "PENDING")
+        
+        progress_entry: Dict[str, Any] = {
+            "name": step_name,
+            "status": step_status,
+            "progress_pct": step_data.get("progress_pct", 0 if step_status in ("PENDING", "RUNNING") else 100 if step_status in ("COMPLETED", "SKIPPED") else 0),
+        }
+        
+        # Add optional fields
+        if step_data.get("progress_message"):
+            progress_entry["message"] = step_data["progress_message"]
+        
+        if step_data.get("duration_ms") is not None:
+            progress_entry["duration_ms"] = step_data["duration_ms"]
+        
+        if step_data.get("estimated_remaining_s") is not None:
+            progress_entry["estimated_remaining_s"] = step_data["estimated_remaining_s"]
+        
+        if step_data.get("started_at"):
+            progress_entry["started_at"] = step_data["started_at"]
+        
+        if step_data.get("ended_at"):
+            progress_entry["ended_at"] = step_data["ended_at"]
+        
+        result.append(progress_entry)
+    
+    return result
+
+
 def _derive_status_config(manifest: Dict[str, Any]) -> Dict[str, Any]:
     """Return a status-friendly config payload populated from manifest + step metadata."""
     config_source = manifest.get("config") or {}
@@ -156,6 +416,9 @@ def get_run_status(run_id: str):
         # Fallback to index
         steps_completed = run.get("steps_completed", [])
 
+    # Build steps_progress array for real-time pipeline visibility
+    steps_progress = _build_steps_progress(manifest)
+
     status_config = _derive_status_config(manifest)
 
     return {
@@ -164,6 +427,7 @@ def get_run_status(run_id: str):
         "current_step": current_step,
         "updated_at": updated_at,
         "steps_completed": steps_completed,
+        "steps_progress": steps_progress,
         "failure_step": manifest.get("failure_step"),
         "error_message": manifest.get("error", {}).get("message"),
         "input_metadata": manifest.get("input_metadata", {}),

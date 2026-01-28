@@ -309,3 +309,51 @@ class TestToIngestConfig:
         ingest = config.to_ingest_config()
         assert ingest.trim_silence is True
         assert ingest.normalize is True
+    
+    def test_denoise_basic(self):
+        """denoise enables noise reduction."""
+        config = PipelineConfig(steps=["ingest"], preprocessing=["denoise"])
+        ingest = config.to_ingest_config()
+        assert ingest.denoise is True
+        assert ingest.denoise_strength == 0.5  # default
+    
+    def test_denoise_with_strength(self):
+        """denoise with custom strength."""
+        config = PipelineConfig(
+            steps=["ingest"],
+            preprocessing=["denoise(strength=0.8)"]
+        )
+        ingest = config.to_ingest_config()
+        assert ingest.denoise is True
+        assert ingest.denoise_strength == 0.8
+    
+    def test_speed_adjustment(self):
+        """speed sets playback speed factor."""
+        config = PipelineConfig(steps=["ingest"], preprocessing=["speed(factor=1.5)"])
+        ingest = config.to_ingest_config()
+        assert ingest.speed == 1.5
+    
+    def test_speed_slow(self):
+        """speed can slow down audio."""
+        config = PipelineConfig(steps=["ingest"], preprocessing=["speed(factor=0.75)"])
+        ingest = config.to_ingest_config()
+        assert ingest.speed == 0.75
+    
+    def test_all_preprocessing_combined(self):
+        """All preprocessing ops can be combined."""
+        config = PipelineConfig(
+            steps=["ingest"],
+            preprocessing=[
+                "trim_silence(min_silence_ms=200)",
+                "normalize_loudness",
+                "denoise(strength=0.3)",
+                "speed(factor=1.25)"
+            ]
+        )
+        ingest = config.to_ingest_config()
+        assert ingest.trim_silence is True
+        assert ingest.silence_duration_s == 0.2
+        assert ingest.normalize is True
+        assert ingest.denoise is True
+        assert ingest.denoise_strength == 0.3
+        assert ingest.speed == 1.25

@@ -179,6 +179,35 @@ PREPROCESSING_REGISTRY: Dict[str, Dict[str, Any]] = {
             "factor": {"type": "float", "default": 1.0},
         },
     },
+    "normalize_peak": {
+        "description": "Peak normalization",
+        "params": {
+            "target_db": {"type": "float", "default": -1.0},
+        },
+    },
+    "convert_samplerate": {
+        "description": "Explicit sample rate conversion",
+        "params": {
+            "target_sr": {"type": "int", "default": 16000},
+        },
+    },
+    "mono_mix": {
+        "description": "Stereo to mono downmix",
+        "params": {},
+    },
+    "compress_dynamics": {
+        "description": "Dynamic range compression",
+        "params": {
+            "threshold_db": {"type": "float", "default": -20.0},
+            "ratio": {"type": "float", "default": 4.0},
+        },
+    },
+    "gate_noise": {
+        "description": "Noise gate",
+        "params": {
+            "threshold_db": {"type": "float", "default": -40.0},
+        },
+    },
 }
 
 
@@ -319,6 +348,30 @@ class PipelineConfig:
             elif op_name == "speed":
                 if "factor" in params:
                     kwargs["speed"] = float(params["factor"])
+                    
+            elif op_name == "normalize_peak":
+                kwargs["peak_normalize"] = True
+                if "target_db" in params:
+                    kwargs["peak_target_db"] = float(params["target_db"])
+                    
+            elif op_name == "mono_mix":
+                kwargs["mono_mix"] = True
+                
+            elif op_name == "compress_dynamics":
+                kwargs["compress_dynamics"] = True
+                if "threshold_db" in params:
+                    kwargs["compress_threshold_db"] = float(params["threshold_db"])
+                if "ratio" in params:
+                    kwargs["compress_ratio"] = float(params["ratio"])
+                    
+            elif op_name == "gate_noise":
+                kwargs["gate_noise"] = True
+                if "threshold_db" in params:
+                    kwargs["gate_threshold_db"] = float(params["threshold_db"])
+                    
+            elif op_name == "convert_samplerate":
+                if "target_sr" in params:
+                    kwargs["sample_rate"] = params["target_sr"]
         
         return IngestConfig(**kwargs)
 
