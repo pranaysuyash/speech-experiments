@@ -93,7 +93,7 @@ export default function WorkbenchPage() {
   });
   
   // Per-step configuration (for custom mode)
-  const [stepConfigs, setStepConfigs] = useState<StepConfig>({});
+  const [stepConfigs] = useState<StepConfig>({});
   const [showStepConfig, setShowStepConfig] = useState(false);
 
   // Pipeline configuration
