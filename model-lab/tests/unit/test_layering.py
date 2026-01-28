@@ -13,6 +13,7 @@ def test_server_does_not_import_harness():
     # Allowlist: intentional integration points that need harness access
     allowlist = {
         "server/api/workbench.py",
+        "server/api/pipelines.py",  # Uses harness.pipeline_config for step registry
         "server/services/lifecycle.py",  # Spawns run workers
     }
     

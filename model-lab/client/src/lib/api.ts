@@ -299,6 +299,21 @@ export const api = {
     return res.data;
   },
 
+  // User-defined pipeline templates (server-side storage)
+  getUserTemplates: async (): Promise<{ name: string; steps: string[]; preprocessing: string[]; description: string; created_at: string; updated_at: string }[]> => {
+    const res = await axios.get(`${API_BASE}/pipelines/user-templates`);
+    return res.data;
+  },
+
+  saveUserTemplate: async (template: { name: string; steps: string[]; preprocessing?: string[]; description?: string }): Promise<{ name: string; created: boolean; updated: boolean }> => {
+    const res = await axios.post(`${API_BASE}/pipelines/user-templates`, template);
+    return res.data;
+  },
+
+  deleteUserTemplate: async (name: string): Promise<void> => {
+    await axios.delete(`${API_BASE}/pipelines/user-templates/${encodeURIComponent(name)}`);
+  },
+
   // Workbench with dynamic pipeline
   createWorkbenchRun: async (
     file: File,

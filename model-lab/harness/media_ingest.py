@@ -27,6 +27,11 @@ class IngestConfig:
     sample_rate: int = 16000
     channels: int = 1
     sample_fmt: str = "pcm_s16le"
+    # Denoise settings
+    denoise: bool = False
+    denoise_strength: float = 0.5  # 0.0-1.0
+    # Speed adjustment
+    speed: float = 1.0  # 1.0 = normal, 0.5 = half speed, 2.0 = double speed
 
     def to_json_obj(self) -> Dict[str, Any]:
         return dataclasses.asdict(self)
@@ -87,6 +92,37 @@ def build_ffmpeg_filter_chain(cfg: IngestConfig) -> Optional[str]:
             raise ValueError(f"Unsupported loudnorm_mode={cfg.loudnorm_mode} (expected single_pass)")
         # Single pass loudnorm. Documented trade-off.
         filters.append("loudnorm=I=-16:LRA=11:TP=-1.5")
+
+    # Denoise using highpass + lowpass filter chain (basic noise reduction)
+    if getattr(cfg, 'denoise', False):
+        strength = getattr(cfg, 'denoise_strength', 0.5)
+        # Use highpass to remove low-frequency rumble and lowpass for high-frequency hiss
+        # Strength 0-1 maps to cutoff frequencies
+        highpass_freq = int(80 + (strength * 120))  # 80-200Hz
+        lowpass_freq = int(12000 - (strength * 4000))  # 8000-12000Hz
+        filters.append(f"highpass=f={highpass_freq}")
+        filters.append(f"lowpass=f={lowpass_freq}")
+
+    # Speed adjustment using atempo filter
+    if getattr(cfg, 'speed', None) and getattr(cfg, 'speed', 1.0) != 1.0:
+        speed = cfg.speed
+        # atempo only supports 0.5-2.0, chain multiple for extreme values
+        if 0.5 <= speed <= 2.0:
+            filters.append(f"atempo={speed}")
+        elif speed < 0.5:
+            # Chain multiple atempo filters for very slow speeds
+            while speed < 0.5:
+                filters.append("atempo=0.5")
+                speed = speed / 0.5
+            if speed != 1.0:
+                filters.append(f"atempo={speed}")
+        else:
+            # Chain multiple atempo filters for very fast speeds
+            while speed > 2.0:
+                filters.append("atempo=2.0")
+                speed = speed / 2.0
+            if speed != 1.0:
+                filters.append(f"atempo={speed}")
 
     if not filters:
         return None

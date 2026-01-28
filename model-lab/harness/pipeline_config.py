@@ -21,22 +21,62 @@ Example pipeline config:
 from __future__ import annotations
 
 import json
+import re
 import yaml
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+def parse_preprocessing_op(op_str: str) -> Tuple[str, Dict[str, Any]]:
+    """
+    Parse a preprocessing operator string like "trim_silence(min_silence_ms=300)".
+    
+    Returns (op_name, params_dict).
+    """
+    match = re.match(r"(\w+)(?:\(([^)]*)\))?", op_str.strip())
+    if not match:
+        return op_str.strip(), {}
+    
+    op_name = match.group(1)
+    params_str = match.group(2)
+    
+    if not params_str:
+        return op_name, {}
+    
+    params = {}
+    for param in params_str.split(","):
+        if "=" in param:
+            key, val = param.split("=", 1)
+            key = key.strip()
+            val = val.strip()
+            # Try to parse as number
+            try:
+                if "." in val:
+                    params[key] = float(val)
+                else:
+                    params[key] = int(val)
+            except ValueError:
+                params[key] = val
+        else:
+            # Positional arg - skip for now
+            pass
+    
+    return op_name, params
+
+
 # All available steps in the system with their dependencies
+# duration_estimate_s: Estimated duration per minute of audio (rough guide for UI)
 STEP_REGISTRY: Dict[str, Dict[str, Any]] = {
     "ingest": {
         "deps": [],
         "description": "Audio normalization and preprocessing",
         "required": True,  # Always runs first
         "produces": ["processed_audio"],
+        "duration_estimate_s": 2,  # ~2s per minute of audio
     },
     "asr": {
         "deps": ["ingest"],
@@ -47,6 +87,7 @@ STEP_REGISTRY: Dict[str, Dict[str, Any]] = {
             "model_name": {"type": "string", "default": "large-v3"},
             "language": {"type": "string", "default": "en"},
         },
+        "duration_estimate_s": 15,  # ~15s per minute with large-v3
     },
     "diarization": {
         "deps": ["ingest"],
@@ -55,16 +96,19 @@ STEP_REGISTRY: Dict[str, Dict[str, Any]] = {
         "config_schema": {
             "model_name": {"type": "string", "default": "heuristic_diarization"},
         },
+        "duration_estimate_s": 8,  # ~8s per minute
     },
     "alignment": {
         "deps": ["asr", "diarization"],
         "description": "Merge transcription with speaker labels",
         "produces": ["alignment"],
+        "duration_estimate_s": 1,  # Fast, mostly CPU
     },
     "chapters": {
         "deps": ["alignment"],
         "description": "Topic segmentation using embeddings",
         "produces": ["chapters"],
+        "duration_estimate_s": 3,  # Embedding computation
     },
     "summarize_by_speaker": {
         "deps": ["alignment"],
@@ -73,16 +117,19 @@ STEP_REGISTRY: Dict[str, Dict[str, Any]] = {
         "config_schema": {
             "model": {"type": "string", "default": "gpt-4o-mini"},
         },
+        "duration_estimate_s": 10,  # LLM API call
     },
     "action_items_assignee": {
         "deps": ["alignment"],
         "description": "Extract action items with assignees",
         "produces": ["action_items"],
+        "duration_estimate_s": 8,  # LLM API call
     },
     "bundle": {
         "deps": ["ingest"],  # Minimal dep; collects whatever is available
         "description": "Package outputs as Meeting Pack",
         "produces": ["bundle"],
+        "duration_estimate_s": 1,  # Fast bundling
     },
 }
 
@@ -219,6 +266,61 @@ class PipelineConfig:
     
     def to_yaml(self) -> str:
         return yaml.dump(self.to_dict(), default_flow_style=False)
+    
+    def to_ingest_config(self) -> "IngestConfig":
+        """
+        Convert preprocessing operators to an IngestConfig for the harness.
+        
+        Maps:
+        - trim_silence -> trim_silence=True, silence_threshold_db, silence_duration_s
+        - normalize_loudness -> normalize=True
+        - resample -> sample_rate
+        - extract_channel -> channels=1 (always mono in current impl)
+        
+        Note: Some ops (denoise, speed) require ffmpeg filters not yet in IngestConfig.
+        """
+        from harness.media_ingest import IngestConfig
+        
+        # Start with defaults
+        kwargs: Dict[str, Any] = {}
+        
+        for op_str in self.preprocessing:
+            op_name, params = parse_preprocessing_op(op_str)
+            
+            if op_name == "trim_silence":
+                kwargs["trim_silence"] = True
+                if "threshold_db" in params:
+                    kwargs["silence_threshold_db"] = int(params["threshold_db"])
+                if "min_silence_ms" in params:
+                    kwargs["silence_duration_s"] = params["min_silence_ms"] / 1000.0
+                    
+            elif op_name == "normalize_loudness":
+                kwargs["normalize"] = True
+                # target_lufs could be added to IngestConfig if needed
+                
+            elif op_name == "normalize_volume":
+                # Not directly supported by current IngestConfig - log warning
+                logger.warning("normalize_volume not yet wired to IngestConfig, using loudnorm instead")
+                kwargs["normalize"] = True
+                
+            elif op_name == "resample":
+                if "target_sr" in params:
+                    kwargs["sample_rate"] = params["target_sr"]
+                    
+            elif op_name == "extract_channel":
+                # Always mono in current implementation
+                kwargs["channels"] = 1
+                
+            elif op_name == "denoise":
+                kwargs["denoise"] = True
+                if "strength" in params:
+                    kwargs["denoise_strength"] = float(params["strength"])
+                    
+            elif op_name == "speed":
+                if "factor" in params:
+                    kwargs["speed"] = float(params["factor"])
+        
+        return IngestConfig(**kwargs)
 
 
 # Built-in pipeline templates
@@ -292,6 +394,7 @@ def list_available_steps() -> List[Dict[str, Any]]:
             "description": info.get("description", ""),
             "produces": info.get("produces", []),
             "config_schema": info.get("config_schema"),
+            "duration_estimate_s": info.get("duration_estimate_s", 5),
         }
         for name, info in STEP_REGISTRY.items()
     ]
@@ -327,13 +430,13 @@ def validate_pipeline_config(config: Dict[str, Any]) -> List[str]:
             errors.append(f"Unknown step: {step}")
     
     # Check preprocessing
-    for op in config.get("preprocessing", []):
+    for op in config.get("preprocessing") or []:
         op_name = op.split("(")[0]
         if op_name not in PREPROCESSING_REGISTRY:
             errors.append(f"Unknown preprocessing operator: {op_name}")
     
     # Validate step config keys
-    step_config = config.get("config", {})
+    step_config = config.get("config") or {}
     for step_name, step_cfg in step_config.items():
         if step_name not in STEP_REGISTRY:
             errors.append(f"Config for unknown step: {step_name}")

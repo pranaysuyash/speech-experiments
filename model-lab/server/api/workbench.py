@@ -298,8 +298,17 @@ async def create_workbench_run(
             pipeline_config_payload = pipeline_cfg.to_dict()
 
         steps_for_runner = resolved_steps
+        
+        # Convert preprocessing ops to IngestConfig
+        ingest_config = pipeline_cfg.to_ingest_config() if pipeline_config_payload else None
 
-        runner = SessionRunner(dest, _runs_root(), steps=steps_for_runner, config=config_overrides)
+        runner = SessionRunner(
+            dest,
+            _runs_root(),
+            steps=steps_for_runner,
+            config=config_overrides,
+            preprocessing=ingest_config,
+        )
         # Construct run_request data
         run_request_data = {
             "schema_version": "1",

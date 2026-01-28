@@ -52,14 +52,23 @@ interface ModelConfig {
     model_size: string;
     language: string;
   };
+  diarization: {
+    model_name: string;
+  };
   device_preference: string[];
+}
+
+interface StepConfig {
+  [stepName: string]: Record<string, string | number | boolean>;
 }
 
 interface UserTemplate {
   name: string;
   steps: string[];
   preprocessing: string[];
-  createdAt: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export default function WorkbenchPage() {
@@ -79,8 +88,13 @@ export default function WorkbenchPage() {
   const [selectedPreset, setSelectedPreset] = useState('full');
   const [modelConfig, setModelConfig] = useState<ModelConfig>({
     asr: { model_size: 'base', language: 'en' },
+    diarization: { model_name: 'heuristic_diarization' },
     device_preference: ['mps', 'cpu']
   });
+  
+  // Per-step configuration (for custom mode)
+  const [stepConfigs, setStepConfigs] = useState<StepConfig>({});
+  const [showStepConfig, setShowStepConfig] = useState(false);
 
   // Pipeline configuration
   const [pipelineMode, setPipelineMode] = useState<PipelineMode>('preset');
@@ -92,10 +106,11 @@ export default function WorkbenchPage() {
   const [selectedPreprocessing, setSelectedPreprocessing] = useState<string[]>([]);
   const [resolvedSteps, setResolvedSteps] = useState<string[]>([]);
   
-  // User-defined pipeline templates (localStorage)
+  // User-defined pipeline templates (server-side storage)
   const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // Data
   const [useCases, setUseCases] = useState<UseCase[]>([]);
@@ -126,14 +141,12 @@ export default function WorkbenchPage() {
         if (prsts.length > 0) setSelectedPreset(prsts.find(p => p.steps_preset === 'full')?.steps_preset || prsts[0].steps_preset);
         if (templates.length > 0) setSelectedTemplate(templates[0].name);
         
-        // Load user templates from localStorage
+        // Load user templates from server
         try {
-          const saved = localStorage.getItem('modellab_user_templates');
-          if (saved) {
-            setUserTemplates(JSON.parse(saved));
-          }
+          const userTpls = await api.getUserTemplates();
+          setUserTemplates(userTpls);
         } catch {
-          console.warn('Failed to load user templates from localStorage');
+          console.warn('Failed to load user templates from server');
         }
       } catch (e) {
         setError("Failed to load configuration");
@@ -143,29 +156,38 @@ export default function WorkbenchPage() {
     })();
   }, []);
 
-  // Save user template
-  const saveUserTemplate = () => {
-    if (!newTemplateName.trim()) return;
+  // Save user template (server-side)
+  const saveUserTemplate = async () => {
+    if (!newTemplateName.trim() || savingTemplate) return;
     
-    const template: UserTemplate = {
-      name: newTemplateName.trim(),
-      steps: selectedSteps,
-      preprocessing: selectedPreprocessing,
-      createdAt: new Date().toISOString(),
-    };
-    
-    const updated = [...userTemplates.filter(t => t.name !== template.name), template];
-    setUserTemplates(updated);
-    localStorage.setItem('modellab_user_templates', JSON.stringify(updated));
-    setShowSaveDialog(false);
-    setNewTemplateName('');
+    setSavingTemplate(true);
+    try {
+      await api.saveUserTemplate({
+        name: newTemplateName.trim(),
+        steps: selectedSteps,
+        preprocessing: selectedPreprocessing,
+      });
+      
+      // Refresh templates from server
+      const userTpls = await api.getUserTemplates();
+      setUserTemplates(userTpls);
+      setShowSaveDialog(false);
+      setNewTemplateName('');
+    } catch (e) {
+      console.error('Failed to save template', e);
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
-  // Delete user template
-  const deleteUserTemplate = (name: string) => {
-    const updated = userTemplates.filter(t => t.name !== name);
-    setUserTemplates(updated);
-    localStorage.setItem('modellab_user_templates', JSON.stringify(updated));
+  // Delete user template (server-side)
+  const deleteUserTemplate = async (name: string) => {
+    try {
+      await api.deleteUserTemplate(name);
+      setUserTemplates(userTemplates.filter(t => t.name !== name));
+    } catch (e) {
+      console.error('Failed to delete template', e);
+    }
   };
 
   // Load user template
@@ -253,10 +275,12 @@ export default function WorkbenchPage() {
         throw new Error("Invariant Violation: Compare mode requires exactly 2 selected candidates.");
       }
 
-      // Build config overrides
+      // Build config overrides with per-step configuration
       const configOverrides = showAdvanced ? {
         asr: modelConfig.asr,
+        diarization: modelConfig.diarization,
         device_preference: modelConfig.device_preference,
+        ...stepConfigs, // Merge per-step overrides
       } : undefined;
 
       // For simple single runs with custom pipeline, use direct workbench API
@@ -628,66 +652,177 @@ export default function WorkbenchPage() {
               )}
 
               {/* Model Configuration */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <label className="block">
-                  <span className="block font-semibold mb-1 text-sm">Model Size</span>
-                  <select
-                    value={modelConfig.asr.model_size}
-                    onChange={(e) => setModelConfig({
-                      ...modelConfig,
-                      asr: { ...modelConfig.asr, model_size: e.target.value }
-                    })}
-                    disabled={isSubmitting}
-                    className="w-full border p-2 rounded text-sm"
-                  >
-                    <option value="tiny">Tiny (fastest)</option>
-                    <option value="base">Base</option>
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large-v3">Large-v3 (most accurate)</option>
-                  </select>
-                </label>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm">Model Configuration</span>
+                  {pipelineMode === 'custom' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowStepConfig(!showStepConfig)}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      {showStepConfig ? '▼ Simple View' : '▶ Per-Step Config'}
+                    </button>
+                  )}
+                </div>
+                
+                {/* Simple Configuration (default) */}
+                {!showStepConfig && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label className="block">
+                      <span className="block font-semibold mb-1 text-sm">Model Size</span>
+                      <select
+                        value={modelConfig.asr.model_size}
+                        onChange={(e) => setModelConfig({
+                          ...modelConfig,
+                          asr: { ...modelConfig.asr, model_size: e.target.value }
+                        })}
+                        disabled={isSubmitting}
+                        className="w-full border p-2 rounded text-sm"
+                      >
+                        <option value="tiny">Tiny (fastest)</option>
+                        <option value="base">Base</option>
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large-v3">Large-v3 (most accurate)</option>
+                      </select>
+                    </label>
 
-                <label className="block">
-                  <span className="block font-semibold mb-1 text-sm">Language</span>
-                  <select
-                    value={modelConfig.asr.language}
-                    onChange={(e) => setModelConfig({
-                      ...modelConfig,
-                      asr: { ...modelConfig.asr, language: e.target.value }
-                    })}
-                    disabled={isSubmitting}
-                    className="w-full border p-2 rounded text-sm"
-                  >
-                    <option value="en">English</option>
-                    <option value="auto">Auto-detect</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                    <option value="zh">Chinese</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                    <option value="hi">Hindi</option>
-                    <option value="pt">Portuguese</option>
-                  </select>
-                </label>
+                    <label className="block">
+                      <span className="block font-semibold mb-1 text-sm">Language</span>
+                      <select
+                        value={modelConfig.asr.language}
+                        onChange={(e) => setModelConfig({
+                          ...modelConfig,
+                          asr: { ...modelConfig.asr, language: e.target.value }
+                        })}
+                        disabled={isSubmitting}
+                        className="w-full border p-2 rounded text-sm"
+                      >
+                        <option value="en">English</option>
+                        <option value="auto">Auto-detect</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="hi">Hindi</option>
+                        <option value="pt">Portuguese</option>
+                      </select>
+                    </label>
 
-                <label className="block">
-                  <span className="block font-semibold mb-1 text-sm">Device</span>
-                  <select
-                    value={modelConfig.device_preference[0]}
-                    onChange={(e) => setModelConfig({
-                      ...modelConfig,
-                      device_preference: [e.target.value, 'cpu']
-                    })}
-                    disabled={isSubmitting}
-                    className="w-full border p-2 rounded text-sm"
-                  >
-                    <option value="mps">Apple Silicon (MPS)</option>
-                    <option value="cuda">NVIDIA GPU (CUDA)</option>
-                    <option value="cpu">CPU</option>
-                  </select>
-                </label>
+                    <label className="block">
+                      <span className="block font-semibold mb-1 text-sm">Device</span>
+                      <select
+                        value={modelConfig.device_preference[0]}
+                        onChange={(e) => setModelConfig({
+                          ...modelConfig,
+                          device_preference: [e.target.value, 'cpu']
+                        })}
+                        disabled={isSubmitting}
+                        className="w-full border p-2 rounded text-sm"
+                      >
+                        <option value="mps">Apple Silicon (MPS)</option>
+                        <option value="cuda">NVIDIA GPU (CUDA)</option>
+                        <option value="cpu">CPU</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
+                
+                {/* Per-Step Configuration (advanced) */}
+                {showStepConfig && pipelineMode === 'custom' && (
+                  <div className="space-y-3 border rounded p-3 bg-white">
+                    {/* ASR Configuration */}
+                    {selectedSteps.includes('asr') && (
+                      <div className="border-b pb-3">
+                        <span className="block font-medium text-xs text-gray-600 mb-2">ASR (Speech-to-Text)</span>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className="block text-xs text-gray-500 mb-1">Model Size</span>
+                            <select
+                              value={modelConfig.asr.model_size}
+                              onChange={(e) => setModelConfig({
+                                ...modelConfig,
+                                asr: { ...modelConfig.asr, model_size: e.target.value }
+                              })}
+                              disabled={isSubmitting}
+                              className="w-full border p-1.5 rounded text-xs"
+                            >
+                              <option value="tiny">Tiny (fastest)</option>
+                              <option value="base">Base</option>
+                              <option value="small">Small</option>
+                              <option value="medium">Medium</option>
+                              <option value="large-v3">Large-v3 (accurate)</option>
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="block text-xs text-gray-500 mb-1">Language</span>
+                            <select
+                              value={modelConfig.asr.language}
+                              onChange={(e) => setModelConfig({
+                                ...modelConfig,
+                                asr: { ...modelConfig.asr, language: e.target.value }
+                              })}
+                              disabled={isSubmitting}
+                              className="w-full border p-1.5 rounded text-xs"
+                            >
+                              <option value="en">English</option>
+                              <option value="auto">Auto-detect</option>
+                              <option value="es">Spanish</option>
+                              <option value="fr">French</option>
+                              <option value="de">German</option>
+                              <option value="zh">Chinese</option>
+                              <option value="ja">Japanese</option>
+                              <option value="ko">Korean</option>
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Diarization Configuration */}
+                    {selectedSteps.includes('diarization') && (
+                      <div className="border-b pb-3">
+                        <span className="block font-medium text-xs text-gray-600 mb-2">Diarization (Speaker ID)</span>
+                        <label className="block">
+                          <span className="block text-xs text-gray-500 mb-1">Model</span>
+                          <select
+                            value={modelConfig.diarization.model_name}
+                            onChange={(e) => setModelConfig({
+                              ...modelConfig,
+                              diarization: { model_name: e.target.value }
+                            })}
+                            disabled={isSubmitting}
+                            className="w-full border p-1.5 rounded text-xs"
+                          >
+                            <option value="heuristic_diarization">Heuristic (fast)</option>
+                            <option value="pyannote_diarization">Pyannote (accurate)</option>
+                          </select>
+                        </label>
+                      </div>
+                    )}
+                    
+                    {/* Device Configuration */}
+                    <div>
+                      <span className="block font-medium text-xs text-gray-600 mb-2">Compute Device</span>
+                      <select
+                        value={modelConfig.device_preference[0]}
+                        onChange={(e) => setModelConfig({
+                          ...modelConfig,
+                          device_preference: [e.target.value, 'cpu']
+                        })}
+                        disabled={isSubmitting}
+                        className="w-full border p-1.5 rounded text-xs"
+                      >
+                        <option value="mps">Apple Silicon (MPS)</option>
+                        <option value="cuda">NVIDIA GPU (CUDA)</option>
+                        <option value="cpu">CPU only</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="text-xs text-gray-500 mt-2">

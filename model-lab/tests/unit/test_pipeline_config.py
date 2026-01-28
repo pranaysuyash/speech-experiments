@@ -14,6 +14,7 @@ from harness.pipeline_config import (
     list_pipeline_templates,
     validate_pipeline_config,
     get_pipeline_template,
+    parse_preprocessing_op,
 )
 
 
@@ -224,3 +225,87 @@ class TestSerialization:
         yaml_str = config.to_yaml()
         assert "steps:" in yaml_str
         assert "ingest" in yaml_str
+
+
+class TestPreprocessingParsing:
+    """Tests for preprocessing operator parsing."""
+    
+    def test_parse_simple_op(self):
+        """Parse operator without params."""
+        name, params = parse_preprocessing_op("trim_silence")
+        assert name == "trim_silence"
+        assert params == {}
+    
+    def test_parse_op_with_single_param(self):
+        """Parse operator with one parameter."""
+        name, params = parse_preprocessing_op("trim_silence(min_silence_ms=300)")
+        assert name == "trim_silence"
+        assert params == {"min_silence_ms": 300}
+    
+    def test_parse_op_with_multiple_params(self):
+        """Parse operator with multiple parameters."""
+        name, params = parse_preprocessing_op("trim_silence(min_silence_ms=300, threshold_db=-40)")
+        assert name == "trim_silence"
+        assert params == {"min_silence_ms": 300, "threshold_db": -40}
+    
+    def test_parse_op_with_float_param(self):
+        """Parse operator with float parameter."""
+        name, params = parse_preprocessing_op("speed(factor=1.5)")
+        assert name == "speed"
+        assert params == {"factor": 1.5}
+    
+    def test_parse_op_with_string_param(self):
+        """Parse operator with string parameter."""
+        name, params = parse_preprocessing_op("normalize_volume(method=peak)")
+        assert name == "normalize_volume"
+        assert params == {"method": "peak"}
+
+
+class TestToIngestConfig:
+    """Tests for converting PipelineConfig to IngestConfig."""
+    
+    def test_empty_preprocessing(self):
+        """Empty preprocessing returns default IngestConfig."""
+        config = PipelineConfig(steps=["ingest"], preprocessing=[])
+        ingest = config.to_ingest_config()
+        assert ingest.normalize is False
+        assert ingest.trim_silence is False
+    
+    def test_trim_silence_basic(self):
+        """trim_silence enables silence trimming."""
+        config = PipelineConfig(steps=["ingest"], preprocessing=["trim_silence"])
+        ingest = config.to_ingest_config()
+        assert ingest.trim_silence is True
+    
+    def test_trim_silence_with_params(self):
+        """trim_silence with custom parameters."""
+        config = PipelineConfig(
+            steps=["ingest"],
+            preprocessing=["trim_silence(min_silence_ms=300, threshold_db=-35)"]
+        )
+        ingest = config.to_ingest_config()
+        assert ingest.trim_silence is True
+        assert ingest.silence_duration_s == 0.3
+        assert ingest.silence_threshold_db == -35
+    
+    def test_normalize_loudness(self):
+        """normalize_loudness enables normalization."""
+        config = PipelineConfig(steps=["ingest"], preprocessing=["normalize_loudness"])
+        ingest = config.to_ingest_config()
+        assert ingest.normalize is True
+    
+    def test_resample(self):
+        """resample sets sample rate."""
+        config = PipelineConfig(steps=["ingest"], preprocessing=["resample(target_sr=22050)"])
+        ingest = config.to_ingest_config()
+        assert ingest.sample_rate == 22050
+    
+    def test_multiple_ops(self):
+        """Multiple preprocessing ops are combined."""
+        config = PipelineConfig(
+            steps=["ingest"],
+            preprocessing=["trim_silence", "normalize_loudness"]
+        )
+        ingest = config.to_ingest_config()
+        assert ingest.trim_silence is True
+        assert ingest.normalize is True

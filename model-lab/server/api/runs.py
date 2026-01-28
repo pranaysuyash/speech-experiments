@@ -162,6 +162,7 @@ def get_run_status(run_id: str):
         "run_id": run_id,
         "status": status,
         "current_step": current_step,
+        "updated_at": updated_at,
         "steps_completed": steps_completed,
         "failure_step": manifest.get("failure_step"),
         "error_message": manifest.get("error", {}).get("message"),

@@ -6,10 +6,12 @@ Provides endpoints for:
 - Listing and retrieving pipeline templates
 - Creating custom pipeline configurations
 - Running ad-hoc pipelines with user-selected steps
+- User-defined pipeline templates (CRUD)
 """
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -32,6 +34,30 @@ from harness.pipeline_config import (
 )
 
 router = APIRouter(prefix="/api/pipelines", tags=["pipelines"])
+
+
+# ============================================================================
+# User Templates Storage
+# ============================================================================
+
+def _user_templates_path() -> Path:
+    return Path(os.environ.get("MODEL_LAB_DATA_ROOT", "data")).resolve() / "user_templates.json"
+
+
+def _load_user_templates() -> Dict[str, Dict[str, Any]]:
+    path = _user_templates_path()
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_user_templates(templates: Dict[str, Dict[str, Any]]) -> None:
+    path = _user_templates_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(templates, indent=2, sort_keys=True), encoding="utf-8")
 
 
 # ============================================================================
@@ -66,6 +92,14 @@ class PipelineValidateRequest(BaseModel):
     steps: List[str]
     preprocessing: Optional[List[str]] = None
     config: Optional[Dict[str, Dict[str, Any]]] = None
+
+
+class UserTemplateRequest(BaseModel):
+    """Request body for creating/updating a user template."""
+    name: str
+    steps: List[str]
+    preprocessing: Optional[List[str]] = None
+    description: Optional[str] = None
 
 
 # ============================================================================
@@ -286,3 +320,111 @@ def build_pipeline_config(
         config=config or {},
         device_preference=device_preference or ["mps", "cuda", "cpu"],
     )
+
+
+# ============================================================================
+# User Templates Endpoints
+# ============================================================================
+
+@router.get("/user-templates")
+def list_user_templates() -> JSONResponse:
+    """
+    List all user-defined pipeline templates.
+    """
+    templates = _load_user_templates()
+    return JSONResponse(content=[
+        {
+            "name": name,
+            "steps": data.get("steps", []),
+            "preprocessing": data.get("preprocessing", []),
+            "description": data.get("description", ""),
+            "created_at": data.get("created_at"),
+            "updated_at": data.get("updated_at"),
+        }
+        for name, data in templates.items()
+    ])
+
+
+@router.post("/user-templates")
+def create_user_template(request: UserTemplateRequest) -> JSONResponse:
+    """
+    Create or update a user-defined pipeline template.
+    """
+    # Validate steps
+    errors = validate_pipeline_config({
+        "steps": request.steps,
+        "preprocessing": request.preprocessing or [],
+    })
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+    
+    templates = _load_user_templates()
+    now = datetime.now(timezone.utc).isoformat()
+    
+    is_update = request.name in templates
+    
+    templates[request.name] = {
+        "steps": request.steps,
+        "preprocessing": request.preprocessing or [],
+        "description": request.description or "",
+        "created_at": templates.get(request.name, {}).get("created_at", now),
+        "updated_at": now,
+    }
+    
+    _save_user_templates(templates)
+    
+    return JSONResponse(
+        status_code=200 if is_update else 201,
+        content={
+            "name": request.name,
+            "created": not is_update,
+            "updated": is_update,
+        }
+    )
+
+
+@router.get("/user-templates/{name}")
+def get_user_template(name: str) -> JSONResponse:
+    """
+    Get a specific user-defined template.
+    """
+    templates = _load_user_templates()
+    if name not in templates:
+        raise HTTPException(status_code=404, detail=f"User template '{name}' not found")
+    
+    data = templates[name]
+    
+    # Resolve dependencies for display
+    try:
+        config = PipelineConfig(
+            steps=data.get("steps", []),
+            preprocessing=data.get("preprocessing", []),
+        )
+        resolved = config.resolve_dependencies()
+    except ValueError:
+        resolved = data.get("steps", [])
+    
+    return JSONResponse(content={
+        "name": name,
+        "steps": data.get("steps", []),
+        "preprocessing": data.get("preprocessing", []),
+        "description": data.get("description", ""),
+        "resolved_steps": resolved,
+        "created_at": data.get("created_at"),
+        "updated_at": data.get("updated_at"),
+    })
+
+
+@router.delete("/user-templates/{name}")
+def delete_user_template(name: str) -> JSONResponse:
+    """
+    Delete a user-defined template.
+    """
+    templates = _load_user_templates()
+    if name not in templates:
+        raise HTTPException(status_code=404, detail=f"User template '{name}' not found")
+    
+    del templates[name]
+    _save_user_templates(templates)
+    
+    return JSONResponse(content={"deleted": name})
