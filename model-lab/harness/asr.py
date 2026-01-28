@@ -55,11 +55,12 @@ def resolve_asr_config(user_config: Optional[Dict[str, Any]] = None) -> Resolved
     - language: "auto" unless forced in config
     """
     user_config = user_config or {}
-    
+
     # 1. Resolve model_id
     model_type = user_config.get("model_type", "faster_whisper")
-    model_name = user_config.get("model_name", "default")
-    
+    # Accept both model_name and model_size for flexibility (UI uses model_size)
+    model_name = user_config.get("model_name") or user_config.get("model_size", "default")
+
     # Map "default" to actual model name per model type
     if model_name == "default":
         default_models = {

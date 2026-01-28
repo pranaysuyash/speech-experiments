@@ -811,7 +811,11 @@ class SessionRunner:
              # Call harness function. Assuming refactoring to take (input, output_dir, config)
              # Current: run_asr(input_path, output_dir, model_name, device, logic_config)
              from harness.asr import run_asr
-             res = run_asr(ctx.audio_path, ctx.artifacts_dir, config=self.extra_config.get("asr", {}), progress_callback=ctx.on_progress)
+             # Merge device_preference from top-level config into ASR config
+             asr_config = dict(self.extra_config.get("asr", {}))
+             if "device_preference" in self.extra_config:
+                 asr_config["device_preference"] = self.extra_config["device_preference"]
+             res = run_asr(ctx.audio_path, ctx.artifacts_dir, config=asr_config, progress_callback=ctx.on_progress)
              
              # Post-process to ensure type info for registry
              if isinstance(res, dict) and "artifacts" in res:
