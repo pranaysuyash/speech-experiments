@@ -290,11 +290,24 @@ export default function WorkbenchPage() {
         return;
       }
 
+      // Build pipeline options for experiment (if using custom pipeline in compare mode)
+      const pipelineOptions = showAdvanced && pipelineMode !== 'preset' ? {
+        steps: pipelineMode === 'custom' ? selectedSteps : undefined,
+        preprocessing: selectedPreprocessing.length > 0 ? selectedPreprocessing : undefined,
+        pipelineTemplate: pipelineMode === 'template' ? selectedTemplate : undefined,
+      } : undefined;
+
       // For experiment-based runs (compare mode or preset mode)
-      const exp = await api.createExperiment(file, useCaseId, candsToRun, {
-        ...configOverrides,
-        steps_preset: selectedPreset,
-      });
+      const exp = await api.createExperiment(
+        file,
+        useCaseId,
+        candsToRun,
+        {
+          ...configOverrides,
+          steps_preset: selectedPreset,
+        },
+        pipelineOptions
+      );
       const expId = exp.experiment_id;
 
       if (mode === 'single') {

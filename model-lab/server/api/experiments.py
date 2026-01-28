@@ -27,6 +27,7 @@ from server.api.candidates import (
     get_candidate_snapshot,
     USE_CASES,
 )
+from server.api.pipelines import build_pipeline_config
 from server.services.compare_results_v1 import compute_comparison_v1
 from server.services.results_v1 import compute_result_v1
 
@@ -110,12 +111,23 @@ def _load_experiment(experiment_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _parse_csv(value: Optional[str]) -> list[str]:
+    """Parse a comma-separated string into a list of non-empty, stripped items."""
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 @router.post("")
 async def create_experiment(
     file: UploadFile = File(...),
     use_case_id: str = Form(...),
     candidate_ids: Optional[str] = Form(None),  # comma-separated, optional
     config: Optional[str] = Form(None),  # JSON config overrides
+    # Dynamic pipeline configuration (new parameters)
+    steps: Optional[str] = Form(None),  # comma-separated custom steps
+    preprocessing: Optional[str] = Form(None),  # comma-separated preprocessing ops
+    pipeline_template: Optional[str] = Form(None),  # named template
 ) -> JSONResponse:
     
     # Parse candidate_ids if provided
@@ -205,11 +217,38 @@ async def create_experiment(
     
     sha256_hex = h.hexdigest()
     now = datetime.now(timezone.utc)
-    
+
+    # Parse dynamic pipeline configuration
+    custom_steps = _parse_csv(steps)
+    preprocessing_ops = _parse_csv(preprocessing)
+    pipeline_template_name = pipeline_template.strip() if pipeline_template else None
+
+    # Resolve pipeline configuration if custom parameters provided
+    resolved_pipeline = None
+    if custom_steps or pipeline_template_name or preprocessing_ops:
+        try:
+            pipeline_cfg = build_pipeline_config(
+                template=pipeline_template_name,
+                steps=custom_steps or None,
+                preprocessing=preprocessing_ops or None,
+            )
+            resolved_pipeline = {
+                "template": pipeline_template_name,
+                "steps_custom": custom_steps or None,
+                "preprocessing": preprocessing_ops or None,
+                "resolved_steps": pipeline_cfg.resolve_dependencies(),
+                "config": pipeline_cfg.to_dict(),
+            }
+        except ValueError as e:
+            return JSONResponse(
+                status_code=400,
+                content={"error_code": "INVALID_PIPELINE", "error_message": str(e)}
+            )
+
     # Build candidates with snapshots (for reproducibility)
     candidate_configs = []
     for i, c in enumerate(candidates_list):
-        config = {
+        cand_config = {
             "candidate_id": ["A", "B"][i],
             "candidate_ref": c.candidate_id,  # original candidate ID
             "label": c.label,
@@ -221,11 +260,14 @@ async def create_experiment(
                 "params": c.params if hasattr(c, 'params') else {},
             }
         }
-        candidate_configs.append(config)
+        # If custom pipeline provided, override the steps for all candidates
+        if resolved_pipeline:
+            cand_config["pipeline_config"] = resolved_pipeline
+        candidate_configs.append(cand_config)
     
     # Write experiment_request.json
     request_data = {
-        "schema_version": "2",  # upgraded from 1 to include candidate snapshots
+        "schema_version": "3",  # upgraded to include pipeline configuration
         "experiment_id": experiment_id,
         "created_at": now.isoformat(),
         "use_case_id": use_case_id,
@@ -238,34 +280,42 @@ async def create_experiment(
         },
         "candidates": candidate_configs,
     }
+    # Add pipeline configuration if custom pipeline was specified
+    if resolved_pipeline:
+        request_data["pipeline_config"] = resolved_pipeline
     _atomic_write_json(exp_dir / "experiment_request.json", request_data)
     
     # Compute provenance hash
     req_canonical = json.dumps(request_data, sort_keys=True, separators=(',', ':')).encode('utf-8')
     req_hash = hashlib.sha256(req_canonical).hexdigest()
     
+    # Build run entries with optional pipeline config
+    run_entries = []
+    for c in candidate_configs:
+        run_entry = {
+            "candidate_id": c["candidate_id"],
+            "candidate_ref": c["candidate_ref"],
+            "steps_preset": c["steps_preset"],
+            "run_id": None,
+            "status": "QUEUED",
+            "created_at": now.isoformat(),
+            "started_at": None,
+            "ended_at": None,
+        }
+        if c.get("pipeline_config"):
+            run_entry["pipeline_config"] = c["pipeline_config"]
+        run_entries.append(run_entry)
+
     # Write experiment_state.json
     state_data = {
-        "schema_version": "1",
+        "schema_version": "2",  # upgraded to include pipeline configuration
         "experiment_id": experiment_id,
         "provenance": {
             "hash": req_hash,
             "algorithm": "sha256",
             "timestamp": now.isoformat(),
         },
-        "runs": [
-            {
-                "candidate_id": c["candidate_id"],
-                "candidate_ref": c["candidate_ref"],
-                "steps_preset": c["steps_preset"],
-                "run_id": None,
-                "status": "QUEUED",
-                "created_at": now.isoformat(),
-                "started_at": None,
-                "ended_at": None,
-            }
-            for c in candidate_configs
-        ],
+        "runs": run_entries,
         "last_updated_at": now.isoformat(),
     }
     _atomic_write_json(exp_dir / "experiment_state.json", state_data)
@@ -336,7 +386,10 @@ def start_next_run(experiment_id: str) -> JSONResponse:
         None
     )
     candidate_snapshot = candidate_config.get("candidate_snapshot") if candidate_config else None
-    
+
+    # Get pipeline config (from run slot or experiment-level)
+    pipeline_config = queued_slot.get("pipeline_config") or request.get("pipeline_config")
+
     # Try to start run
     try:
         result = start_run_from_path(
@@ -351,6 +404,7 @@ def start_next_run(experiment_id: str) -> JSONResponse:
                 "rel_path": f"experiments/{experiment_id}/{input_rel}",
             },
             candidate_snapshot=candidate_snapshot,
+            pipeline_config=pipeline_config,
         )
     except RunnerBusyError:
         return JSONResponse(status_code=409, content={"error_code": "RUNNER_BUSY"})

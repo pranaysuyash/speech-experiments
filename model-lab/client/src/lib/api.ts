@@ -239,7 +239,17 @@ export const api = {
     `${API_BASE}/runs/${runId}/meeting-pack/artifacts/${encodeURIComponent(name)}/preview?max_bytes=${maxBytes}`,
 
   // Experiments
-  createExperiment: async (file: File, use_case_id: string, candidate_ids?: string[], config?: Record<string, unknown>): Promise<any> => {
+  createExperiment: async (
+    file: File,
+    use_case_id: string,
+    candidate_ids?: string[],
+    config?: Record<string, unknown>,
+    pipelineOptions?: {
+      steps?: string[];
+      preprocessing?: string[];
+      pipelineTemplate?: string;
+    }
+  ): Promise<any> => {
     const form = new FormData();
     form.append('file', file);
     form.append('use_case_id', use_case_id);
@@ -248,6 +258,16 @@ export const api = {
     }
     if (config) {
       form.append('config', JSON.stringify(config));
+    }
+    // Pipeline configuration (for custom steps in compare mode)
+    if (pipelineOptions?.steps?.length) {
+      form.append('steps', pipelineOptions.steps.join(','));
+    }
+    if (pipelineOptions?.preprocessing?.length) {
+      form.append('preprocessing', pipelineOptions.preprocessing.join(','));
+    }
+    if (pipelineOptions?.pipelineTemplate) {
+      form.append('pipeline_template', pipelineOptions.pipelineTemplate);
     }
     const res = await axios.post(`${API_BASE}/experiments`, form);
     return res.data;

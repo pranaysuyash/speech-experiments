@@ -118,12 +118,13 @@ def start_run_from_path(
     source_ref: Optional[Dict[str, Any]] = None,
     candidate_snapshot: Optional[Dict[str, Any]] = None,
     config_overrides: Optional[Dict[str, Any]] = None,
+    pipeline_config: Optional[Dict[str, Any]] = None,  # Custom pipeline configuration
 ) -> Dict[str, Any]:
     """
     Start a run from a file path (not multipart upload).
-    
+
     This is the pure function callable by experiments API.
-    
+
     Args:
         input_path: Path to input media file
         use_case_id: Use case identifier
@@ -132,27 +133,41 @@ def start_run_from_path(
         candidate_id: Optional candidate ID within experiment
         source_ref: Optional source reference metadata
         config_overrides: Optional configuration overrides (e.g. device_preference)
-    
+        pipeline_config: Optional custom pipeline configuration with resolved_steps
+
     Returns:
         {run_id, run_dir, console_url}
-    
+
     Raises:
         RunnerBusyError: If runner is already processing another job
         HTTPException: If preset is invalid
     """
     if not try_acquire_worker():
         raise RunnerBusyError("Runner is busy with another job")
-    
+
     try:
-        if steps_preset not in PRESETS:
+        # Determine steps: pipeline_config takes precedence over preset
+        if pipeline_config and pipeline_config.get("resolved_steps"):
+            steps = pipeline_config["resolved_steps"]
+        elif steps_preset not in PRESETS:
             raise HTTPException(status_code=400, detail=f"Invalid steps_preset. Available: {list(PRESETS.keys())}")
-        
-        steps = PRESETS[steps_preset]["steps"]
-        
+        else:
+            steps = PRESETS[steps_preset]["steps"]
+
         # Merge config overrides
         run_config = config_overrides or {}
-        
-        runner = SessionRunner(input_path, _runs_root(), steps=steps, config=run_config)
+
+        # Build preprocessing config if provided in pipeline_config
+        ingest_config = None
+        if pipeline_config and pipeline_config.get("config"):
+            from harness.pipeline_config import PipelineConfig
+            try:
+                cfg = PipelineConfig.from_dict(pipeline_config["config"])
+                ingest_config = cfg.to_ingest_config()
+            except Exception:
+                pass  # Fall back to no preprocessing
+
+        runner = SessionRunner(input_path, _runs_root(), steps=steps, config=run_config, preprocessing=ingest_config)
         
         now = datetime.now(timezone.utc)
         
@@ -181,6 +196,10 @@ def start_run_from_path(
             run_request_data["candidate_id"] = candidate_id
             run_request_data["source_ref"] = source_ref
             run_request_data["candidate_snapshot"] = candidate_snapshot
+
+        # Add pipeline configuration if custom pipeline was used
+        if pipeline_config:
+            run_request_data["pipeline_config"] = pipeline_config
 
         # Launch worker
         result = launch_run_worker(runner, run_request_data, background=True)
