@@ -24,24 +24,27 @@ fi
 poll_run() {
   local run_id="$1"
   local start_time=$(date +%s)
+  local final_status=""
   
   while true; do
     local status
     status=$(curl -sS --max-time 5 "$SERVER/api/runs/$run_id/status" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
-    echo "  status=$status"
+    echo "  status=$status" >&2
     
     if [[ "$status" =~ ^(COMPLETED|FAILED|STALE)$ ]]; then
-      echo "$status"
-      return 0
+      final_status="$status"
+      break
     fi
     
     local now=$(date +%s)
     if (( now - start_time > TIMEOUT )); then
-      echo "TIMEOUT"
-      return 1
+      final_status="TIMEOUT"
+      break
     fi
     sleep 2
   done
+  
+  echo "$final_status"
 }
 
 # ============================================================================
