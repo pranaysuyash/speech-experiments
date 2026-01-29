@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { RunDetail as RunDetailType, ResultSummary, StepProgress as ApiStepProgress } from '../lib/api';
@@ -7,6 +7,7 @@ import { Loader2, ArrowLeft, Download } from 'lucide-react';
 import { deriveRunDetailViewModel } from '../lib/viewModel';
 import { PipelineProgress, type StepProgressData } from './PipelineProgress';
 import RunHistory from './RunHistory';
+import { RunEventStream, type RunEvent } from '../lib/ws';
 
 interface RunDetailProps {
     onBack?: () => void;
@@ -167,7 +168,10 @@ export default function RunDetail({ onBack }: RunDetailProps) {
         );
     };
 
-    // Poll for status until terminal
+    // WebSocket stream ref for real-time events
+    const wsRef = useRef<RunEventStream | null>(null);
+
+    // Poll for status until terminal, with WebSocket streaming for real-time updates
     useEffect(() => {
         if (!runId) return;
         let pollTimer: ReturnType<typeof setInterval>;
@@ -199,6 +203,12 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 if (['COMPLETED', 'FAILED', 'STALE', 'CANCELLED'].includes(s.status)) {
                     if (pollTimer) clearInterval(pollTimer);
 
+                    // Close WebSocket when run is terminal
+                    if (wsRef.current) {
+                        wsRef.current.close();
+                        wsRef.current = null;
+                    }
+
                     // Fetch Semantic Results (Metrics, Flags)
                     try {
                         const res = await api.getRunResults(runId);
@@ -215,12 +225,67 @@ export default function RunDetail({ onBack }: RunDetailProps) {
             }
         };
 
+        // Initialize WebSocket for real-time events
+        const initWebSocket = () => {
+            if (wsRef.current) return; // Already connected
+
+            // Create stream (connection starts automatically)
+            const ws = new RunEventStream(runId);
+            wsRef.current = ws;
+
+            ws.onEvent((event: RunEvent) => {
+                if (!isActive) return;
+
+                // Handle different event types
+                switch (event.type) {
+                    case 'step_started':
+                    case 'step_completed':
+                    case 'step_failed':
+                    case 'step_progress':
+                        // Real-time step updates - trigger a status refresh
+                        // This is more responsive than waiting for the next poll
+                        checkStatus();
+                        break;
+
+                    case 'run_completed':
+                    case 'run_failed':
+                    case 'run_cancelled':
+                        // Terminal event - fetch final status
+                        checkStatus();
+                        break;
+
+                    case 'heartbeat':
+                        // Heartbeat confirms connection is alive
+                        break;
+
+                    default:
+                        // Log unknown events for debugging
+                        console.debug('Unknown WS event:', event);
+                }
+            });
+
+            ws.onError((_error) => {
+                console.warn('WebSocket error, falling back to polling');
+                // WebSocket failed, but polling will continue as backup
+            });
+
+            // Connect after setting up handlers
+            ws.connect();
+        };
+
         checkStatus();
         pollTimer = setInterval(checkStatus, 2000);
+
+        // Start WebSocket connection for real-time updates
+        initWebSocket();
 
         return () => {
             isActive = false;
             if (pollTimer) clearInterval(pollTimer);
+            if (wsRef.current) {
+                wsRef.current.close();
+                wsRef.current = null;
+            }
         };
     }, [runId]);
 
