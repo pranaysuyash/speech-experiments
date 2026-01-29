@@ -272,8 +272,20 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                             <div className="font-semibold text-red-800 text-sm mb-1">❌ {step.name}</div>
                             {step.error && (
                                 <>
-                                    <div className="text-xs text-red-700 font-mono mb-1">{step.error.type}</div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xs text-red-700 font-mono">{step.error.code || step.error.type}</span>
+                                        {step.error.recoverable && (
+                                            <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
+                                                Recoverable
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="text-sm text-red-600">{step.error.message}</div>
+                                    {step.error.traceback_path && (
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            Traceback: {step.error.traceback_path}
+                                        </div>
+                                    )}
                                 </>
                             )}
                             {step.duration_ms && (
@@ -703,10 +715,20 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                                 </div>
                             )}
                         </div>
-                        <div className="text-right">
-                            <span className="text-xs font-mono text-red-500 bg-red-100 px-2 py-1 rounded border border-red-200">
+                        <div className="text-right space-y-1">
+                            <span className="text-xs font-mono text-red-500 bg-red-100 px-2 py-1 rounded border border-red-200 block">
                                 Step: {status.failed_step || "N/A"}
                             </span>
+                            {status.error_code && (
+                                <span className="text-xs font-mono text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200 block">
+                                    {status.error_code}
+                                </span>
+                            )}
+                            {status.error_recoverable && (
+                                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded block">
+                                    Recoverable - Try Again
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -835,7 +857,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                 {/* Actions */}
                 <div className="mt-8 flex flex-col items-center gap-4">
                     {renderActions("flex items-center gap-4 justify-center")}
-                    <button onClick={onBack} className="mt-2 text-sm text-gray-500 hover:text-gray-700 underline">
+                    <button type="button" onClick={onBack} className="mt-2 text-sm text-gray-500 hover:text-gray-700 underline">
                         Back to List
                     </button>
                 </div>
@@ -849,7 +871,7 @@ export default function RunDetail({ onBack }: RunDetailProps) {
             {/* Header */}
             <header className="bg-white border-b py-3 px-6 flex items-center justify-between shadow-sm z-10">
                 <div className="flex items-center gap-4">
-                    <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full">
+                    <button type="button" onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full" title="Back to list" aria-label="Back to list">
                         <ArrowLeft size={20} />
                     </button>
                     <div>

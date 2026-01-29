@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import logging
 
 from harness.media_ingest import IngestConfig, ingest_media, sha256_file
+from harness.errors import classify_error, format_traceback, E_UNKNOWN
 
 logger = logging.getLogger("session")
 
@@ -1301,28 +1302,47 @@ class SessionRunner:
             entry["status"] = "FAILED"
             entry["ended_at"] = now_iso()
             entry["duration_ms"] = duration_ms
-            entry["error"] = {"type": e.__class__.__name__, "message": str(e)}
-            
+
+            # Classify error using structured error types
+            error_code, recoverable = classify_error(e)
+
+            entry["error"] = {
+                "type": e.__class__.__name__,
+                "message": str(e),
+                "code": error_code,
+                "recoverable": recoverable,
+            }
+
+            # Save traceback to file for debugging
+            logs_dir = self.session_dir / "logs"
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            traceback_path = logs_dir / f"{name}_traceback.txt"
+            try:
+                traceback_path.write_text(format_traceback(e))
+                entry["error"]["traceback_path"] = str(traceback_path.relative_to(self.session_dir))
+            except Exception:
+                pass  # Don't fail on traceback write
+
             # Add failure fields to manifest
             m["status"] = "FAILED"
             m["failure_step"] = name  # AUTHORITATIVE: Captured at exception site
             m["error_step"] = name
-            m["error_code"] = e.__class__.__name__
+            m["error_code"] = error_code  # Use classified error code
             m["error_message"] = str(e)[:200]  # Truncate to 200 chars
+            m["error_recoverable"] = recoverable
             m["current_step"] = None  # No longer running
             m["updated_at"] = now_iso()
-            
+
             # Log path if artifacts exist
             artifacts_dir = self.session_dir / "artifacts" / name
             if artifacts_dir.exists():
                 m["log_path"] = str(artifacts_dir.relative_to(self.session_dir))
-            
+
             self._save_manifest(m)
             # Log the full exception traceback for server logs
-            logger.exception(f"Step '{name}' failed")
+            logger.exception(f"Step '{name}' failed with {error_code}")
             # We do NOT re-raise here to allow the runner loop to handle the break
             return
-            raise
         
         finally:
             # Stop heartbeat thread
