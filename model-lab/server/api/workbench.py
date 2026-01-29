@@ -46,6 +46,21 @@ def _parse_csv(value: Optional[str]) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Deep merge two dictionaries.
+
+    Override values take precedence. Nested dicts are merged recursively.
+    """
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
 # Preset registry - source of truth for available step presets
 PRESETS = {
     "ingest": {
@@ -154,8 +169,14 @@ def start_run_from_path(
         else:
             steps = PRESETS[steps_preset]["steps"]
 
-        # Merge config overrides
-        run_config = config_overrides or {}
+        # Merge config: candidate params (base) + config overrides (user)
+        # Candidate params come from the candidate definition (e.g., model_type, model_name)
+        # Config overrides come from the UI (e.g., device_preference)
+        run_config = {}
+        if candidate_snapshot and candidate_snapshot.get("params"):
+            run_config = _deep_merge(run_config, candidate_snapshot["params"])
+        if config_overrides:
+            run_config = _deep_merge(run_config, config_overrides)
 
         # Build preprocessing config if provided in pipeline_config
         ingest_config = None
