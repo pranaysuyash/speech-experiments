@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Pre-commit hook: Run worklog checker and basic hygiene
+set -euo pipefail
+
+echo "Running pre-commit checks..."
+
+# Check if worklog checker exists and run it
+if [ -x scripts/worklog_checker.sh ]; then
+  scripts/worklog_checker.sh
+else
+  echo "Warning: scripts/worklog_checker.sh not found or not executable."
+fi
+
+# Check for ticket references in commit message
+commit_msg=$(cat "$1")
+if ! echo "$commit_msg" | grep -qE "TCK-[0-9]{8}-[0-9]{3}"; then
+  echo "Warning: Commit message does not reference a ticket (TCK-YYYYMMDD-NNN). Consider adding one."
+fi
+
+echo "Pre-commit checks complete."
