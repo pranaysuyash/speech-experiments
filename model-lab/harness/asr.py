@@ -133,7 +133,8 @@ def run_asr(
     input_path: Path,
     output_dir: Path,
     config: Optional[Dict[str, Any]] = None,
-    progress_callback: Optional[Callable[[], None]] = None
+    progress_callback: Optional[Callable[[], None]] = None,
+    update_progress: Optional[Callable[[int, Optional[str], Optional[int]], None]] = None
 ) -> Dict[str, Any]:
     """
     Run ASR on input media.
@@ -201,10 +202,16 @@ def run_asr(
     t0 = time.time()
     logger.info(f"Loading {model_type} on {device}")
     
+    if update_progress:
+        update_progress(5, "Loading model...")
+    
     try:
         model_bundle = ModelRegistry.load_model(model_type, config, device=device)
     except Exception as e:
         raise ValueError(f"Failed to load model {model_type}: {e}")
+
+    if update_progress:
+        update_progress(20, "Model loaded, preparing audio...")
 
     # Check capabilities
     caps = model_bundle.get("capabilities", [])
@@ -222,6 +229,8 @@ def run_asr(
         raise RuntimeError(f"Failed to read audio file {ingest_audio_path}: {e}")
     
     logger.info(f"Transcribing {ingest_audio_path.name}...")
+    if update_progress:
+        update_progress(30, "Transcribing audio...")
     try:
          # Pass progress_callback if supported? 
          # Bundle Contract v1 doesn't strictly mandate progress_callback in signature, 
@@ -233,6 +242,9 @@ def run_asr(
          result = transcribe_func(audio_data, sr=sr)
     except Exception as e:
          raise RuntimeError(f"Transcription failed: {e}")
+
+    if update_progress:
+        update_progress(90, "Processing results...")
 
     duration_ms = int((time.time() - t0) * 1000)
     
@@ -297,6 +309,9 @@ def run_asr(
     
     with open(artifact_path, 'w') as f:
         json.dump(artifact.to_dict(), f, indent=2)
+    
+    if update_progress:
+        update_progress(100, "ASR completed")
         
     return {
         "artifacts": [

@@ -1,0 +1,7 @@
+provider,product,sku_or_model,unit,pricing_url,last_checked_utc,notes
+OpenAI,Transcription,gpt-4o-mini-transcribe,per minute / per token,https://platform.openai.com/pricing,,Store price snapshots by date. Keep region/currency if relevant.
+Google Cloud,Speech-to-Text,Speech-to-Text v2,per 15 seconds / per minute,https://cloud.google.com/speech-to-text/pricing,,"Different tiers for standard vs enhanced, streaming vs batch."
+AWS,Transcribe,AWS Transcribe,per minute,https://aws.amazon.com/transcribe/pricing/,,Add medical/call analytics SKUs if needed.
+Microsoft Azure,Speech,Speech to Text / Neural TTS,per hour / per million chars,https://azure.microsoft.com/pricing/details/cognitive-services/speech-services/,,Separate STT and TTS SKUs.
+Deepgram,ASR,Deepgram,per minute,https://deepgram.com/pricing,,Track model tier and features like diarization.
+ElevenLabs,TTS,ElevenLabs,per character / subscription,https://elevenlabs.io/pricing,,Track voice cloning and usage tiers.

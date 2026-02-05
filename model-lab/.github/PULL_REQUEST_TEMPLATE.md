@@ -3,6 +3,7 @@
 Short description of changes and why they were needed.
 
 ## Checklist
+
 - [ ] Added or updated worklog ticket(s) in `docs/WORKLOG_TICKETS.md` (include ticket IDs)
 - [ ] Linked evidence (audit file, logs, tests)
 - [ ] Verified tests: `pytest -q` and any relevant client builds
@@ -10,5 +11,6 @@ Short description of changes and why they were needed.
 - [ ] Updated docs/ if behavior changed
 
 ## Reviewer Notes
+
 - Acceptance criteria to verify
 - Any rollout or migration notes

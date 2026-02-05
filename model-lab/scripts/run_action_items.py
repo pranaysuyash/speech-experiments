@@ -162,7 +162,7 @@ def extract_chunk_action_items(
 def run_action_items(
     asr_artifact_path: Path,
     nlp_model: str = DEFAULT_NLP_MODEL,
-    chunking_policy: ChunkingPolicy = None,
+    chunking_policy: Optional[ChunkingPolicy] = None,
 ) -> Tuple[Dict[str, Any], Path]:
     """
     Extract action items from ASR artifact, with chunking for long audio.
@@ -303,7 +303,7 @@ def run_action_items(
     return artifact_dict, run_file
 
 
-def run_asr_first(input_path: Path, asr_model: str = None, pre: str = None) -> Path:
+def run_asr_first(input_path: Path, asr_model: Optional[str] = None, pre: Optional[str] = None) -> Path:
     """Run ASR on input file and return artifact path."""
     logger.info(f"Running ASR on {input_path.name}...")
     

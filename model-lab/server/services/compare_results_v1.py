@@ -17,7 +17,7 @@ def compute_comparison_v1(experiment_id: str, res_a: Optional[Dict], res_b: Opti
     """
     
     # Base Structure
-    summary = {
+    summary: Dict[str, Any] = {
         "schema_version": "v1",
         "experiment_id": experiment_id,
         "candidates": {

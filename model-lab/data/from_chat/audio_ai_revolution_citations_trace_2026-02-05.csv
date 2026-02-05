@@ -1,0 +1,13 @@
+domain,kind,detail,notes
+www.daily.co,visit,webpage,Domain provided; full URL not captured in trace.
+blog.csdn.net,visit,webpage,Domain provided; full URL not captured in trace.
+graphlogic.ai,visit,webpage,Domain provided; full URL not captured in trace.
+www.jamy.ai,visit,webpage,Domain provided; full URL not captured in trace.
+zhuanlan.zhihu.com,visit,webpage,Domain provided; full URL not captured in trace.
+stability.ai,visit,webpage,Domain provided; full URL not captured in trace.
+microsoft.ai,visit,webpage,Domain provided; full URL not captured in trace.
+news.qq.com,visit,webpage,Domain provided; full URL not captured in trace.
+www.siliconflow.com,visit,webpage,Domain provided; full URL not captured in trace.
+github.com,visit,webpage,Domain provided; full URL not captured in trace.
+(multiple),search,"Whisper model alternatives; audio generation models comparison 2026; Open source speech recognition model comparison 2025; ...",Search queries are preserved only as free-form text in the raw trace file.
+

@@ -58,7 +58,7 @@ class EntityMetrics:
     @staticmethod
     def extract_entities(text: str) -> Dict[str, List[str]]:
         """Extract entities by category from text."""
-        entities = {category: [] for category in EntityMetrics.PATTERNS}
+        entities: Dict[str, List[str]] = {category: [] for category in EntityMetrics.PATTERNS}
 
         for category, patterns in EntityMetrics.PATTERNS.items():
             for pattern in patterns:

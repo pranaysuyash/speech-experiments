@@ -6,7 +6,7 @@ Ensures consistent comparisons across all providers.
 import hashlib
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, cast
 import json
 from datetime import datetime
 
@@ -66,7 +66,7 @@ class RunContract:
             return "unknown"
 
     @staticmethod
-    def calculate_dataset_hash(audio_path: Path, text_path: Path = None) -> str:
+    def calculate_dataset_hash(audio_path: Path, text_path: Optional[Path] = None) -> str:
         """Calculate hash of dataset files."""
         hasher = hashlib.sha256()
 
@@ -85,7 +85,7 @@ class RunContract:
 
     @staticmethod
     def create_run_manifest(provider_id: str, config_path: Path,
-                          audio_path: Path, text_path: Path = None) -> Dict[str, Any]:
+                          audio_path: Path, text_path: Optional[Path] = None) -> Dict[str, Any]:
         """Create run manifest for reproducibility."""
         return {
             'provider_id': provider_id,
@@ -104,7 +104,7 @@ class NormalizationValidator:
     """Ensure normalization parity across all providers."""
 
     # Locked normalization rules (versioned)
-    NORMALIZATION_PROTOCOL = {
+    NORMALIZATION_PROTOCOL: Dict[str, Any] = {
         'version': '1.0',
         'rules': {
             'lowercase': True,
@@ -119,13 +119,15 @@ class NormalizationValidator:
     }
 
     @staticmethod
-    def normalize_text(text: str, protocol: dict = None) -> str:
+    def normalize_text(text: str, protocol: Optional[dict] = None) -> str:
         """
         Apply locked normalization protocol.
         This MUST be used identically for all providers.
         """
         if protocol is None:
             protocol = NormalizationValidator.NORMALIZATION_PROTOCOL['rules']
+
+        protocol = cast(dict, protocol)  # Type hint for mypy
 
         normalized = text
 
@@ -234,7 +236,7 @@ class EntityExtractionProtocol:
     """Lock entity extraction rules to prevent EER variance."""
 
     # Locked entity rules (versioned)
-    ENTITY_PROTOCOL = {
+    ENTITY_PROTOCOL: Dict[str, Any] = {
         'version': '1.0',
         'number_definition': r'\b\d+(?:\.\d+)?\b',  # Decimals included
         'date_formats': [

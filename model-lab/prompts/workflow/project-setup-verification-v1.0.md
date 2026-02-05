@@ -3,6 +3,7 @@
 **Purpose:** Verify project setup before starting work.
 
 Checklist:
+
 - Git hooks enabled: `git config core.hooksPath .githooks` (run `./scripts/setup-githooks.sh` if needed).
 - Worklog exists: `docs/WORKLOG_TICKETS.md` is present and append-only.
 - Prompts indexed: `prompts/README.md` lists available prompts.

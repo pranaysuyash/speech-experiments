@@ -193,7 +193,7 @@ def merge_entities(all_entities: List[Dict]) -> List[Entity]:
 def run_ner(
     asr_artifact_path: Path,
     nlp_model: str = DEFAULT_NLP_MODEL,
-    chunking_policy: ChunkingPolicy = None,
+    chunking_policy: Optional[ChunkingPolicy] = None,
 ) -> Tuple[Dict[str, Any], Path]:
     """
     Extract named entities from ASR artifact.
@@ -263,7 +263,7 @@ def run_ner(
         truncated = True
     
     # Count by type
-    type_counts = defaultdict(int)
+    type_counts: Dict[str, int] = defaultdict(int)
     for e in merged:
         type_counts[e.type] += 1
     
@@ -338,7 +338,7 @@ def run_ner(
     return artifact_dict, run_file
 
 
-def run_asr_first(input_path: Path, asr_model: str = None, pre: str = None) -> Path:
+def run_asr_first(input_path: Path, asr_model: Optional[str] = None, pre: Optional[str] = None) -> Path:
     """Run ASR on input file and return artifact path."""
     logger.info(f"Running ASR on {input_path.name}...")
     

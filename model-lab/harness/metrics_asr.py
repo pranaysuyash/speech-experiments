@@ -4,7 +4,7 @@ Implements WER, CER, and related metrics with proper error tracking.
 """
 
 import numpy as np
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Optional
 from dataclasses import dataclass
 import logging
 
@@ -118,7 +118,7 @@ class ASRMetrics:
                  ground_truth: str,
                  audio_duration_s: float,
                  latency_s: float,
-                 metadata: Dict[str, Any] = None) -> ASRResult:
+                 metadata: Optional[Dict[str, Any]] = None) -> ASRResult:
         """
         Comprehensive ASR evaluation.
 

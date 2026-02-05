@@ -1,0 +1,16 @@
+suite_id,task,datasets,metrics,notes,links
+asr-general,ASR,LibriSpeech test-clean/test-other; Common Voice (subset),"WER, CER, RTF (real-time factor), latency p50/p95",General English benchmark + open multilingual subset; measure on your own domain audio too.,https://www.openslr.org/12 | https://commonvoice.mozilla.org
+asr-noisy,ASR,CHiME (or internal noisy recordings),"WER, robustness vs SNR, RTF",Noisy speech and real-world mic audio.,https://chimechallenge.github.io
+asr-multispeaker,ASR + Diarization,AMI Meeting Corpus (or internal meetings),"WER, diarization error rate (DER), speaker-attributed WER (SA-WER)","Meeting audio stresses overlap, turns, far-field.",https://groups.inf.ed.ac.uk/ami/corpus/
+asr-streaming,Streaming ASR,Internal mic captures; scripted prompts,"Latency p50/p95, stability (edits/sec), WER",Streaming requires specialized metrics: update stability and partial hypothesis churn.,(internal)
+tts-quality,TTS,Internal prompt set; multilingual scripts,"MOS (human), MCD, PESQ (proxy), latency",MOS is king; include pronunciation edge-cases and numbers/dates.,
+enhancement-speech,Speech Enhancement,VoiceBank+DEMAND (if you choose) + internal noisy,"PESQ, STOI, SI-SDR, ASR WER before/after",Use 'ASR lift' as the most product-relevant metric.,https://datashare.ed.ac.uk/handle/10283/2791
+sep-music,Source Separation,MUSDB18,"SDR, SIR, SAR; subjective artifacts",Standard for music separation baselines.,https://sigsep.github.io/datasets/musdb.html
+tagging-audioset,Audio Tagging,AudioSet eval (or subsets),"mAP, AUC, top-k accuracy; embedding retrieval recall@k",Tagging and embeddings for search and classification.,https://research.google.com/audioset/
+retrieval-clap,Text-audio Retrieval,Clotho / internal captioned audio,"Recall@K, mAP",CLAP-style retrieval evaluation.,https://zenodo.org/record/3490684
+music-transcription,Music Transcription,"MAESTRO (piano), or internal","Note F1, onset F1, frame F1",Use for piano transcription; multi-instrument requires other sets.,https://magenta.tensorflow.org/datasets/maestro
+codec-quality,Neural Codec,Internal mixed audio,"Bitrate vs (PESQ/STOI/SI-SDR), subjective artifacts, CPU/GPU cost",Compare against Opus/AAC as baselines.,
+forensics-asvspoof,Deepfake/Spoof Detection,ASVspoof challenge datasets,"EER, t-DCF, ROC-AUC",Treat outputs as risk signals; check false positives on noisy real audio.,https://www.asvspoof.org
+vad,VAD,Internal labeled segments; small curated set,"F1, false-positive rate, missed speech %, latency",VAD drives streaming quality and cost.,
+diarization,Diarization,AMI / VoxConverse / internal,"DER, JER, clustering purity",Evaluate overlap handling and short-turn performance.,https://github.com/joonson/voxconverse
+speaker-embeddings,Speaker Embeddings,VoxCeleb1 test set (or internal),"EER, minDCF, clustering purity",High consent/privacy risk. Keep use-cases constrained.,http://www.robots.ox.ac.uk/~vgg/data/voxceleb/

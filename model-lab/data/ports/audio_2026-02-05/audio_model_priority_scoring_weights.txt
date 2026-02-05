@@ -1,0 +1,13 @@
+priority_score formula (additive):
+implementation_priority: {'P0': 100, 'P1': 70, 'P2': 40, 'P3': 20, '': 30}
+maturity_level: {'production': 20, 'beta': 10, 'research': 0, 'legacy': -10, '': 0}
+latency_class: {'realtime': 15, 'near-realtime': 10, 'batch': 0, '': 0}
+local_or_api: {'Local': 10, 'API': 5, 'Local and API': 8, '': 0}
+cost_class: {'free/open': 10, 'mixed': 5, 'payg': 2, 'subscription': 0, '': 0}
+maintenance_risk: {'low': 10, 'medium': 0, 'high': -10, '': 0}
+consent_risk: {'low': 0, 'medium': -10, 'high': -25, '': 0}
+community_signal: {'very high': 10, 'high': 7, 'medium': 3, 'low': 0, 'growing': 4, '': 0}
+integration_complexity: {'low': 8, 'medium': 3, 'high': -5, '': 0}
+packaging_targets bonus: mac +3, linux +2, windows +2, ios +3, android +3, web +2
+eval_suites present: +3
+docs_url missing: -5

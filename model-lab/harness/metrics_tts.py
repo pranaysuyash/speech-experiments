@@ -4,7 +4,7 @@ Implements audio similarity, naturalness, and timing metrics.
 """
 
 import numpy as np
-from typing import Tuple, Dict, Any, List
+from typing import Tuple, Dict, Any, List, Optional
 from dataclasses import dataclass
 import logging
 
@@ -37,15 +37,21 @@ class TTSMetrics:
         import torchaudio
 
         # Convert to tensors
+        audio1_tensor: torch.Tensor
+        audio2_tensor: torch.Tensor
         if isinstance(audio1, np.ndarray):
-            audio1 = torch.from_numpy(audio1).float()
+            audio1_tensor = torch.from_numpy(audio1).float()
+        else:
+            audio1_tensor = audio1  # type: ignore[assignment]
         if isinstance(audio2, np.ndarray):
-            audio2 = torch.from_numpy(audio2).float()
+            audio2_tensor = torch.from_numpy(audio2).float()
+        else:
+            audio2_tensor = audio2  # type: ignore[assignment]
 
         # Ensure same length
-        min_len = min(len(audio1), len(audio2))
-        audio1 = audio1[:min_len]
-        audio2 = audio2[:min_len]
+        min_len = min(len(audio1_tensor), len(audio2_tensor))
+        audio1_tensor = audio1_tensor[:min_len]
+        audio2_tensor = audio2_tensor[:min_len]
 
         # Calculate MFCCs
         mfcc_transform = torchaudio.transforms.MFCC(
@@ -54,8 +60,8 @@ class TTSMetrics:
             melkwargs={'n_mels': 40, 'n_fft': 512}
         )
 
-        mfcc1 = mfcc_transform(audio1.unsqueeze(0))
-        mfcc2 = mfcc_transform(audio2.unsqueeze(0))
+        mfcc1 = mfcc_transform(audio1_tensor.unsqueeze(0))
+        mfcc2 = mfcc_transform(audio2_tensor.unsqueeze(0))
 
         # Calculate cosine similarity
         similarity = torch.nn.functional.cosine_similarity(
@@ -92,7 +98,7 @@ class TTSMetrics:
                  text: str,
                  sr: int,
                  latency_s: float,
-                 metadata: Dict[str, Any] = None) -> TTSResult:
+                 metadata: Optional[Dict[str, Any]] = None) -> TTSResult:
         """
         Comprehensive TTS evaluation.
 
@@ -144,16 +150,19 @@ class VoiceQualityMetrics:
         """Calculate spectral centroid (brightness)."""
         import torch
 
+        audio_tensor: torch.Tensor
         if isinstance(audio, np.ndarray):
-            audio = torch.from_numpy(audio).float()
+            audio_tensor = torch.from_numpy(audio).float()
+        else:
+            audio_tensor = audio  # type: ignore[assignment]
 
         # Simple approximation using FFT
-        fft = torch.fft.fft(audio.unsqueeze(0))
+        fft = torch.fft.fft(audio_tensor.unsqueeze(0))
         magnitude = torch.abs(fft).mean(dim=0)
 
         # Centroid calculation
-        freqs = torch.fft.fftfreq(len(audio), 1/sr)[:len(audio)//2]
-        magnitude_half = magnitude[:len(audio)//2]
+        freqs = torch.fft.fftfreq(len(audio_tensor), 1/sr)[:len(audio_tensor)//2]
+        magnitude_half = magnitude[:len(audio_tensor)//2]
 
         if magnitude_half.sum() > 0:
             centroid = (freqs * magnitude_half).sum() / magnitude_half.sum()
@@ -167,9 +176,12 @@ class VoiceQualityMetrics:
         """Calculate RMS energy."""
         import torch
 
+        audio_tensor: torch.Tensor
         if isinstance(audio, np.ndarray):
-            audio = torch.from_numpy(audio).float()
-        return torch.sqrt(torch.mean(audio**2)).item()
+            audio_tensor = torch.from_numpy(audio).float()
+        else:
+            audio_tensor = audio  # type: ignore[assignment]
+        return torch.sqrt(torch.mean(audio_tensor**2)).item()
 
     @staticmethod
     def assess_voice_characteristics(audio: np.ndarray, sr: int) -> Dict[str, float]:

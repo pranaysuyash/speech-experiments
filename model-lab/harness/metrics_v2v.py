@@ -25,7 +25,7 @@ class V2VMetrics:
     def evaluate(response_audio: Optional[np.ndarray],
                  sr: int,
                  latency_s: float,
-                 metadata: Dict[str, Any] = None) -> V2VResult:
+                 metadata: Optional[Dict[str, Any]] = None) -> V2VResult:
         """
         Evaluate V2V response.
         

@@ -23,6 +23,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import hashlib
+import numpy as np
 import subprocess
 from datetime import datetime
 

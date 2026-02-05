@@ -1,0 +1,9 @@
+ticket_id,priority,area,work,success_metric,dependencies,notes
+LAB-001,P0,ASR,Add faster-whisper backend with compute_type selection (float16/int8/int4) + chunking,RTF<=1 on target device; WER within target on asr-general,ctranslate2,Expose compute_type and beam params; store provenance.
+LAB-002,P0,ASR,Add whisper.cpp backend with GGUF quant selection + Metal acceleration toggle (mac),Realtime mic demo stable for 10 min; CPU < target,whisper.cpp,Package weights; keep binary reproducible.
+LAB-003,P0,Glue,Add VAD module (Silero + WebRTC) with A/B switch; integrate into streaming pipeline,Reduce silent chunk spend by >60%; no missed-speech regression,"silero-vad,webrtcvad",Collect per-session VAD stats.
+LAB-004,P0,Glue,Add diarization baseline (pyannote) + transcript merge interface,DER target on diarization suite; stable speaker labels,pyannote.audio,Handle overlap and short turns gracefully.
+LAB-005,P1,Enhancement,Add DeepFilterNet pre-processing stage; measure ASR lift,ASR WER improves on noisy suite; artifacts acceptable,deepfilternet,Make optional; keep raw audio for audit.
+LAB-006,P1,Embeddings,Add CLAP embeddings + audio indexing/search,Recall@10 on internal retrieval suite; query latency < target,clap,"Version embeddings, store vector DB config."
+LAB-007,P2,Translation,Add Gemma 3n audio AST and cascaded ASR->TranslateGemma->TTS pipeline,BLEU/COMET on internal set; latency acceptable,"gemma-3n,translategemma",Keep text normalization layer.
+LAB-008,P2,Forensics,Add ASVspoof baseline scoring + calibrated thresholds,EER and FP rate measured; explainability notes,aasist/asvspoof,Use as signal only; log uncertainty.

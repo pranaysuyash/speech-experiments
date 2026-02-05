@@ -302,6 +302,15 @@ class ProductionGate:
     def _check_baseline(self, model_id: str, task_type: str) -> GateCheck:
         """Check if model beats baseline."""
         baseline_id = self.criteria.baseline_model_id
+        if not baseline_id:
+            return GateCheck(
+                name="baseline_comparison",
+                passed=True,  # Pass if no baseline configured
+                required_value="beat_baseline",
+                actual_value="no_baseline_configured",
+                message="⚠️ No baseline model configured, skipping comparison"
+            )
+        
         baseline_batch = self.results_manager.get_latest_batch(baseline_id, task_type)
         current_batch = self.results_manager.get_latest_batch(model_id, task_type)
         

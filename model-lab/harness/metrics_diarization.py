@@ -36,7 +36,7 @@ class DiarizationMetrics:
     def evaluate(pred_segments: List[Dict[str, Any]],
                  expected: Dict[str, Any],
                  latency_s: float,
-                 metadata: Dict[str, Any] = None) -> DiarizationResult:
+                 metadata: Optional[Dict[str, Any]] = None) -> DiarizationResult:
         """
         Evaluate diarization output.
         

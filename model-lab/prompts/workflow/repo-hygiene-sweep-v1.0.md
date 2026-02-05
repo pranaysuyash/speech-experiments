@@ -3,6 +3,7 @@
 **Purpose:** Ensure no stray files or untracked artifacts in the repo.
 
 Steps:
+
 1. Run `git status --porcelain` — should be clean after commits.
 2. Check for orphaned docs: Ensure all docs in `docs/` are indexed in `docs/README.md` or referenced.
 3. Check for unused prompts: Ensure all prompts in `prompts/` are listed in `prompts/README.md`.

@@ -4,7 +4,7 @@ Validates timestamp monotonicity and coverage.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class AlignmentMetrics:
     def evaluate(segments: List[Dict[str, Any]],
                  audio_duration_s: float,
                  latency_s: float,
-                 metadata: Dict[str, Any] = None) -> AlignmentResult:
+                 metadata: Optional[Dict[str, Any]] = None) -> AlignmentResult:
         """
         Evaluate alignment/segmentation quality.
         

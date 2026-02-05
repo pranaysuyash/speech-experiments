@@ -111,7 +111,7 @@ def chunk_by_time(view: TranscriptView, policy: ChunkingPolicy) -> List[Chunk]:
         return []
     
     chunks = []
-    current_segments = []
+    current_segments: List[Segment] = []
     current_start = 0.0
     chunk_id = 0
     
@@ -144,7 +144,7 @@ def chunk_by_time(view: TranscriptView, policy: ChunkingPolicy) -> List[Chunk]:
                 chunk_id += 1
             
             # Start new chunk, potentially with overlap
-            overlap_segments = []
+            overlap_segments: List[Segment] = []
             if policy.overlap_seconds > 0:
                 # Include segments from end of previous chunk
                 overlap_time = 0
@@ -198,8 +198,8 @@ def chunk_by_text(text: str, policy: ChunkingPolicy, duration_s: float = 0) -> L
             word_count=len(text.split()),
         )]
     
-    chunks = []
-    current_sentences = []
+    chunks: List[TranscriptChunk] = []
+    current_sentences: List[str] = []
     chunk_id = 0
     
     for sent in sentences:
@@ -246,7 +246,7 @@ def chunk_by_text(text: str, policy: ChunkingPolicy, duration_s: float = 0) -> L
     return chunks
 
 
-def chunk_transcript(view: TranscriptView, policy: ChunkingPolicy = None) -> ChunkingResult:
+def chunk_transcript(view: TranscriptView, policy: Optional[ChunkingPolicy] = None) -> ChunkingResult:
     """
     Chunk a transcript using the best available method.
     
@@ -317,7 +317,7 @@ def dedupe_items(items: List[Dict], text_key: str = 'text', threshold: float = 0
         return len(a & b) / len(a | b)
     
     result = []
-    seen_tokens = []
+    seen_tokens: List[List[str]] = []
     
     for item in items:
         text = item.get(text_key, '')

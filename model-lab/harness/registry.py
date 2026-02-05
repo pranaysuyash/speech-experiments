@@ -7,13 +7,14 @@ All loaders MUST return Bundle Contract v1 (see contracts.py).
 
 from __future__ import annotations
 import hashlib
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, Optional, Callable, List, cast
 from pathlib import Path
 import logging
 from datetime import datetime
 from enum import Enum
+import torch
 
-from .contracts import Bundle, validate_bundle
+from .contracts import Bundle, validate_bundle, ASRResult
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +223,7 @@ def load_lfm2_5_audio(config: Dict[str, Any], device: str) -> Bundle:
 
             # CRITICAL FIX: Manually initialize audio detokenizer to avoid .cuda() hardcode in library
             # The library's processor.audio_detokenizer property calls .cuda() which fails on MPS
-            if processor._audio_detokenizer is None:
+            if processor._audio_detokenizer is None and processor.detokenizer_path:
                 try:
                     from liquid_audio.processor import Lfm2Config, LFM2AudioDetokenizer
                     from safetensors.torch import load_file
@@ -738,7 +739,7 @@ def load_whisper_cpp(config: Dict[str, Any], device: str) -> Bundle:
     if not model_path:
         raise RuntimeError("Missing whisper_cpp.model_path in config (path to ggml/gguf model).")
 
-    def transcribe_path(audio_path: str, **kwargs) -> Dict[str, Any]:
+    def transcribe_path(audio_path: str, **kwargs) -> ASRResult:
         """Transcribe audio file using whisper.cpp CLI."""
         lang = kwargs.get("language", "en")
         cmd = [
@@ -756,11 +757,11 @@ def load_whisper_cpp(config: Dict[str, Any], device: str) -> Bundle:
         try:
             out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
             text = out.strip()
-            return {"text": text, "segments": [], "meta": {"raw_output": out}}
+            return cast(ASRResult, {"text": text, "segments": [], "meta": {"raw_output": out}})
         except subprocess.CalledProcessError as e:
-            return {"text": "", "segments": [], "meta": {"error": str(e)}}
+            return cast(ASRResult, {"text": "", "segments": [], "meta": {"error": str(e)}})
 
-    def transcribe(audio, sr=16000, **kwargs) -> Dict[str, Any]:
+    def transcribe(audio, sr=16000, **kwargs) -> ASRResult:
         """
         Transcribe audio array using whisper.cpp.
         Writes temp wav file and calls CLI.

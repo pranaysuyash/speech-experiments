@@ -177,6 +177,71 @@ _PyTorch 2.9.0+cu126, CUDA 12.6_
 - **Do Not Use**: SeamlessM4T for ASR (severe hallucinations, 97.8% WER on PRIMARY)
 - **Edge Deployment**: Consider model optimization (quantization, ONNX) for CPU/Mobile
 
+---
+
+## Addendum (Feb 5, 2026): Streaming ASR Benchmarks (Chunked PCM)
+
+Model-Lab now includes an **in-process streaming ASR benchmark** (ported from EchoPanel’s streaming pipeline) so we can measure **chunk-level latency** and **streaming artifacts** (boundary cuts, VAD tradeoffs) alongside batch metrics.
+
+### What’s new
+
+- Streaming ASR pipeline: `model-lab/harness/streaming_asr/stream.py`
+- Faster-whisper streaming provider: `model-lab/harness/streaming_asr/provider_faster_whisper.py`
+- Benchmark script (writes JSON report): `model-lab/scripts/bench_streaming_asr.py`
+- Model catalog CSV (ported from Downloads): `model-lab/data/model_catalog.csv`
+
+### Run the benchmark
+
+```bash
+# Run from model-lab so uv uses model-lab/pyproject.toml
+cd model-lab
+
+# A small speech-like sample in this repo (recommended)
+uv run python scripts/bench_streaming_asr.py --input data/audio/conversation_2ppl_10s.wav --chunk-seconds 4
+
+# Optional: simulate real-time pacing
+uv run python scripts/bench_streaming_asr.py --input data/audio/conversation_2ppl_10s.wav --chunk-seconds 4 --realtime
+```
+
+The script prints the JSON output path (default under `model-lab/runs/streaming_bench/`), including:
+- overall wall time + RTF
+- per-chunk first-event latency (ms)
+- per-chunk event counts / character counts
+
+### Notes (device support)
+
+- `faster-whisper` / CTranslate2 does **not** support MPS; on macOS, `MODEL_LAB_WHISPER_DEVICE=auto|mps` will effectively run on CPU for this streaming provider.
+
+### External benchmark references (Reported)
+
+For convenience, we also store a **chat-provided** extraction of explicit benchmark numbers (WER/RTF/latency/VRAM) as a reference table:
+
+- `model-lab/docs/from_chat/AUDIO_MODELS_BENCHMARKS_EXTRACTED_2026-02-05.md`
+- `model-lab/docs/from_chat/AUDIO_AI_REVOLUTION_BENCHMARKS_EXTRACTED_2026-02-05.md`
+
+Additional chat-captured context and bibliography (all **Reported**):
+
+- Audit excerpt: `model-lab/docs/from_chat/AUDIO_MODEL_AUDIT_FULLTEXT_2026-02-05.md`
+- Alternate trace-style log: `model-lab/docs/from_chat/AUDIO_MODEL_AUDIT_BROWSER_TRACE_2026-02-05.md`
+- Citation subset (raw): `model-lab/docs/from_chat/AUDIO_MODEL_AUDIT_CITATIONS_2026-02-05.md`
+- Citation subset (deduped CSV): `model-lab/data/from_chat/audio_model_audit_citations_deduped_2026-02-05.csv`
+- Full audit text (end-to-end, Reported): `model-lab/docs/from_chat/AUDIO_MODEL_AUDIT_FULLTEXT_COMPLETE_2026-02-05.md`
+
+Other model notes (Reported):
+
+- ACE-Step 1.5 + KugelAudio-0 quick audit: `model-lab/docs/audit/audio-models-ace-step-1-5_kugelaudio-0_2026-02-05.md`
+
+Catalog note (Reported):
+
+- `model-lab/data/model_catalog.csv` is now upgraded to the **expanded_plus** schema (includes `evidence_links`).
+- Full audit-style notes (narrative, model rosters, pricing, licensing — **Reported**):
+  - `model-lab/docs/from_chat/AUDIO_MODEL_AUDIT_NOTE_2026-02-05.md`
+  - `model-lab/docs/from_chat/AUDIO_MODEL_LANDSCAPE_AUDIT_NOTE_2026-02-05.md`
+- Bibliography-style citations for the audit note (URL list as provided): `model-lab/docs/from_chat/AUDIO_MODEL_AUDIT_CITATIONS_2026-02-05.md`
+- Citation/browsing trace behind the report (domains + search phrases, as provided): `model-lab/docs/from_chat/AUDIO_AI_REVOLUTION_CITATIONS_TRACE_2026-02-05.md`
+
+These numbers are **not** Model-Lab measurements until re-run and captured in `runs/` with provenance.
+
 ## Technical Notes
 
 - **Audio Test Types**:

@@ -178,7 +178,7 @@ class GoldenTestRunner:
         logger.info(f"Model: {model_id}, {len(golden_set.test_cases)} test cases")
         
         for test_case in golden_set.test_cases:
-            result = self._run_single(
+            run_result = self._run_single(
                 test_case=test_case,
                 model_id=model_id,
                 model_version=model_version,
@@ -186,7 +186,7 @@ class GoldenTestRunner:
                 inference_fn=inference_fn,
                 device=device,
             )
-            batch.add_result(result)
+            batch.add_result(run_result)
         
         # Check against thresholds
         threshold_checks = self._check_thresholds(batch, golden_set.thresholds)

@@ -1,0 +1,23 @@
+{
+  "provenance": {
+    "date_received": "2026-02-05",
+    "source": "user_pasted_chat_note",
+    "evidence_status": "reported_unverified"
+  },
+  "schema": {
+    "fields": [
+      "record_type",
+      "domain",
+      "model",
+      "metric",
+      "value_raw",
+      "value_num",
+      "unit",
+      "dataset_or_condition",
+      "hardware",
+      "source_context"
+    ]
+  },
+  "records_csv_path": "model-lab/data/from_chat/audio_ai_revolution_benchmarks_extracted_2026-02-05.csv"
+}
+

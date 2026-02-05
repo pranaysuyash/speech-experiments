@@ -1,0 +1,8 @@
+model,download_size,wer,best_for,notes
+Moonshine Tiny,~50MB,~10%,Smallest bundle,
+faster-whisper tiny.en,~75MB,12%,Fast / acceptable,
+faster-whisper base.en,~150MB,8%,Good balance,Marked as “current” in chat note
+Vosk small-en,~40MB,~15%,Ultra-low resource,
+faster-whisper distil-large-v3,~750MB,4%,Near-best quality,
+Voxtral-Mini-4B-Realtime,~4GB,~3%,Best streaming (v0.3),Reported; not yet validated in Model-Lab
+

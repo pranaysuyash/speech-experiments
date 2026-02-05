@@ -1,0 +1,2 @@
+model_id,family,version,local_or_api,category,tasks_supported,languages,streaming_support,realtime_latency_target_ms,base_weights,runtime,quantization,hardware_reqs,context_or_max_audio,benchmarks,license,pricing,docs_url,community_signal,integration_complexity,known_failure_modes,ideal_use_cases,avoid_when,notes
+

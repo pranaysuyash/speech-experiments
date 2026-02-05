@@ -48,7 +48,7 @@ Transcript of {speaker}:
 
 Summary (bullet points):"""
 
-def run_alignment_dependency(input_path: Path, pre: str = None) -> Path:
+def run_alignment_dependency(input_path: Path, pre: Optional[str] = None) -> Path:
     """Run alignment pipeline."""
     cmd = [sys.executable, str(Path(__file__).parent / "run_alignment.py"), "--input", str(input_path)]
     if pre:
@@ -105,7 +105,7 @@ def summarize_speaker_content(
         use_cache=True,
     )
     
-    if result.success:
+    if result.success and result.text:
         lines = result.text.strip().split('\n')
         bullets = [l.strip().lstrip('-•*').strip() for l in lines if len(l.strip()) > 5]
         return bullets

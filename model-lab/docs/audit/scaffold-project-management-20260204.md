@@ -4,9 +4,11 @@
 **Author:** GitHub Copilot (agent)
 
 ## Summary
+
 Expanded the initial scaffold to a comprehensive project-management setup inspired by `learning_for_kids`, including full workflow prompts, process docs, scripts, hooks, and coordination rules.
 
 ## Files Created/Updated
+
 - **Prompts:**
   - `prompts/workflow/agent-entrypoint-v1.0.md`
   - `prompts/workflow/project-setup-verification-v1.0.md`
@@ -25,18 +27,21 @@ Expanded the initial scaffold to a comprehensive project-management setup inspir
   - Added `TCK-20260204-002` for this expansion
 
 ## Rationale
+
 - Enable reproducible agent workflows with standardized entrypoints and checks.
 - Enforce ticket discipline with hooks and checkers.
 - Preserve work history and prevent accidental deletions.
 - Provide comprehensive guidance for contributors.
 
 ## Evidence
+
 - Files created/updated in the repo at 2026-02-04.
 - `./scripts/worklog_checker.sh` output: Checked recent commits and open tickets.
 - Pre-commit hook created and executable.
 - AGENTS.md now includes full coordination principles from template repo.
 
 ## Next Actions (recommended)
+
 - Run `./scripts/setup-githooks.sh` to enable hooks.
 - Use `prompts/workflow/project-setup-verification-v1.0.md` to verify setup.
 - Extend with role-specific prompts (e.g., audit, review) as work types arise.

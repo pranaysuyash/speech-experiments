@@ -8,7 +8,7 @@ import psutil
 import os
 import gc
 from contextlib import contextmanager
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Generator
 from dataclasses import dataclass
 import logging
 import numpy as np
@@ -45,7 +45,7 @@ class PerformanceTimer:
 
     @contextmanager
     def time_operation(self, operation_name: str = "operation",
-                       collect_gc: bool = True) -> TimingResult:
+                       collect_gc: bool = True) -> Generator[Dict[str, Any], None, None]:
         """
         Context manager for timing operations with resource monitoring.
 
@@ -66,7 +66,7 @@ class PerformanceTimer:
         start_time = time.perf_counter()
 
         # Create a mutable container for the result
-        result_container = {'result': None}
+        result_container: Dict[str, Any] = {'result': None}
 
         try:
             yield result_container
@@ -104,7 +104,7 @@ class PerformanceTimer:
         with self.time_operation(func.__name__) as timer:
             result = func(*args, **kwargs)
 
-        return result, timer
+        return result, timer['result']
 
 
 class LatencyProfiler:
@@ -118,9 +118,9 @@ class LatencyProfiler:
     @contextmanager
     def profile_run(self, run_index: int):
         """Profile a single run."""
-        with self.timer.time_operation(f"run_{run_index}") as timing:
+        with self.timer.time_operation(f"run_{run_index}") as timing:  # type: Dict[str, Any]
             yield timing
-        self.latencies_ms.append(timing.elapsed_time_ms)
+        self.latencies_ms.append(timing['result'].elapsed_time_ms)
 
     def get_statistics(self) -> Dict[str, float]:
         """Calculate latency statistics."""

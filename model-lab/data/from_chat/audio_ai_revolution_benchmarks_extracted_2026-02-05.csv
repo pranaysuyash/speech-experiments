@@ -1,0 +1,56 @@
+record_type,domain,model,metric,value_raw,value_num,unit,dataset_or_condition,hardware,source_context
+benchmark,ASR,Whisper Large-v3,WER,2.7%,2.7,percent,LibriSpeech Clean,,2.7% Whisper WER LibriSpeech Clean
+benchmark,ASR,wav2vec 2.0 Large,WER,1.8%,1.8,percent,Fine-tuned English,,1.8% wav2vec 2.0 WER Fine-tuned English
+benchmark,AudioGen,Stable Audio 2.5,Generation time,<2s,,s,3-minute track,,<2s Generation Time Stable Audio 2.5
+resource,AudioGen,ACE-Step 1.5,VRAM,4GB,4,GB,Inference,,4GB VRAM Requirement ACE-Step 1.5
+adoption,ASR,Whisper,Languages supported,100+,,count,Multilingual coverage,,100+ Languages Supported Whisper's multilingual coverage
+benchmark,ASR,Whisper Turbo,RTF,216×,216,x,Real-time factor,,216× Real-time Factor Whisper Turbo optimization
+adoption,ASR,Whisper,GitHub stars,94K,,count,Community adoption,,94K GitHub Stars Whisper community adoption
+training,ASR,Whisper,Training hours,680,000 hours,,hours,Weak supervision dataset,,trained on approximately 680,000 hours of diverse multilingual data
+resource,ASR,Whisper Tiny,Parameters,39M,,params,Model size,,tiny (39M parameters)
+resource,ASR,Whisper Base,Parameters,74M,,params,Model size,,base (74M)
+resource,ASR,Whisper Small,Parameters,244M,,params,Model size,,small (244M)
+resource,ASR,Whisper Medium,Parameters,769M,,params,Model size,,medium (769M)
+resource,ASR,Whisper Large-v3,Parameters,1.55B,,params,Model size,,large-v3 (1.55B)
+resource,ASR,Whisper Turbo,Parameters,809M,,params,Model size,,Turbo 809M
+benchmark,ASR,Whisper Tiny,WER,~9%,,,LibriSpeech Clean,,Tiny ~9%
+benchmark,ASR,Whisper Tiny,WER,~13%,,,LibriSpeech Other,,Tiny ~13%
+benchmark,ASR,Whisper Base,WER,~6%,,,LibriSpeech Clean,,Base ~6%
+benchmark,ASR,Whisper Base,WER,~9%,,,LibriSpeech Other,,Base ~9%
+benchmark,ASR,Whisper Small,WER,~4%,,,LibriSpeech Clean,,Small ~4%
+benchmark,ASR,Whisper Small,WER,~7%,,,LibriSpeech Other,,Small ~7%
+benchmark,ASR,Whisper Medium,WER,~3%,,,LibriSpeech Clean,,Medium ~3%
+benchmark,ASR,Whisper Medium,WER,~6%,,,LibriSpeech Other,,Medium ~6%
+benchmark,ASR,Whisper Large-v3,WER,5.2%,5.2,percent,LibriSpeech Other,,Large/Large-v3 5.2%
+benchmark,ASR,Whisper (multilingual),WER,~9.0%,,,Common Voice (avg across languages),,~9.0% Common Voice WER
+benchmark,ASR,wav2vec 2.0 Base,WER,4.8%,4.8,percent,LibriSpeech Clean,,4.8% LibriSpeech Clean WER
+benchmark,ASR,wav2vec 2.0,WER,37.04%,37.04,percent,Ionio Clean Speech,,37.04% Ionio Clean Speech
+benchmark,ASR,wav2vec 2.0,WER,54.69%,54.69,percent,Ionio Noisy Speech,,54.69% Ionio Noisy Speech
+benchmark,ASR,Whisper,WER,19.96%,19.96,percent,Ionio Clean Speech,,19.96% Ionio Clean Speech
+benchmark,ASR,Whisper,WER,29.80%,29.8,percent,Ionio Noisy Speech,,29.80% Ionio Noisy Speech
+econ,ASR,wav2vec 2.0,Adaptation cost,$10K,,USD,1,000h fine-tuning,,Adaptation Cost $10K For 1,000h fine-tuning
+benchmark,ASR,wav2vec 2.0 Base,RTF,~0.3,,,Inference,Standard GPU,RTF ~0.3 Standard GPU
+benchmark,ASR,Whisper Small,RTF,~0.6,,,Inference,Consumer GPU/CPU,RTF ~0.6 Consumer GPU/CPU
+benchmark,ASR,Whisper Large-v3,RTF,~1.0,,,Inference,16 GB VRAM GPU,RTF ~1.0 16 GB VRAM GPU
+benchmark,ASR,Faster Whisper,Speedup,4×,4,x,Optimized inference,,Faster Whisper 4× improvement
+benchmark,ASR,Gemini Audio,Latency,Sub-300ms,,ms,End-to-end processing,,Latency Sub-300ms End-to-end processing
+adoption,ASR,Gemini Audio,MAU,450M+,,count,Across Gemini services,,Scale 450M+ MAU
+benchmark,ASR,MAI-Voice-1,Inference speed,1 min < 1s,,ratio,Audio generation,,Inference Speed 1 min < 1s
+training,AudioGen,AudioCraft,Training hours,20,000 hours,,hours,Licensed music,,20,000 hours of licensed music
+adoption,AudioGen,AudioCraft,GitHub stars,23,000,,count,Repo stars,,approximately 23,000 GitHub stars
+adoption,AudioGen,AudioCraft,Forks,2,600,,count,Repo forks,,2,600+ forks
+benchmark,AudioGen,Stable Audio 2.5,Generation steps,8,8,steps,Diffusion sampling,,8-step generation process
+adoption,AudioGen,stable-audio-tools,GitHub stars,~3,600,,count,Repo stars,,~3,600 stars for stable-audio-tools
+benchmark,AudioGen,ACE-Step 1.5,Latency,~2s,,s,Inference,A100,~2s on A100
+benchmark,AudioGen,ACE-Step 1.5,Latency,<10s,,s,Inference,RTX 3090,<10s on RTX 3090
+benchmark,AudioGen,ACE-Step 1.5,Variants,0.6B / 1.7B / 4B,,params,Model sizes,,Variants 0.6B 1.7B 4B
+benchmark,TTS,Fish Speech V1.5,ELO,1339,1339,elo,TTS Arena,,ELO Score 1339 (TTS Arena)
+benchmark,TTS,Fish Speech V1.5,WER,3.5%,3.5,percent,English,,WER 3.5% (English)
+benchmark,TTS,Fish Speech V1.5,CER,1.2%,1.2,percent,English,,CER 1.2% (English)
+benchmark,TTS,CosyVoice2-0.5B,Latency,150ms,150,ms,Response latency,,150ms response
+benchmark,TTS,VibeVoice-1.5B,Context,64K tokens,,tokens,Context length,,64K tokens (~90 minutes)
+benchmark,TTS,VibeVoice-1.5B,Token rate,7.5 Hz,7.5,Hz,Token rate,,7.5 Hz token rate
+benchmark,TTS,VibeVoice-Realtime-0.5B,Latency,~300ms,,ms,Latency,,~300ms latency
+adoption,TTS,VibeVoice,GitHub stars,22,308+,,count,Repo stars,,22,308+ stars
+benchmark,TTS,Chatterbox-Turbo,Latency,<200ms,,ms,TTS inference,,sub-200ms inference
+

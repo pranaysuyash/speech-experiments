@@ -3,6 +3,7 @@
 **Purpose:** A lightweight gate to ensure prompts in `prompts/` follow style and traceability rules.
 
 Checklist:
+
 - Prompt file has a Version and Purpose section.
 - Prompts reference required evidence sources and desired outputs.
 - Prompts include required steps and expected acceptance criteria.

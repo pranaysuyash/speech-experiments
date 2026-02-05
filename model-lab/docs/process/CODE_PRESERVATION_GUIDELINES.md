@@ -3,6 +3,7 @@
 Principle: Investigate before deleting. Preserve contributor intent and history unless there is explicit approval to remove code.
 
 When you find unused or suspicious code:
+
 1. Search git history: `git log -p -- <file>` to understand origin and rationale.
 2. Ask the author (if resolvable) or add a note in the audit file referencing the code section.
 3. If removal is considered, prefer moving to `archive/` with a pointer note and an audit explaining why deletion is chosen.

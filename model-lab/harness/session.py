@@ -56,6 +56,9 @@ class SessionContext:
     
     # Progress callback
     on_progress: Optional[Callable[[], None]] = None
+    
+    # Progress updater for step progress
+    update_progress: Optional[Callable[[int, Optional[str], Optional[int]], None]] = None
 
     @property
     def audio_path(self) -> Optional[Path]:
@@ -816,7 +819,7 @@ class SessionRunner:
              asr_config = dict(self.extra_config.get("asr", {}))
              if "device_preference" in self.extra_config:
                  asr_config["device_preference"] = self.extra_config["device_preference"]
-             res = run_asr(ctx.audio_path, ctx.artifacts_dir, config=asr_config, progress_callback=ctx.on_progress)
+             res = run_asr(ctx.audio_path, ctx.artifacts_dir, config=asr_config, progress_callback=ctx.on_progress, update_progress=ctx.update_progress)
              
              # Post-process to ensure type info for registry
              if isinstance(res, dict) and "artifacts" in res:
@@ -1142,6 +1145,12 @@ class SessionRunner:
             progress_state["last_semantic_progress_at"] = now_iso()
             
         self.ctx.on_progress = on_progress
+        
+        # Set up progress updater for this step
+        def update_progress(progress_pct: int, message: Optional[str] = None, estimated_remaining_s: Optional[int] = None):
+            self.update_step_progress(name, progress_pct, message, estimated_remaining_s)
+        
+        self.ctx.update_progress = update_progress
         
         heartbeat_thread = threading.Thread(target=heartbeat_worker, daemon=True)
         heartbeat_thread.start()

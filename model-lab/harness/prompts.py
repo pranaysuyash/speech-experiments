@@ -7,7 +7,7 @@ No model logic, just prompt engineering utilities.
 import json
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 
 
@@ -18,15 +18,10 @@ class PromptTemplate:
     template: str
     version: str = "1.0.0"
     description: str = ""
-    variables: List[str] = None
-    metadata: Dict[str, Any] = None
+    variables: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
     
     def __post_init__(self):
-        if self.variables is None:
-            self.variables = []
-        if self.metadata is None:
-            self.metadata = {}
-        
         # Extract variables from template
         if not self.variables:
             self.variables = self._extract_variables()

@@ -25,6 +25,7 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -79,7 +80,7 @@ def quarantine_run(run_path: Path, reason: str) -> Path:
     return quarantine_path
 
 
-def validate_promotion(run: dict, target_grade: str, gt_path: Path = None) -> tuple[bool, str]:
+def validate_promotion(run: dict, target_grade: str, gt_path: Optional[Path] = None) -> tuple[bool, str]:
     """
     Validate if run can be promoted to target grade.
     
@@ -125,7 +126,7 @@ def validate_promotion(run: dict, target_grade: str, gt_path: Path = None) -> tu
     return True, "valid"
 
 
-def promote_run(run_path: Path, target_grade: str, gt_path: Path = None) -> bool:
+def promote_run(run_path: Path, target_grade: str, gt_path: Optional[Path] = None) -> bool:
     """
     Attempt to promote a run to target grade.
     

@@ -3,11 +3,13 @@
 This folder contains reusable prompts that guide agents and contributors when performing work in this repository.
 
 ## Start Here (Any Agent)
+
 1. Use: `prompts/workflow/agent-entrypoint-v1.0.md`
 2. Update tracking: `docs/WORKLOG_TICKETS.md` (append-only)
 3. Ensure local enforcement if needed: `git config core.hooksPath .githooks` (see `scripts/setup-githooks.sh`)
 
 ## Workflow / Tracking
+
 - Agent entrypoint: `prompts/workflow/agent-entrypoint-v1.0.md`
 - Worklog update helper: `prompts/workflow/worklog-v1.0.md`
 - Pre-flight check: `prompts/workflow/pre-flight-check-v1.0.md`
@@ -16,9 +18,11 @@ This folder contains reusable prompts that guide agents and contributors when pe
 - Prompt quality gate: `prompts/workflow/prompt-quality-gate-v1.0.md`
 
 ## Audit / Review
+
 - Comprehensive product audit: `prompts/audit/comprehensive-audit-v1.0.md`
 
 ## Project Context (Read Before Making Changes)
+
 - Overview: `docs/PROJECT_RULES.md`
 - Architecture & implementation docs under `docs/`.
 - Process reminders: `docs/process/PROCESS_REMINDER.md`

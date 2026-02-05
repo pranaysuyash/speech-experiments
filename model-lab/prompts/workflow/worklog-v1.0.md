@@ -3,6 +3,7 @@
 **Purpose:** Ensure every actionable finding is recorded in `docs/WORKLOG_TICKETS.md` before implementation.
 
 Steps:
+
 1. Read `docs/audit/*.md` and `docs/*` for any findings or items that require tracking.
 2. For each actionable item, create a ticket entry in `docs/WORKLOG_TICKETS.md` using the ticket template.
 3. Use an append-only discipline. Do not modify existing ticket history; only add status updates.

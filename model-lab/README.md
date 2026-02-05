@@ -37,6 +37,16 @@ model-lab/
 - **Production Grades**: A/B/C scoring system
 - **Cost Analysis**: Performance vs resource usage
 
+### **Research Reports**
+
+- `ASR_MODEL_RESEARCH_2026-02.md` (ported from EchoPanel): broad survey + model-size/quality tradeoffs + Voxtral notes
+- `STREAMING_ASR_PORT_NOTES.md`: streaming ASR provider abstraction + env var contract (ported from EchoPanel)
+- `docs/ASR_MODEL_SIZE_SUMMARY_2026-02.md`: one-page “bundle size vs WER” cheatsheet (ported/extracted)
+- `docs/ports/echopanel/README.md`: additional EchoPanel streaming-ASR audits and WS contract (ported)
+- CSV research inputs: `model-lab/data/ports/audio_2026-02-05/README.md` (catalog + eval suites + backlog + top-20 shortlists)
+- Chat-shared benchmark extraction: `model-lab/docs/from_chat/AUDIO_MODELS_BENCHMARKS_EXTRACTED_2026-02-05.md`
+- Chat-shared report capture: `model-lab/docs/from_chat/AUDIO_AI_REVOLUTION_REPORT_2026-02-05.md`
+
 ## 🎯 **Quick Start** (3 Commands)
 
 ```bash

@@ -5,15 +5,18 @@ This file augments `docs/AGENTS.md` with additional coordination rules, workflow
 ## Core Principles
 
 ### Evidence-First Development
+
 - Back claims with evidence: `Observed`, `Inferred`, or `Unknown`.
 - Preserve evidence in audit artifacts and worklog tickets.
 
 ### Single Source of Truth
+
 - **Worklog**: `docs/WORKLOG_TICKETS.md` — canonical, append-only ticket registry.
 - **Audits**: `docs/audit/` — one audit file per audit.
 - **Prompts**: `prompts/` — repository prompt library and `prompts/README.md` index.
 
 ### Preservation First
+
 - Investigate before deleting. Follow `docs/process/CODE_PRESERVATION_GUIDELINES.md`.
 - Prefer activation or archiving over deletion; document decisions in an audit and create a ticket before removal.
 
@@ -31,10 +34,12 @@ This file augments `docs/AGENTS.md` with additional coordination rules, workflow
    - Produce: worklog entry, audit artifact (if applicable), evidence log, and prompt traceability.
 
 ## Audit-to-Ticket Workflow
+
 - Create a ticket for every actionable audit finding before remediation.
 - Use `prompts/workflow/worklog-v1.0.md` ticket template and link evidence.
 
 ## Required Artifacts for Work Units
+
 - Worklog ticket in `docs/WORKLOG_TICKETS.md` (append-only)
 - Audit file `docs/audit/<file>.md` for audits
 - Evidence log (command outputs, test runs)

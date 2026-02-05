@@ -31,7 +31,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Callable
 import logging
 
 logger = logging.getLogger(__name__)
@@ -256,7 +256,7 @@ def get_llm_completion(
             model_id=model,
         )
     
-    call_fn = provider['call']
+    call_fn: Callable[[str, str], Tuple[str, Dict[str, Any]]] = provider['call']
     
     # Retry loop with exponential backoff
     start_time = time.time()

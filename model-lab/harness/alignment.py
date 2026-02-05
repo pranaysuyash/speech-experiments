@@ -163,7 +163,7 @@ def compute_metrics(segments: List[AlignedSegment]) -> AlignmentMetrics:
     total_dur = sum(s.duration_s for s in segments)
     assigned_dur = sum(s.duration_s for s in segments if s.speaker_id != "unknown")
     
-    speaker_dist = {}
+    speaker_dist: Dict[str, float] = {}
     last_speaker = None
     switch_count = 0
     

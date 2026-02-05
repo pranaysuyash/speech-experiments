@@ -4,7 +4,7 @@ Ensures text is consistently formatted across models.
 """
 
 import re
-from typing import List, Dict
+from typing import List, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ class AudioDescriptionNormalizer:
     """Normalize audio descriptions and metadata."""
 
     @staticmethod
-    def normalize_metadata(metadata: Dict[str, any]) -> Dict[str, str]:
+    def normalize_metadata(metadata: Dict[str, Any]) -> Dict[str, str]:
         """Normalize metadata fields."""
         normalized = {}
 
@@ -171,7 +171,7 @@ class ComparisonNormalizer:
         return normalized.split()
 
     @staticmethod
-    def calculate_vocabulary_diversity(texts: List[str]) -> Dict[str, any]:
+    def calculate_vocabulary_diversity(texts: List[str]) -> Dict[str, Any]:
         """Calculate vocabulary statistics across texts."""
         all_tokens = []
 

@@ -93,7 +93,7 @@ class TranscriptView:
         )
     
     @classmethod
-    def from_segments(cls, segments: List[Segment], duration_s: float = None) -> 'TranscriptView':
+    def from_segments(cls, segments: List[Segment], duration_s: Optional[float] = None) -> 'TranscriptView':
         """Create view from time-aligned segments."""
         full_text = ' '.join(seg.text for seg in segments)
         
@@ -149,8 +149,8 @@ def from_asr_artifact(artifact_path: Path) -> TranscriptView:
         for seg in raw_segments:
             if isinstance(seg, dict):
                 segments.append(Segment(
-                    start_s=seg.get('start', seg.get('start_s', 0)),
-                    end_s=seg.get('end', seg.get('end_s', 0)),
+                    start_s=float(seg.get('start') or seg.get('start_s') or 0),
+                    end_s=float(seg.get('end') or seg.get('end_s') or 0),
                     text=seg.get('text', ''),
                     speaker=seg.get('speaker'),
                 ))

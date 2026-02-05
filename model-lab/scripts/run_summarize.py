@@ -210,7 +210,7 @@ def run_summarize(
     asr_artifact_path: Path,
     max_sentences: int = 5,
     nlp_model: str = DEFAULT_NLP_MODEL,
-    chunking_policy: ChunkingPolicy = None,
+    chunking_policy: Optional[ChunkingPolicy] = None,
 ) -> Tuple[Dict[str, Any], Path]:
     """
     Generate summary from ASR artifact, with chunking for long audio.
@@ -394,11 +394,11 @@ def _run_summarize_chunked(
     if success_ratio < MIN_SUCCESS_RATIO:
         logger.error(f"Too many chunk failures: {len(failed_chunks)}/{len(chunk_result.chunks)}")
         status = "failed"
-        sentences = []
+        sentences: List[str] = []
         agg_result = LLMResult(success=False, error_code="CHUNK_FAILURE", error_message=f"Only {success_ratio:.0%} success")
     elif not successful_chunks:
         status = "failed"
-        sentences = []
+        sentences: List[str] = []
         agg_result = LLMResult(success=False, error_code="CHUNK_FAILURE", error_message="No successful chunks")
     else:
         # Aggregate successful chunk summaries
@@ -483,7 +483,7 @@ def _run_summarize_chunked(
     return artifact_dict, run_file
 
 
-def run_asr_first(input_path: Path, asr_model: str = None, pre: str = None) -> Path:
+def run_asr_first(input_path: Path, asr_model: Optional[str] = None, pre: Optional[str] = None) -> Path:
     """Run ASR on input file and return artifact path."""
     logger.info(f"Running ASR on {input_path.name}...")
     
