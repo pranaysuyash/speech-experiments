@@ -23,6 +23,16 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from harness.registry import ModelRegistry, ModelStatus
+from server.metrics import (
+    REGISTRY,
+    REQUEST_TOTAL,
+    REQUEST_DURATION,
+    ASR_REQUESTS,
+    TTS_REQUESTS,
+    ERRORS_TOTAL,
+    MODELS_LOADED,
+    CACHE_MEMORY_BYTES,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -545,11 +555,15 @@ async def rate_limit_middleware(request: Request, call_next):
     response = await call_next(request)
     response_time = time.time() - start_time
 
-    # Update stats
+    # Update legacy stats
     REQUEST_STATS["total_requests"] += 1
     REQUEST_STATS["avg_response_time"] = (
         (REQUEST_STATS["avg_response_time"] * (REQUEST_STATS["total_requests"] - 1)) + response_time
     ) / REQUEST_STATS["total_requests"]
+
+    # Update Prometheus-style metrics
+    REQUEST_TOTAL.inc(method=request.method, endpoint=request.url.path, status=str(response.status_code))
+    REQUEST_DURATION.observe(response_time, method=request.method, endpoint=request.url.path)
 
     return response
 
@@ -678,6 +692,17 @@ async def update_model_status(model_type: str, status: str):
 async def get_stats():
     """Get API usage statistics."""
     return REQUEST_STATS.copy()
+
+
+@app.get("/metrics")
+async def get_metrics():
+    """Prometheus-compatible metrics endpoint."""
+    # Update gauge metrics before export
+    MODELS_LOADED.set(len(MODEL_CACHE))
+    CACHE_MEMORY_BYTES.set(sum(MODEL_CACHE_SIZES.values()))
+
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(REGISTRY.export_text(), media_type="text/plain")
 
 
 def main():

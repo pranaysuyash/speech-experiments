@@ -194,3 +194,32 @@ class TestModelStatusEndpoint:
         response = client.post("/models/whisper/status?status=invalid_status")
         assert response.status_code == 400
         assert "Invalid status" in response.json()["detail"]
+
+
+class TestMetricsEndpoint:
+    """Tests for /metrics Prometheus endpoint."""
+
+    def test_metrics_returns_text(self, client):
+        """Metrics endpoint returns text/plain content."""
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        assert "text/plain" in response.headers.get("content-type", "")
+
+    def test_metrics_includes_request_counter(self, client):
+        """Metrics includes http_requests_total counter."""
+        # Make a request first to ensure counter exists
+        client.get("/health")
+        response = client.get("/metrics")
+        assert "http_requests_total" in response.text
+
+    def test_metrics_includes_duration_histogram(self, client):
+        """Metrics includes request duration histogram."""
+        client.get("/health")
+        response = client.get("/metrics")
+        assert "http_request_duration_seconds" in response.text
+
+    def test_metrics_includes_cache_gauges(self, client):
+        """Metrics includes cache-related gauges."""
+        response = client.get("/metrics")
+        assert "models_loaded" in response.text
+        assert "cache_memory_bytes" in response.text
