@@ -651,10 +651,12 @@ async def list_available_models():
             models_info.append(
                 {
                     "model_type": model_type,
-                    "status": metadata["status"],
-                    "version": metadata["version"],
-                    "description": ModelRegistry._loaders[model_type]["description"],
-                    "performance_baseline": metadata["performance_baseline"],
+                    "status": metadata.get("status", "unknown"),
+                    "version": metadata.get("version", "0.0.0"),
+                    "description": ModelRegistry._loaders.get(model_type, {}).get(
+                        "description", ""
+                    ),
+                    "performance_baseline": metadata.get("performance_baseline"),
                 }
             )
 
