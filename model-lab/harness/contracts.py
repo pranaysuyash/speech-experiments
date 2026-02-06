@@ -1,14 +1,24 @@
 """
-Bundle Contract v1 - Enforceable interface for all model loaders.
+Bundle Contract v2 - Enforceable interface for all model loaders.
 
 Every loader MUST return a Bundle that conforms to this contract.
 The runner ONLY calls bundle["asr"]["transcribe"]() etc - never raw model methods.
+
+LCS-01: Added 6 new surfaces (classify, embed, enhance, separate, music_transcription, asr_stream)
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any, TypedDict
+
+# Contract version - bump when signatures change
+CONTRACT_VERSION = "2.0.0"
+
+
+# =============================================================================
+# Result Types
+# =============================================================================
 
 
 class ASRResult(TypedDict, total=False):
@@ -35,6 +45,69 @@ class ChatResult(TypedDict, total=False):
     text: str
     audio: Any  # optional audio response
     meta: dict
+
+
+class ClassifyResult(TypedDict, total=False):
+    """Result from audio classification."""
+
+    labels: list[dict[str, Any]]  # [{label: str, score: float}, ...]
+    embeddings: Any  # optional tensor
+    meta: dict
+
+
+class EmbedResult(TypedDict, total=False):
+    """Result from audio embedding."""
+
+    embedding: Any  # tensor or ndarray
+    dim: int
+    meta: dict
+
+
+class EnhanceResult(TypedDict, total=False):
+    """Result from audio enhancement."""
+
+    audio: Any  # np.ndarray
+    sr: int
+    latency_ms: float
+    meta: dict
+
+
+class SeparateResult(TypedDict, total=False):
+    """Result from source separation."""
+
+    stems: dict[str, Any]  # {stem_name: audio_array, ...}
+    sr: int
+    meta: dict
+
+
+class MusicTranscriptionResult(TypedDict, total=False):
+    """Result from music transcription."""
+
+    notes: list[dict[str, Any]]  # [{pitch, start, end, velocity?}, ...]
+    tempo: float
+    midi: bytes
+    meta: dict
+
+
+class ASRStreamEvent(TypedDict, total=False):
+    """Event from streaming ASR."""
+
+    type: str  # "partial" | "final" | "error" | "info"
+    text: str
+    segments: list
+    seq: int  # monotonic ordering
+    segment_id: str  # stable across partial updates
+    t_audio_ms_start: int
+    t_audio_ms_end: int
+    t_emit_ms: int
+    stability: float
+    is_endpoint: bool
+    meta: dict
+
+
+# =============================================================================
+# Capability Namespaces
+# =============================================================================
 
 
 class ASRNamespace(TypedDict, total=False):
@@ -86,9 +159,59 @@ class AlignmentNamespace(TypedDict, total=False):
     align: Callable[..., dict[str, Any]]  # returns {"segments": [...]}
 
 
+# -----------------------------------------------------------------------------
+# NEW SURFACES (LCS-01)
+# -----------------------------------------------------------------------------
+
+
+class ClassifyNamespace(TypedDict, total=False):
+    """Audio classification capability namespace."""
+
+    classify: Callable[..., ClassifyResult]
+
+
+class EmbedNamespace(TypedDict, total=False):
+    """Audio embedding capability namespace."""
+
+    embed: Callable[..., EmbedResult]
+
+
+class EnhanceNamespace(TypedDict, total=False):
+    """Audio enhancement capability namespace."""
+
+    enhance: Callable[..., EnhanceResult]
+
+
+class SeparateNamespace(TypedDict, total=False):
+    """Source separation capability namespace."""
+
+    separate: Callable[..., SeparateResult]
+
+
+class MusicTranscriptionNamespace(TypedDict, total=False):
+    """Music transcription capability namespace."""
+
+    transcribe_notes: Callable[..., MusicTranscriptionResult]
+
+
+class ASRStreamNamespace(TypedDict, total=False):
+    """Streaming ASR capability namespace with full lifecycle."""
+
+    start_stream: Callable[..., Any]  # (config) -> stream_handle
+    push_audio: Callable[..., Iterator[ASRStreamEvent]]  # (handle, pcm, sr) -> events
+    flush: Callable[..., Iterator[ASRStreamEvent]]  # (handle) -> remaining events
+    finalize: Callable[..., ASRResult]  # (handle) -> final result
+    close: Callable[..., None]  # (handle) -> cleanup
+
+
+# =============================================================================
+# Bundle Contract
+# =============================================================================
+
+
 class Bundle(TypedDict, total=False):
     """
-    Bundle Contract v1 - Every loader must return this shape.
+    Bundle Contract v2 - Every loader must return this shape.
 
     Required keys:
         model_type: str - identifier matching registry key
@@ -104,6 +227,12 @@ class Bundle(TypedDict, total=False):
         diarization: {"diarize": callable} - for speaker diarization
         v2v: {"run_v2v_turn": callable} - for voice-to-voice
         alignment: {"align": callable} - for timestamp alignment
+        classify: {"classify": callable} - for audio classification
+        embed: {"embed": callable} - for audio embeddings
+        enhance: {"enhance": callable} - for audio enhancement
+        separate: {"separate": callable} - for source separation
+        music_transcription: {"transcribe_notes": callable} - for music transcription
+        asr_stream: {lifecycle methods} - for streaming ASR
 
     Optional:
         raw: dict - escape hatch for debugging (model, processor, etc)
@@ -114,6 +243,7 @@ class Bundle(TypedDict, total=False):
     device: str
     capabilities: list[str]
     modes: list[str]
+    # Existing surfaces
     asr: ASRNamespace
     tts: TTSNamespace
     chat: ChatNamespace
@@ -122,12 +252,45 @@ class Bundle(TypedDict, total=False):
     diarization: DiarizationNamespace
     v2v: V2VNamespace
     alignment: AlignmentNamespace
+    # New surfaces (LCS-01)
+    classify: ClassifyNamespace
+    embed: EmbedNamespace
+    enhance: EnhanceNamespace
+    separate: SeparateNamespace
+    music_transcription: MusicTranscriptionNamespace
+    asr_stream: ASRStreamNamespace
+    # Escape hatch
     raw: dict[str, Any]
+
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+# Mapping of capability -> (namespace_key, required_method)
+_CAPABILITY_REQUIREMENTS: dict[str, tuple[str, str]] = {
+    "asr": ("asr", "transcribe"),
+    "tts": ("tts", "synthesize"),
+    "chat": ("chat", "respond"),
+    "mt": ("mt", "translate"),
+    "vad": ("vad", "detect"),
+    "diarization": ("diarization", "diarize"),
+    "v2v": ("v2v", "run_v2v_turn"),
+    "alignment": ("alignment", "align"),
+    "classify": ("classify", "classify"),
+    "embed": ("embed", "embed"),
+    "enhance": ("enhance", "enhance"),
+    "separate": ("separate", "separate"),
+    "music_transcription": ("music_transcription", "transcribe_notes"),
+}
+
+# Streaming has multiple required methods
+_ASR_STREAM_REQUIRED = ["start_stream", "push_audio", "finalize", "close"]
 
 
 def validate_bundle(bundle: dict[str, Any], model_type: str) -> None:
     """
-    Validate that a bundle conforms to Bundle Contract v1.
+    Validate that a bundle conforms to Bundle Contract v2.
     Raises ValueError if validation fails.
     """
     if not isinstance(bundle, dict):
@@ -140,63 +303,20 @@ def validate_bundle(bundle: dict[str, Any], model_type: str) -> None:
 
     caps = set(bundle.get("capabilities", []))
 
-    # Validate ASR capability - transcribe is REQUIRED
-    if "asr" in caps:
-        if "asr" not in bundle:
-            raise ValueError(f"{model_type}: capability 'asr' requires bundle['asr'] namespace")
-        asr_ns = bundle["asr"]
-        if "transcribe" not in asr_ns:
-            raise ValueError(f"{model_type}: asr namespace requires 'transcribe' callable")
+    # Validate standard capabilities
+    for cap, (ns_key, method) in _CAPABILITY_REQUIREMENTS.items():
+        if cap in caps:
+            if ns_key not in bundle:
+                raise ValueError(f"{model_type}: capability '{cap}' requires bundle['{ns_key}'] namespace")
+            if method not in bundle[ns_key]:
+                raise ValueError(f"{model_type}: {ns_key} namespace requires '{method}' callable")
 
-    # Validate TTS capability
-    if "tts" in caps:
-        if "tts" not in bundle:
-            raise ValueError(f"{model_type}: capability 'tts' requires bundle['tts'] namespace")
-        if "synthesize" not in bundle["tts"]:
-            raise ValueError(f"{model_type}: tts namespace requires 'synthesize' callable")
+    # Validate streaming ASR (multiple required methods)
+    if "asr_stream" in caps:
+        if "asr_stream" not in bundle:
+            raise ValueError(f"{model_type}: capability 'asr_stream' requires bundle['asr_stream'] namespace")
+        stream_ns = bundle["asr_stream"]
+        for method in _ASR_STREAM_REQUIRED:
+            if method not in stream_ns:
+                raise ValueError(f"{model_type}: asr_stream namespace requires '{method}' callable")
 
-    # Validate Chat capability
-    if "chat" in caps:
-        if "chat" not in bundle:
-            raise ValueError(f"{model_type}: capability 'chat' requires bundle['chat'] namespace")
-        if "respond" not in bundle["chat"]:
-            raise ValueError(f"{model_type}: chat namespace requires 'respond' callable")
-
-    # Validate MT capability
-    if "mt" in caps:
-        if "mt" not in bundle:
-            raise ValueError(f"{model_type}: capability 'mt' requires bundle['mt'] namespace")
-        if "translate" not in bundle["mt"]:
-            raise ValueError(f"{model_type}: mt namespace requires 'translate' callable")
-
-    # Validate VAD capability
-    if "vad" in caps:
-        if "vad" not in bundle:
-            raise ValueError(f"{model_type}: capability 'vad' requires bundle['vad'] namespace")
-        if "detect" not in bundle["vad"]:
-            raise ValueError(f"{model_type}: vad namespace requires 'detect' callable")
-
-    # Validate Diarization capability
-    if "diarization" in caps:
-        if "diarization" not in bundle:
-            raise ValueError(
-                f"{model_type}: capability 'diarization' requires bundle['diarization'] namespace"
-            )
-        if "diarize" not in bundle["diarization"]:
-            raise ValueError(f"{model_type}: diarization namespace requires 'diarize' callable")
-
-    # Validate V2V capability
-    if "v2v" in caps:
-        if "v2v" not in bundle:
-            raise ValueError(f"{model_type}: capability 'v2v' requires bundle['v2v'] namespace")
-        if "run_v2v_turn" not in bundle["v2v"]:
-            raise ValueError(f"{model_type}: v2v namespace requires 'run_v2v_turn' callable")
-
-    # Validate Alignment capability
-    if "alignment" in caps:
-        if "alignment" not in bundle:
-            raise ValueError(
-                f"{model_type}: capability 'alignment' requires bundle['alignment'] namespace"
-            )
-        if "align" not in bundle["alignment"]:
-            raise ValueError(f"{model_type}: alignment namespace requires 'align' callable")

@@ -1,5 +1,5 @@
 """
-Tests for Bundle Contract v1 enforcement.
+Tests for Bundle Contract v2 enforcement.
 These tests verify that the contract is correctly implemented and enforced.
 """
 
@@ -9,14 +9,15 @@ import pytest
 
 
 class TestBundleContract:
-    """Test Bundle Contract v1 enforcement."""
+    """Test Bundle Contract v2 enforcement."""
 
     def test_contracts_import(self):
         """Verify contracts module imports correctly."""
-        from harness.contracts import Bundle, validate_bundle
+        from harness.contracts import Bundle, validate_bundle, CONTRACT_VERSION
 
         assert Bundle is not None
         assert validate_bundle is not None
+        assert CONTRACT_VERSION == "2.0.0"
 
     def test_registry_returns_valid_bundles(self):
         """Verify all registered loaders return valid Bundle shape."""
@@ -68,6 +69,112 @@ class TestBundleContract:
 
         with pytest.raises(TypeError, match="must return dict"):
             validate_bundle("not a dict", "test")
+
+
+class TestNewSurfaces:
+    """Test new capability surfaces added in LCS-01."""
+
+    def test_classify_surface_validation(self):
+        """Classify capability must have classify() callable."""
+        from harness.contracts import validate_bundle
+
+        valid = {
+            "model_type": "test",
+            "device": "cpu",
+            "capabilities": ["classify"],
+            "classify": {"classify": lambda a, sr: {"labels": []}},
+        }
+        validate_bundle(valid, "test")
+
+        invalid = {
+            "model_type": "test",
+            "device": "cpu",
+            "capabilities": ["classify"],
+            "classify": {},
+        }
+        with pytest.raises(ValueError, match="requires 'classify' callable"):
+            validate_bundle(invalid, "test")
+
+    def test_embed_surface_validation(self):
+        """Embed capability must have embed() callable."""
+        from harness.contracts import validate_bundle
+
+        valid = {
+            "model_type": "test",
+            "device": "cpu",
+            "capabilities": ["embed"],
+            "embed": {"embed": lambda a, sr: {"embedding": [], "dim": 512}},
+        }
+        validate_bundle(valid, "test")
+
+    def test_enhance_surface_validation(self):
+        """Enhance capability must have enhance() callable."""
+        from harness.contracts import validate_bundle
+
+        valid = {
+            "model_type": "test",
+            "device": "cpu",
+            "capabilities": ["enhance"],
+            "enhance": {"enhance": lambda a, sr: {"audio": a, "sr": sr}},
+        }
+        validate_bundle(valid, "test")
+
+    def test_separate_surface_validation(self):
+        """Separate capability must have separate() callable."""
+        from harness.contracts import validate_bundle
+
+        valid = {
+            "model_type": "test",
+            "device": "cpu",
+            "capabilities": ["separate"],
+            "separate": {"separate": lambda a, sr: {"stems": {}, "sr": sr}},
+        }
+        validate_bundle(valid, "test")
+
+    def test_music_transcription_surface_validation(self):
+        """Music transcription capability must have transcribe_notes() callable."""
+        from harness.contracts import validate_bundle
+
+        valid = {
+            "model_type": "test",
+            "device": "cpu",
+            "capabilities": ["music_transcription"],
+            "music_transcription": {"transcribe_notes": lambda a, sr: {"notes": []}},
+        }
+        validate_bundle(valid, "test")
+
+    def test_asr_stream_requires_lifecycle_methods(self):
+        """ASR stream capability must have all lifecycle methods."""
+        from harness.contracts import validate_bundle
+
+        valid = {
+            "model_type": "test",
+            "device": "cpu",
+            "capabilities": ["asr_stream"],
+            "asr_stream": {
+                "start_stream": lambda c: "handle",
+                "push_audio": lambda h, a, sr: iter([]),
+                "flush": lambda h: iter([]),
+                "finalize": lambda h: {"text": ""},
+                "close": lambda h: None,
+            },
+        }
+        validate_bundle(valid, "test")
+
+        # Missing finalize
+        invalid = {
+            "model_type": "test",
+            "device": "cpu",
+            "capabilities": ["asr_stream"],
+            "asr_stream": {
+                "start_stream": lambda c: "handle",
+                "push_audio": lambda h, a, sr: iter([]),
+                "close": lambda h: None,
+            },
+        }
+        with pytest.raises(ValueError, match="requires 'finalize' callable"):
+            validate_bundle(invalid, "test")
+
 
 
 class TestRunnerContractCompliance:

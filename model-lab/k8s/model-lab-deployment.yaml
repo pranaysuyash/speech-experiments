@@ -1,0 +1,125 @@
+# k8s/model-lab-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-lab-api
+  labels:
+    app: model-lab-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: model-lab-api
+  template:
+    metadata:
+      labels:
+        app: model-lab-api
+    spec:
+      containers:
+      - name: model-lab-api
+        image: model-lab:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: MODEL_CACHE_MAX_MB
+          value: "4096"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://jaeger:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "model-lab-api"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "8Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: model-storage
+          mountPath: /app/models
+          readOnly: true
+        - name: runs-storage
+          mountPath: /app/runs
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: model-storage-pvc
+      - name: runs-storage
+        persistentVolumeClaim:
+          claimName: runs-storage-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-lab-api-service
+  labels:
+    app: model-lab-api
+spec:
+  selector:
+    app: model-lab-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: model-lab-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  rules:
+  - host: model-lab.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: model-lab-api-service
+            port:
+              number: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: model-lab-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: model-lab-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
