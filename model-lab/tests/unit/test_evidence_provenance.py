@@ -371,7 +371,7 @@ class TestRunContext:
             # Allow legacy runs for now, but warn
             import warnings
 
-            warnings.warn(f"Runs without run_context: {len(violations)}")
+            warnings.warn(f"Runs without run_context: {len(violations)}", stacklevel=2)
             # To make hard fail, uncomment:
             # pytest.fail(f"Runs without run_context:\n" + "\n".join(violations[:10]))
 
@@ -405,4 +405,4 @@ class TestRunContext:
         if violations:
             import warnings
 
-            warnings.warn(f"Audio tasks without duration: {len(violations)}")
+            warnings.warn(f"Audio tasks without duration: {len(violations)}", stacklevel=2)

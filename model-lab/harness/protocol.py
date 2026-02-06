@@ -22,7 +22,7 @@ class RunContract:
                 .decode()
                 .strip()
             )
-        except:
+        except Exception:
             return "unknown"
 
     @staticmethod
@@ -49,7 +49,7 @@ class RunContract:
                         if line.startswith("Version:"):
                             versions[package] = line.split(":")[1].strip()
                             break
-            except:
+            except Exception:
                 versions[package] = "not_installed"
 
         return versions
@@ -60,7 +60,7 @@ class RunContract:
         try:
             with open(config_path, "rb") as f:
                 return hashlib.sha256(f.read()).hexdigest()[:16]
-        except:
+        except Exception:
             return "unknown"
 
     @staticmethod

@@ -31,7 +31,7 @@ def get_run_results(run_id: str):
         import logging
 
         logging.getLogger("server.api").error(f"Error computing results for {run_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to compute results")
+        raise HTTPException(status_code=500, detail="Failed to compute results") from e
 
 
 @router.get("")
@@ -71,7 +71,7 @@ def rerun_pipeline(run_id: str, config_overrides: dict[str, Any] | None = None):
     except Exception as e:
         if "Runner is busy" in str(e):
             raise HTTPException(status_code=409, detail=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to rerun pipeline: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to rerun pipeline: {e}") from e
 
 
 @router.get("/{run_id}/status")
@@ -85,7 +85,7 @@ def get_run_status(run_id: str):
         import logging
 
         logging.getLogger("server.api").error(f"Error getting status for {run_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get run status")
+        raise HTTPException(status_code=500, detail="Failed to get run status") from e
 
 
 @router.get("/{run_id}/details")
@@ -274,7 +274,7 @@ def get_bundle_manifest(run_id: str):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read bundle manifest: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to read bundle manifest: {e}") from e
 
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -296,7 +296,7 @@ def _load_bundle_manifest(run_id: str) -> dict[str, Any]:
     try:
         return json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read bundle manifest: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to read bundle manifest: {e}") from e
 
 
 def _artifact_rel_path(entry: dict[str, Any]) -> str | None:
@@ -476,13 +476,13 @@ def download_artifact(run_id: str, artifact_id: str):
         manifest = json.loads(manifest_path.read_text())
     except Exception as e:
         logger.error(f"Failed to read manifest for {run_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to read manifest")
+        raise HTTPException(status_code=500, detail="Failed to read manifest") from e
 
     # 3. Search for artifact by ID across all steps
     session_dir = manifest_path.parent
     found_artifact = None
 
-    for step_name, step_data in manifest.get("steps", {}).items():
+    for _step_name, step_data in manifest.get("steps", {}).items():
         for art in step_data.get("artifacts", []):
             # Only new schema artifacts have 'id'
             if art.get("id") == artifact_id:

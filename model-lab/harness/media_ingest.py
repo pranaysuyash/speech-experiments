@@ -77,8 +77,7 @@ def get_ffmpeg_version() -> str:
     try:
         p = subprocess.run(
             ["ffmpeg", "-version"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=True,
             text=True,
         )
@@ -221,7 +220,7 @@ def extract_audio_ffmpeg(
         ]
 
         logger.debug(f"Running ffmpeg: {' '.join(argv)}")
-        subprocess.run(argv, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(argv, check=True, capture_output=True)
         atomic_replace(tmp_path, output_wav)
         return argv, ffmpeg_version
     except subprocess.CalledProcessError as e:

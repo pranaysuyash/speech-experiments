@@ -101,7 +101,7 @@ class FasterWhisperProvider(ASRProvider):
 
                 t0 = processed_samples / sample_rate
                 chunk_samples = len(audio_bytes) // bytes_per_sample
-                t1 = (processed_samples + chunk_samples) / sample_rate
+                (processed_samples + chunk_samples) / sample_rate
                 processed_samples += chunk_samples
 
                 audio = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0

@@ -90,7 +90,7 @@ def get_cached_response(cache_key: str) -> str | None:
             with open(cache_file) as f:
                 data = json.load(f)
                 return data.get("response")
-        except:
+        except Exception:
             pass
     return None
 

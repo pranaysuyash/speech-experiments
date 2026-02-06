@@ -505,7 +505,7 @@ def validate_pipeline_config(config: dict[str, Any]) -> list[str]:
 
     # Validate step config keys
     step_config = config.get("config") or {}
-    for step_name, step_cfg in step_config.items():
+    for step_name, _step_cfg in step_config.items():
         if step_name not in STEP_REGISTRY:
             errors.append(f"Config for unknown step: {step_name}")
 

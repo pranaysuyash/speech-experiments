@@ -144,7 +144,7 @@ def load_best_run_for_task(model_id: str, task: str) -> dict[str, Any] | None:
         if "valid" in r:
             return r["valid"]
         # Legacy inference
-        gates = r.get("evidence", {}).get("sanity_gates", {})
+        r.get("evidence", {}).get("sanity_gates", {})
         return r.get("evidence", {}).get("wer_valid", True) and not r.get("gates", {}).get(
             "has_failure", False
         )
@@ -172,7 +172,7 @@ def load_best_run_for_task(model_id: str, task: str) -> dict[str, Any] | None:
     metrics = run_data.get("metrics", {})
     system = run_data.get("system", {})
     manifest = run_data.get("manifest", {})
-    output = run_data.get("output", {})
+    run_data.get("output", {})
     evidence = run_data.get("evidence", {})
     gates = run_data.get("gates", {})
 

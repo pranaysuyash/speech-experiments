@@ -25,7 +25,6 @@ import statistics
 import time
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Optional
 
 try:
     import httpx
@@ -105,8 +104,8 @@ async def make_request(
     client: httpx.AsyncClient,
     url: str,
     method: str = "GET",
-    data: Optional[dict] = None,
-) -> tuple[bool, float, Optional[str]]:
+    data: dict | None = None,
+) -> tuple[bool, float, str | None]:
     """Make a single request and return (success, latency_ms, error)."""
     start = time.perf_counter()
     try:
@@ -139,7 +138,7 @@ async def run_concurrent_test(
     concurrent: int,
     total_requests: int,
     method: str = "GET",
-    data: Optional[dict] = None,
+    data: dict | None = None,
 ) -> LoadTestResult:
     """Run load test with N concurrent workers making M total requests."""
     url = f"{target.rstrip('/')}{endpoint}"
@@ -184,7 +183,7 @@ async def run_sustained_test(
     duration_seconds: int,
     rate_per_second: float,
     method: str = "GET",
-    data: Optional[dict] = None,
+    data: dict | None = None,
 ) -> LoadTestResult:
     """Run sustained load test at a fixed rate for a duration."""
     url = f"{target.rstrip('/')}{endpoint}"
@@ -239,7 +238,7 @@ def main():
     # Validate arguments
     if args.duration and args.rate:
         # Sustained mode
-        print(f"Running sustained load test:")
+        print("Running sustained load test:")
         print(f"  Target:    {args.target}")
         print(f"  Endpoint:  {args.endpoint}")
         print(f"  Duration:  {args.duration}s")
@@ -258,7 +257,7 @@ def main():
     else:
         # Concurrent mode
         total = args.requests or 100
-        print(f"Running concurrent load test:")
+        print("Running concurrent load test:")
         print(f"  Target:     {args.target}")
         print(f"  Endpoint:   {args.endpoint}")
         print(f"  Concurrent: {args.concurrent}")

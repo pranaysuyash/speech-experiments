@@ -2,7 +2,6 @@
 Tests for dynamic pipeline configuration.
 """
 
-
 import pytest
 
 from harness.pipeline_config import (
@@ -139,7 +138,7 @@ class TestRegistries:
 
     def test_step_has_required_fields(self):
         """Each step has required metadata."""
-        for name, info in STEP_REGISTRY.items():
+        for _name, info in STEP_REGISTRY.items():
             assert "deps" in info
             assert "description" in info
 

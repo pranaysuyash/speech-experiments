@@ -231,8 +231,8 @@ def run_summarize(
     # Load ASR artifact
     asr_artifact = load_asr_artifact(asr_artifact_path)
     asr_artifact_hash = compute_file_hash(asr_artifact_path)
-    asr_model_id = asr_artifact["run_context"]["model_id"]
-    audio_duration = asr_artifact["inputs"].get("audio_duration_s", 0)
+    asr_artifact["run_context"]["model_id"]
+    asr_artifact["inputs"].get("audio_duration_s", 0)
 
     # Create transcript view
     view = from_asr_artifact(asr_artifact_path)
@@ -513,9 +513,7 @@ def _run_summarize_chunked(
     return artifact_dict, run_file
 
 
-def run_asr_first(
-    input_path: Path, asr_model: str | None = None, pre: str | None = None
-) -> Path:
+def run_asr_first(input_path: Path, asr_model: str | None = None, pre: str | None = None) -> Path:
     """Run ASR on input file and return artifact path."""
     logger.info(f"Running ASR on {input_path.name}...")
 

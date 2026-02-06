@@ -178,7 +178,7 @@ def main():
 
     # Step 3: Create metadata
     print("\n3. Creating conversation test metadata...")
-    metadata = create_conversation_test_metadata()
+    create_conversation_test_metadata()
 
     # Summary
     print("\n" + "=" * 60)

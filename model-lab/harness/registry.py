@@ -267,7 +267,7 @@ def load_lfm2_5_audio(config: dict[str, Any], device: str) -> Bundle:
                     logger.warning(f"Failed to manually initialize detokenizer: {e}")
                     # Fallback to library behavior (might fail on MPS later)
         except Exception as e:
-            raise RuntimeError(f"LFM2.5-Audio processor loading failed: {e}")
+            raise RuntimeError(f"LFM2.5-Audio processor loading failed: {e}") from e
 
         def transcribe(audio, sr=16000, **kwargs):
             """
@@ -495,7 +495,7 @@ def load_lfm2_5_audio(config: dict[str, Any], device: str) -> Bundle:
         }
 
     except Exception as e:
-        raise RuntimeError(f"LFM2.5-Audio loading failed: {e}")
+        raise RuntimeError(f"LFM2.5-Audio loading failed: {e}") from e
 
 
 def load_whisper(config: dict[str, Any], device: str) -> Bundle:
@@ -877,7 +877,7 @@ def load_silero_vad(config: dict[str, Any], device: str) -> Bundle:
         }
 
     except Exception as e:
-        raise RuntimeError(f"Silero VAD loading failed: {e}")
+        raise RuntimeError(f"Silero VAD loading failed: {e}") from e
 
 
 def load_pyannote_diarization(config: dict[str, Any], device: str) -> Bundle:
@@ -942,7 +942,7 @@ def load_pyannote_diarization(config: dict[str, Any], device: str) -> Bundle:
 
             return {
                 "segments": segments,
-                "num_speakers": len(set(s["speaker"] for s in segments)),
+                "num_speakers": len({s["speaker"] for s in segments}),
                 "meta": {"model": model_name},
             }
 
@@ -956,7 +956,7 @@ def load_pyannote_diarization(config: dict[str, Any], device: str) -> Bundle:
         }
 
     except Exception as e:
-        raise RuntimeError(f"Pyannote loading failed: {e}")
+        raise RuntimeError(f"Pyannote loading failed: {e}") from e
 
 
 def load_heuristic_diarizer(config: dict[str, Any], device: str) -> Bundle:
@@ -1020,7 +1020,7 @@ def load_heuristic_diarizer(config: dict[str, Any], device: str) -> Bundle:
         }
 
     except Exception as e:
-        raise RuntimeError(f"Heuristic Diarizer loading failed: {e}")
+        raise RuntimeError(f"Heuristic Diarizer loading failed: {e}") from e
 
 
 # =============================================================================

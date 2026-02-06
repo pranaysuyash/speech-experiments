@@ -99,7 +99,6 @@ def compute_result_v1(run_id: str) -> dict[str, Any] | None:
 
         # Word Count & Confidence
         word_count = 0
-        confidence_sum = 0.0
         segment_count = 0
 
         # Try to load transcript

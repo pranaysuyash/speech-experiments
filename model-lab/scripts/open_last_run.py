@@ -32,7 +32,7 @@ def main():
             run_id = data.get("run_id", manifest_path.parent.name)
             started_at = data.get("started_at", "")
             runs.append((run_id, started_at, manifest_path))
-        except:
+        except Exception:
             continue
 
     if not runs:

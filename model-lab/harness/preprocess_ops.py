@@ -252,7 +252,7 @@ class NormalizeLoudness(Operator):
         # Measure output
         try:
             output_lufs = meter.integrated_loudness(normalized)
-        except:
+        except Exception:
             output_lufs = target_lufs  # Assume success
 
         gain_db = target_lufs - input_lufs if not np.isinf(input_lufs) else 0

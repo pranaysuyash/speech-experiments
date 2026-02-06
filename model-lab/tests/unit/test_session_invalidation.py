@@ -31,7 +31,7 @@ def test_invalidation_when_ingest_config_changes(tmp_path: Path, test_wav_path: 
     # Currently we only have ingest active fully.
     # But we can verify ingest DID re-run (started_at changes).
 
-    t1 = m1["steps"]["ingest"]["started_at"]
+    m1["steps"]["ingest"]["started_at"]
 
     r2 = SessionRunner(
         test_wav_path,

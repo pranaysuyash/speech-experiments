@@ -56,7 +56,6 @@ def main():
     # 1. Create Run
     info("Creating Run...")
     files = {"file": (TEST_FILENAME, TEST_FILE_CONTENT, "audio/wav")}
-    data = {"use_case_id": "default", "steps_preset": "ingest"}  # Use ingest for speed, or full?
     # Actually ingest is fast. We need a slow run to kill it?
     # If ingest finishes too fast, we can't kill it.
     # The 'full' preset will fail eventually on fake audio, but stay running long enough to kill?

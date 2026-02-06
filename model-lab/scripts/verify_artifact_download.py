@@ -82,9 +82,9 @@ def test_download_endpoint():
 
         # Validate JSON
         try:
-            data = resp.json()
+            resp.json()
             print("   ✓ Valid JSON response")
-        except:
+        except Exception:
             print("   ✓ Valid binary response (not JSON)")
     else:
         print(f"   ❌ Download failed: HTTP {resp.status_code}")

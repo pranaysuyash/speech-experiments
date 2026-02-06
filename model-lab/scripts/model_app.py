@@ -92,14 +92,14 @@ def cmd_recommend(args):
                             {
                                 "error": f"No evidence for device: {device_filter}",
                                 "available_devices": list(
-                                    set(m.get("device") for m in models if m.get("device"))
+                                    {m.get("device") for m in models if m.get("device")}
                                 ),
                             }
                         )
                     )
                 else:
                     print(f"\n⚠️ No evidence for device: {device_filter}")
-                    available = list(set(m.get("device") for m in models if m.get("device")))
+                    available = list({m.get("device") for m in models if m.get("device")})
                     print(f"Available devices: {available}")
                 sys.exit(EXIT_MISSING_EVIDENCE)
             models = device_models
@@ -907,7 +907,7 @@ def cmd_sweep(args):
             task_cov = tasks_cov.get(task, {})
 
             # Check if evidence exists at target grade
-            has_evidence = task_cov.get("has_evidence", False)
+            task_cov.get("has_evidence", False)
             best_grade = task_cov.get("best_grade", "")
 
             grade_rank = {"golden_batch": 3, "smoke": 2, "adhoc": 1}

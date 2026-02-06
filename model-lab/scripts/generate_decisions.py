@@ -406,7 +406,7 @@ def generate_decisions_doc(results: dict[str, list[DecisionResult]]):
     for use_case_name, decisions in results.items():
         recommended = [d for d in decisions if d.outcome == Outcome.RECOMMENDED]
         acceptable = [d for d in decisions if d.outcome == Outcome.ACCEPTABLE]
-        rejected = [d for d in decisions if d.outcome == Outcome.REJECTED]
+        [d for d in decisions if d.outcome == Outcome.REJECTED]
 
         lines.append(f"### {use_case_name}")
 
@@ -664,7 +664,7 @@ def evaluate_pipeline_for_use_case(
     # Get min_runs requirements
     min_runs_config = use_case.get("min_runs", {})
     min_runs_required = min_runs_config.get("required", {})
-    min_runs_secondary = min_runs_config.get("secondary", {})
+    min_runs_config.get("secondary", {})
 
     # Get all required tasks
     primary_reqs = use_case["requirements"].get("primary", [])

@@ -396,7 +396,7 @@ class ModelComparator:
 
         # Box plot
         plt.subplot(1, 2, 1)
-        data = [values for values in model_results.values()]
+        data = list(model_results.values())
         labels = list(model_results.keys())
         plt.boxplot(data, labels=labels)
         plt.title(f"{metric_name} Distribution by Model")

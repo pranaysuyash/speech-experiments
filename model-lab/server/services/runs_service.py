@@ -202,7 +202,7 @@ class RunsService:
         try:
             run_request = json.loads(run_request_path.read_text())
         except Exception as e:
-            raise ValueError(f"Failed to read run request: {e}")
+            raise ValueError(f"Failed to read run request: {e}") from e
 
         # Find original input file
         manifest_path = Path(run_data["manifest_path"])

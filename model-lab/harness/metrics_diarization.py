@@ -31,7 +31,7 @@ class DiarizationMetrics:
         """
         Calculate absolute error in speaker count.
         """
-        pred_speakers = set(s.get("speaker", "unknown") for s in pred_segments)
+        pred_speakers = {s.get("speaker", "unknown") for s in pred_segments}
         num_pred = len(pred_speakers)
         num_auth = expected.get("num_speakers", 0)
         return abs(num_pred - num_auth)
@@ -52,7 +52,7 @@ class DiarizationMetrics:
             latency_s: Processing time
             metadata: Additional metadata
         """
-        pred_speakers = set(s.get("speaker", "unknown") for s in pred_segments)
+        pred_speakers = {s.get("speaker", "unknown") for s in pred_segments}
         num_pred = len(pred_speakers)
         num_auth = expected.get("num_speakers", 0)
 

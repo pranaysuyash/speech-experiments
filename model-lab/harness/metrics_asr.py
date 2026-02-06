@@ -218,7 +218,7 @@ def _ngrams(tokens: list[str], n: int = 3) -> list[tuple]:
     """Generate n-grams from token list."""
     if len(tokens) < n:
         return []
-    return list(zip(*[tokens[i:] for i in range(n)]))
+    return list(zip(*[tokens[i:] for i in range(n)], strict=False))
 
 
 def repeat_3gram_rate(text: str) -> float:

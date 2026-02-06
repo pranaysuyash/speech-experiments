@@ -58,7 +58,7 @@ class PromptTemplate:
             try:
                 return self.template.format(**kwargs)
             except KeyError as e:
-                raise ValueError(f"Template variable error: {e}")
+                raise ValueError(f"Template variable error: {e}") from e
 
     def validate(self) -> bool:
         """Validate template syntax."""
@@ -105,7 +105,7 @@ class PromptLibrary:
         for key in self.templates.keys():
             name = key.split("_v")[0]
             names.add(name)
-        return sorted(list(names))
+        return sorted(names)
 
     def save_library(self, filepath: Path | None = None):
         """Save library to file."""

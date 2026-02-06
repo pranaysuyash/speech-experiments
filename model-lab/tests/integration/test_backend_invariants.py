@@ -296,7 +296,6 @@ class TestBackendInvariants:
         m["status"] = "RUNNING"
         runner._save_manifest(m)
 
-
         resolved = ResolvedASRConfig(
             model_id="faster_whisper:large-v3",
             source="hf",

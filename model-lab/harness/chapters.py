@@ -191,7 +191,7 @@ class SemanticSegmenter:
                     index=i + 1,
                     start=start,
                     end=end,
-                    speakers=sorted(list(speakers)),
+                    speakers=sorted(speakers),
                     evidence_segments=[
                         {"text": s.text, "start": s.start_s, "end": s.end_s} for s in chap_segsi
                     ],
@@ -202,12 +202,12 @@ class SemanticSegmenter:
 
     def _create_chapter(self, index, start, end, segments):
         """Helper for single chapter fallback."""
-        speakers = set(s.speaker_id for s in segments if s.speaker_id != "unknown")
+        speakers = {s.speaker_id for s in segments if s.speaker_id != "unknown"}
         return Chapter(
             index=index + 1,
             start=start,
             end=end,
-            speakers=sorted(list(speakers)),
+            speakers=sorted(speakers),
             evidence_segments=[
                 {"text": s.text, "start": s.start_s, "end": s.end_s} for s in segments
             ],

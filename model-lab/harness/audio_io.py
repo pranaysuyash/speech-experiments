@@ -66,7 +66,7 @@ class AudioLoader:
         try:
             audio, sample_rate = sf.read(audio_path)
         except Exception as e:
-            raise OSError(f"Failed to load audio file {audio_path}: {e}")
+            raise OSError(f"Failed to load audio file {audio_path}: {e}") from e
 
         # Handle channel conversion
         if audio.ndim > 1:

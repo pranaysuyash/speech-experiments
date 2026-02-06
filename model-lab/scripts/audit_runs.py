@@ -11,9 +11,9 @@ def audit_run_manifest(manifest_path):
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
         run_id = data.get("run_id", "unknown")
         status = data.get("status")
-        created_at = data.get("created_at") or data.get("started_at")  # Fallback
+        data.get("created_at") or data.get("started_at")  # Fallback
         updated_at = data.get("updated_at")
-        steps = data.get("steps", {})
+        data.get("steps", {})
 
         # 1. Terminal State Check
         # If pipeline is done, status must be COMPLETED or FAILED

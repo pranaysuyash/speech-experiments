@@ -10,8 +10,8 @@ Provides:
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 
 @dataclass
@@ -232,9 +232,7 @@ ASR_REQUESTS = REGISTRY.counter("asr_requests_total", "Total ASR transcription r
 
 TTS_REQUESTS = REGISTRY.counter("tts_requests_total", "Total TTS synthesis requests")
 
-ERRORS_TOTAL = REGISTRY.counter(
-    "errors_total", "Total errors", labels=["type", "endpoint"]
-)
+ERRORS_TOTAL = REGISTRY.counter("errors_total", "Total errors", labels=["type", "endpoint"])
 
 MODELS_LOADED = REGISTRY.gauge("models_loaded", "Number of models currently in cache")
 

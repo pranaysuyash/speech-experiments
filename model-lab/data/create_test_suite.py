@@ -31,7 +31,6 @@ def generate_pink_noise(
     noise = np.random.randn(int(sample_rate * duration))
     # Basic pink noise filter
     b = [0.049922035, -0.095993537, 0.050612699, -0.004408786]
-    a = [1, -2.494956002, 2.017265875, -0.522189400]
 
     # Apply filter (simplified)
     pink_noise = np.convolve(noise, b, mode="same")
@@ -45,7 +44,7 @@ def generate_sine_sweep(
     t = np.linspace(0, duration, int(sample_rate * duration))
     # Logarithmic frequency sweep
     k = (end_freq / start_freq) ** (1 / duration)
-    instantaneous_freq = start_freq * (k**t)
+    start_freq * (k**t)
     phase = 2 * np.pi * start_freq * (k**t - 1) / np.log(k)
     return 0.5 * np.sin(phase)
 

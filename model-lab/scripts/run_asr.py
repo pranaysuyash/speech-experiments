@@ -643,7 +643,7 @@ def main():
             print(f"Artifact: {artifact_path}")
         else:
             # Dataset mode: existing behavior
-            result = run_asr_test(args.model, args.dataset, device=args.device)
+            run_asr_test(args.model, args.dataset, device=args.device)
             print("\n🎉 Test completed successfully!")
         return 0
     except Exception as e:

@@ -1,7 +1,6 @@
 """Tests for structured error handling."""
 
 
-
 class TestErrorClassification:
     """Test error classification logic."""
 

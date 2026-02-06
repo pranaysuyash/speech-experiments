@@ -5,7 +5,6 @@ which doesn't require FastAPI.
 """
 
 
-
 class TestPipelineConfig:
     """Test PipelineConfig class."""
 

@@ -22,7 +22,6 @@ def debug_find(run_id):
         return
 
     # Check for transcript
-    artifact = "transcript"
     # logic from artifacts.py
     candidates = [
         "bundle/transcript.json",

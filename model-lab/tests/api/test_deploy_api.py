@@ -9,16 +9,16 @@ Covers:
 - Model cache memory limits
 """
 
-import pytest
-from fastapi.testclient import TestClient
-
 # Import the app - adjust path based on how deploy_api is structured
 import sys
 from pathlib import Path
 
+import pytest
+from fastapi.testclient import TestClient
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from scripts.deploy_api import app, REQUEST_STATS, MODEL_CACHE, MODEL_CACHE_SIZES
+from scripts.deploy_api import MODEL_CACHE, MODEL_CACHE_SIZES, REQUEST_STATS, app
 
 
 @pytest.fixture
@@ -169,9 +169,7 @@ class TestASREndpoint:
             data={"model_type": "whisper"},
         )
         # Should not be 400 (format rejection) - may be 500 if model not loaded
-        assert response.status_code != 400 or "Unsupported audio format" not in str(
-            response.json()
-        )
+        assert response.status_code != 400 or "Unsupported audio format" not in str(response.json())
 
 
 class TestInputValidation:

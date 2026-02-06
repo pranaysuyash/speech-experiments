@@ -296,7 +296,7 @@ def transcribe_faster_whisper(wav_path: str, asr_cfg: dict) -> str:
     try:
         from faster_whisper import WhisperModel
     except Exception as e:
-        raise RuntimeError(f"faster-whisper not available: {e}")
+        raise RuntimeError(f"faster-whisper not available: {e}") from e
 
     model = WhisperModel(asr_cfg["model"], compute_type=asr_cfg.get("compute_type", "int8"))
     segments, info = model.transcribe(
@@ -346,7 +346,7 @@ def main():
 
     root = os.path.dirname(os.path.abspath(__file__))
     baselines_path = os.path.join(root, "baselines.json")
-    fixtures_dir = os.path.join(root, "fixtures")
+    os.path.join(root, "fixtures")
     reports_dir = os.path.join(root, "reports")
     os.makedirs(reports_dir, exist_ok=True)
 

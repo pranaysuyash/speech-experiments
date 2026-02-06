@@ -21,7 +21,9 @@ try:
     LIQUID_AUDIO_AVAILABLE = True
 except ImportError:
     LIQUID_AUDIO_AVAILABLE = False
-    warnings.warn("Liquid Audio library not available. Install with: pip install liquid-audio")
+    warnings.warn(
+        "Liquid Audio library not available. Install with: pip install liquid-audio", stacklevel=2
+    )
 
 
 class LFMModelManager:
@@ -124,7 +126,7 @@ class LFMModelManager:
             print("3. Check CUDA availability")
             print("4. Ensure liquid-audio library is installed")
 
-            raise RuntimeError(f"Model loading failed: {e}")
+            raise RuntimeError(f"Model loading failed: {e}") from e
 
     def unload_model(self):
         """Unload model and free resources."""
@@ -193,9 +195,7 @@ class AdvancedAudioProcessor:
         try:
             waveform, sample_rate = torchaudio.load(audio_path)
         except Exception as e:
-            raise RuntimeError(f"Failed to load audio {audio_path}: {e}")
-
-        original_shape = waveform.shape
+            raise RuntimeError(f"Failed to load audio {audio_path}: {e}") from e
 
         # Convert to mono if stereo
         if waveform.shape[0] > 1:

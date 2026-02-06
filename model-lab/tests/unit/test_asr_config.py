@@ -1,7 +1,6 @@
 """Tests for ASR configuration resolution."""
 
 
-
 class TestResolveASRConfig:
     """Test resolve_asr_config function."""
 

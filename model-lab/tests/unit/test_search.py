@@ -48,7 +48,7 @@ def test_search_query_constraints(mock_runs_index):
 def test_search_cache_invalidation(mock_runs_index):
     # Setup initial state
     run_id = "run_test"
-    manifest_path = Path("/tmp/fake_run/manifest.json")
+    Path("/tmp/fake_run/manifest.json")
 
     with patch("server.services.runs_index.Path") as MockPath:
         # 1. First Load
@@ -58,10 +58,8 @@ def test_search_cache_invalidation(mock_runs_index):
         MockPath.return_value.stat.return_value.st_mtime_ns = 100
 
         # Mock file reads
-        manifest_content = json.dumps(
-            {"run_id": run_id, "steps": {"asr": {"artifacts": [{"path": "asr.json"}]}}}
-        )
-        asr_content_1 = json.dumps({"segments": [{"text": "Version One", "start": 0, "end": 1}]})
+        json.dumps({"run_id": run_id, "steps": {"asr": {"artifacts": [{"path": "asr.json"}]}}})
+        json.dumps({"segments": [{"text": "Version One", "start": 0, "end": 1}]})
 
         # We neeed to mock read_text specifically for manifest and asr
         # This is tricky with one MockPath.

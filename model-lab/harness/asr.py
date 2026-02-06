@@ -167,8 +167,8 @@ def run_asr(
     # ModelRegistry needs type/config.
     # Let's pass 'device' explicitly.
 
-    pre_ops = config.get("pre_ops")
-    dataset_def = config.get("dataset_def")
+    config.get("pre_ops")
+    config.get("dataset_def")
 
     input_path = input_path.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -209,7 +209,7 @@ def run_asr(
     try:
         model_bundle = ModelRegistry.load_model(model_type, config, device=device)
     except Exception as e:
-        raise ValueError(f"Failed to load model {model_type}: {e}")
+        raise ValueError(f"Failed to load model {model_type}: {e}") from e
 
     if update_progress:
         update_progress(20, "Model loaded, preparing audio...")
@@ -228,7 +228,7 @@ def run_asr(
     try:
         audio_data, sr = sf.read(ingest_audio_path)
     except Exception as e:
-        raise RuntimeError(f"Failed to read audio file {ingest_audio_path}: {e}")
+        raise RuntimeError(f"Failed to read audio file {ingest_audio_path}: {e}") from e
 
     logger.info(f"Transcribing {ingest_audio_path.name}...")
     if update_progress:
@@ -243,7 +243,7 @@ def run_asr(
         logger.warning(f"Model {model_type} does not support progress tracking")
         result = transcribe_func(audio_data, sr=sr)
     except Exception as e:
-        raise RuntimeError(f"Transcription failed: {e}")
+        raise RuntimeError(f"Transcription failed: {e}") from e
 
     if update_progress:
         update_progress(90, "Processing results...")
@@ -251,8 +251,6 @@ def run_asr(
     duration_ms = int((time.time() - t0) * 1000)
 
     # 5. Metrics (if golden) - Skipped for now
-    metrics = None
-    diagnostics = []
 
     # Sanitize model name for filename
     safe_model_name = model_name.replace("/", "_").replace("\\", "_")
@@ -284,9 +282,7 @@ def run_asr(
     }
 
     # RTF Calculation
-    audio_duration = ingest.get(
-        "duration", 0
-    )  # IngestResult uses 'duration' or 'duration_s'? Check IngestResult.
+    ingest.get("duration", 0)  # IngestResult uses 'duration' or 'duration_s'? Check IngestResult.
     # IngestResult (Step 1937) has 'duration_s'.
     # ingest() returns dict. Let's assume 'duration_s' exists.
     audio_duration_s = ingest.get("duration_s", 0.1)

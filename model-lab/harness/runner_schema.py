@@ -137,7 +137,7 @@ class RunnerArtifact:
             },
             "metrics": {
                 **self.metrics_structural,
-                **{k: v for k, v in asdict(self.metrics_quality).items()},
+                **dict(asdict(self.metrics_quality).items()),
             },
         }
 

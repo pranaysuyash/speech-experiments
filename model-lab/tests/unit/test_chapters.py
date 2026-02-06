@@ -66,8 +66,7 @@ class TestChapters(unittest.TestCase):
         # Topic B vec: [0, 1]
 
         def mock_encode(texts):
-            vecs = []
-            for t in texts:
+            for _t in texts:
                 # Naive: if "Seg 0" to "Seg 3" -> Topic A
                 # If "Seg 4" starts appearing -> transition
                 # Real logic in test is determining how `_create_windows` groups them.

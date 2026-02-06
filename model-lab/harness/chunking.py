@@ -262,9 +262,7 @@ def chunk_by_text(text: str, policy: ChunkingPolicy, duration_s: float = 0) -> l
     return chunks
 
 
-def chunk_transcript(
-    view: TranscriptView, policy: ChunkingPolicy | None = None
-) -> ChunkingResult:
+def chunk_transcript(view: TranscriptView, policy: ChunkingPolicy | None = None) -> ChunkingResult:
     """
     Chunk a transcript using the best available method.
 

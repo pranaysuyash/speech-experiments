@@ -65,7 +65,7 @@ def enrich_chapter(chapter: Chapter, context: str):
     # 2. Segment
     logger.info("Running semantic segmentation...")
 
-    cache_dir = (
+    (
         Path("runs/cache/embeddings")
         if not os.environ.get("EMBEDDING_CACHE_DIR")
         else Path(os.environ.get("EMBEDDING_CACHE_DIR"))

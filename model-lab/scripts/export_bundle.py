@@ -66,7 +66,7 @@ def find_latest_artifact_for_task(task_dir: Path, source_hash: str) -> Path | No
 
             # 1. Inputs schema (RunnerArtifact)
             inputs = data.get("inputs", {})
-            file_audio_hash = inputs.get("audio_hash")
+            inputs.get("audio_hash")
 
             # 2. NLP Inputs (NLPArtifact)
             # NLP inputs point to parent artifact, not audio directly usually

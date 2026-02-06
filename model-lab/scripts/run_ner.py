@@ -356,9 +356,7 @@ def run_ner(
     return artifact_dict, run_file
 
 
-def run_asr_first(
-    input_path: Path, asr_model: str | None = None, pre: str | None = None
-) -> Path:
+def run_asr_first(input_path: Path, asr_model: str | None = None, pre: str | None = None) -> Path:
     """Run ASR on input file and return artifact path."""
     logger.info(f"Running ASR on {input_path.name}...")
 

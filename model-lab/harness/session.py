@@ -167,7 +167,8 @@ class SessionRunner:
         force: bool = False,
         resume: bool = True,
         preprocessing: IngestConfig | None = None,
-        embedding_cache_dir: Path | None = None,  # Kept for existing logic support (though moving towards context)
+        embedding_cache_dir: Path
+        | None = None,  # Kept for existing logic support (though moving towards context)
         steps: list[str] | None = None,
         config: dict[str, Any] | None = None,  # Generic config override
     ) -> None:
@@ -467,11 +468,8 @@ class SessionRunner:
             eval_data = {
                 "schema_version": "1",
                 "run_id": run_id,
-                "schema_version": "1",
-                "run_id": run_id,
                 "use_case_id": use_case_id,  # Updated from None
                 "model_id": model_id,  # Updated from None
-                "params": manifest.get("config", {}),
                 "params": manifest.get("config", {}),
                 "metrics": {},
                 "checks": [],
@@ -690,7 +688,7 @@ class SessionRunner:
 
                 if t_len > 100:
                     t_ok = True
-            except:
+            except Exception:
                 pass
 
         scores.append(
@@ -716,7 +714,7 @@ class SessionRunner:
                     rows = list(reader)
                     if len(rows) > 0:  # Has header at least
                         ai_ok = True
-            except:
+            except Exception:
                 pass
         scores.append(
             {
@@ -754,7 +752,7 @@ class SessionRunner:
             if self.manifest_path.exists():
                 disk_m = json.loads(self.manifest_path.read_text())
                 disk_status = disk_m.get("status")
-                local_status = m.get("status")
+                m.get("status")
 
                 terminal_states = {"CANCELLED", "FAILED", "STALE"}
 
@@ -1376,7 +1374,7 @@ class SessionRunner:
                             "type": "Cancelled",
                             "message": "Step finished but run was cancelled.",
                         }
-                except:
+                except Exception:
                     pass
 
             entry["status"] = final_status
@@ -1640,7 +1638,7 @@ class SessionRunner:
                 # Artifacts
                 # Iterate manifest steps
                 m = self._load_manifest()
-                for step_name, step_rec in m.get("steps", {}).items():
+                for _step_name, step_rec in m.get("steps", {}).items():
                     # We might export artifacts even if FAILED? Usually only COMPLETED.
                     if step_rec.get("status") == "COMPLETED":
                         for art in step_rec.get("artifacts", []):

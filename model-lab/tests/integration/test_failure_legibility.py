@@ -82,7 +82,7 @@ def test_stale_run_is_detected():
         # This simulates what the status endpoint does
         status = manifest["status"]
         updated_at = manifest.get("updated_at")
-        current_step = manifest.get("current_step")
+        manifest.get("current_step")
 
         STALE_THRESHOLD_SECONDS = 90
 

@@ -73,7 +73,7 @@ class TestBackendFixes(unittest.TestCase):
         mock_path = Path("/tmp/some/artifact.rttm")
 
         # We need to patch where it is defined, not where it is imported inside a function
-        with patch("harness.alignment.run_alignment", return_value=mock_path) as mock_run:
+        with patch("harness.alignment.run_alignment", return_value=mock_path):
             result = alignment_func(ctx)
 
             # Verification 1: It should return a dict
@@ -108,9 +108,7 @@ class TestBackendFixes(unittest.TestCase):
 
         # Create a manifest with specific data we want to check for
         # Set updated_at to > 90s ago
-        old_time = (
-            (datetime.now(UTC) - timedelta(seconds=200)).isoformat().replace("+00:00", "Z")
-        )
+        old_time = (datetime.now(UTC) - timedelta(seconds=200)).isoformat().replace("+00:00", "Z")
 
         manifest_data = {
             "run_id": run_id,

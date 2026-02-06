@@ -156,7 +156,7 @@ def create_run_context(
             )
             if result.returncode == 0:
                 runner_git_hash = result.stdout.strip()
-        except:
+        except Exception:
             pass
 
     return {

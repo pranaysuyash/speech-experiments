@@ -36,7 +36,6 @@ class TestSessionRunner(unittest.TestCase):
         runner._init_dirs()
 
         # Calculate expected hash for validation
-        expected_hash = runner.input_hash
 
         # Manually create a completed step in manifest
         runner.manifest = runner._default_manifest()  # Ensure manifest is dict

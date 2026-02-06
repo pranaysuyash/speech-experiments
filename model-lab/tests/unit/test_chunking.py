@@ -147,7 +147,7 @@ class TestChunking:
         # Hashes should exist
         assert all(c.text_hash for c in result.chunks)
         # At least some should be unique (unless text is identical)
-        assert len(set(c.text_hash for c in result.chunks)) >= 1
+        assert len({c.text_hash for c in result.chunks}) >= 1
 
     def test_max_chunks_limit_enforced(self):
         """Operability limit on max chunks is enforced."""

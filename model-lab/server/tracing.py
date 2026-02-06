@@ -21,7 +21,6 @@ Usage:
 """
 
 import os
-from typing import Optional
 
 # Lazy imports to avoid dependency issues if opentelemetry not installed
 _tracer = None
@@ -83,7 +82,9 @@ def init_tracing(app=None) -> bool:
 
     except ImportError as e:
         print(f"OpenTelemetry not available: {e}")
-        print("Install with: uv pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-instrumentation-fastapi")
+        print(
+            "Install with: uv pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-instrumentation-fastapi"
+        )
         return False
 
 
@@ -101,6 +102,7 @@ def get_tracer():
     # Return no-op tracer if not initialized
     try:
         from opentelemetry import trace
+
         return trace.get_tracer(__name__)
     except ImportError:
         # Create a minimal no-op tracer
@@ -124,7 +126,7 @@ def get_tracer():
         return NoOpTracer()
 
 
-def trace_function(name: Optional[str] = None):
+def trace_function(name: str | None = None):
     """
     Decorator to trace a function.
 
@@ -133,11 +135,14 @@ def trace_function(name: Optional[str] = None):
         def my_function():
             pass
     """
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             span_name = name or func.__name__
             tracer = get_tracer()
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator

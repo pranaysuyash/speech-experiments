@@ -69,7 +69,7 @@ def run_diarization(
     try:
         bundle = ModelRegistry.load_model(model_name, {}, device)
     except Exception as e:
-        raise ValueError(f"Failed to load diarization model {model_name}: {e}")
+        raise ValueError(f"Failed to load diarization model {model_name}: {e}") from e
 
     # 3. Run Diarization via bundle's diarization capability
     t0 = time.time()
@@ -105,7 +105,7 @@ def run_diarization(
         audio_hash=audio_hash,
     )
 
-    output_data = {"segments": segments, "num_speakers": len(set(s["speaker"] for s in segments))}
+    output_data = {"segments": segments, "num_speakers": len({s["speaker"] for s in segments})}
 
     artifact = RunnerArtifact(
         run_context=run_ctx,

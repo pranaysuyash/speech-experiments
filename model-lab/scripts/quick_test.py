@@ -17,21 +17,18 @@ def test_imports():
     print("=== Testing Harness Imports ===")
 
     try:
-
         print("✓ AudioLoader")
     except Exception as e:
         print(f"✗ AudioLoader: {e}")
         return False
 
     try:
-
         print("✓ ASRMetrics")
     except Exception as e:
         print(f"✗ ASRMetrics: {e}")
         return False
 
     try:
-
         print("✓ Protocol modules")
     except Exception as e:
         print(f"✗ Protocol: {e}")
@@ -45,7 +42,6 @@ def test_lfm_import():
     print("\n=== Testing LFM2.5-Audio Import ===")
 
     try:
-
         print("✓ LFM2AudioModel and LFM2AudioProcessor")
         return True
     except Exception as e:

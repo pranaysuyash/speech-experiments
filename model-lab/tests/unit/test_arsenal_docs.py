@@ -108,7 +108,7 @@ generate_markdown(cards, Path("{tmpdir}/ARSENAL.md"))
                 "Model count mismatch. Run 'make arsenal'"
             )
 
-            for c, n in zip(current["models"], new["models"]):
+            for c, n in zip(current["models"], new["models"], strict=False):
                 assert c["model_id"] == n["model_id"], (
                     f"Model order mismatch: {c['model_id']} vs {n['model_id']}. Run 'make arsenal'"
                 )

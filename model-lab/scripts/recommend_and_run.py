@@ -231,7 +231,7 @@ def run_task(task: str, model_id: str, audio_path: Path, **kwargs):
         elapsed = time.time() - start
 
         turns = result.get("turns", [])
-        speakers = set(t.get("speaker") for t in turns)
+        speakers = {t.get("speaker") for t in turns}
 
         print(f"\n🎤 DIARIZATION ({elapsed:.1f}s):\n")
         print(f"Speakers detected: {len(speakers)}")

@@ -234,9 +234,7 @@ class ResultsManager:
             data = json.load(f)
         return BatchResult.from_dict(data)
 
-    def list_results(
-        self, model_id: str | None = None, task_type: str | None = None
-    ) -> list[Path]:
+    def list_results(self, model_id: str | None = None, task_type: str | None = None) -> list[Path]:
         """List all result files matching criteria."""
         if model_id and task_type:
             search_dir = self.runs_dir / model_id / task_type

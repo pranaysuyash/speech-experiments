@@ -38,8 +38,10 @@ logging.basicConfig(level=logging.INFO, format="%(name)s - %(levelname)s - %(mes
 logger = logging.getLogger("run_alignment")
 
 
-def run_dependency(script_name: str, input_path: Path, args_list: list = []) -> Path:
+def run_dependency(script_name: str, input_path: Path, args_list: list = None) -> Path:
     """Run a dependency script and return its artifact path."""
+    if args_list is None:
+        args_list = []
     cmd = [
         sys.executable,
         str(Path(__file__).parent / script_name),

@@ -363,7 +363,7 @@ def main():
     for case in cases:
         case_id = case["id"]
         input_audio_path = Path(case["input_audio"])
-        expected = case.get("expected", {})
+        case.get("expected", {})
 
         if not input_audio_path.exists():
             logger.warning(f"Input audio missing: {input_audio_path}")

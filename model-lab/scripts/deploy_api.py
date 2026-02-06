@@ -24,14 +24,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from harness.registry import ModelRegistry, ModelStatus
 from server.metrics import (
-    REGISTRY,
-    REQUEST_TOTAL,
-    REQUEST_DURATION,
-    ASR_REQUESTS,
-    TTS_REQUESTS,
-    ERRORS_TOTAL,
-    MODELS_LOADED,
     CACHE_MEMORY_BYTES,
+    MODELS_LOADED,
+    REGISTRY,
+    REQUEST_DURATION,
+    REQUEST_TOTAL,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -506,7 +503,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
     logger.info("Starting production API server")
-    startup_time = time.time()
+    time.time()
 
     # Pre-load production models
     production_models = ModelRegistry.get_production_models()
@@ -562,7 +559,9 @@ async def rate_limit_middleware(request: Request, call_next):
     ) / REQUEST_STATS["total_requests"]
 
     # Update Prometheus-style metrics
-    REQUEST_TOTAL.inc(method=request.method, endpoint=request.url.path, status=str(response.status_code))
+    REQUEST_TOTAL.inc(
+        method=request.method, endpoint=request.url.path, status=str(response.status_code)
+    )
     REQUEST_DURATION.observe(response_time, method=request.method, endpoint=request.url.path)
 
     return response
@@ -702,6 +701,7 @@ async def get_metrics():
     CACHE_MEMORY_BYTES.set(sum(MODEL_CACHE_SIZES.values()))
 
     from fastapi.responses import PlainTextResponse
+
     return PlainTextResponse(REGISTRY.export_text(), media_type="text/plain")
 
 

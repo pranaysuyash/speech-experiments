@@ -250,7 +250,7 @@ def run_action_items(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     transcript = load_alignment(alignment_path)
-    allowed_speakers = sorted(list(transcript.metrics.speaker_distribution.keys()))
+    allowed_speakers = sorted(transcript.metrics.speaker_distribution.keys())
 
     speaker_text = defaultdict(list)
     full_text_context = []

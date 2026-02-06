@@ -8,7 +8,7 @@ from harness.session import SessionRunner, StepDef
 def mock_step_long(ctx):
     # Simulate work with progress updates for 30s
     print("Mock step starting...")
-    for i in range(30):
+    for _i in range(30):
         time.sleep(1)
         if ctx.on_progress:
             ctx.on_progress()

@@ -319,7 +319,6 @@ class RunsIndex:
                 # Extract input hash from run_request.json if available
                 input_hash = None
                 run_request_path = p.parent / "run_request.json"
-                pipeline_config = {}
                 preprocessing_ops: list[str] = []
                 custom_steps: list[str] | None = None
                 template_used: str | None = None
@@ -328,7 +327,7 @@ class RunsIndex:
                     try:
                         run_request = json.loads(run_request_path.read_text())
                         input_hash = run_request.get("sha256")
-                        pipeline_config = run_request.get("pipeline_config", {})
+                        run_request.get("pipeline_config", {})
                         preprocessing_ops = run_request.get("preprocessing", []) or []
                         custom_steps = run_request.get("steps_custom")
                         template_used = run_request.get("pipeline_template")
