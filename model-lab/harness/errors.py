@@ -7,10 +7,9 @@ Provides:
 - Error classification utilities
 """
 
-from dataclasses import dataclass, asdict
-from typing import Optional, Dict, Any
 import traceback
-
+from dataclasses import asdict, dataclass
+from typing import Any
 
 # ============================================================================
 # ERROR CODES
@@ -45,6 +44,7 @@ E_UNKNOWN = "E_UNKNOWN"
 # STRUCTURED ERROR TYPE
 # ============================================================================
 
+
 @dataclass
 class StepError:
     """
@@ -58,14 +58,15 @@ class StepError:
         recoverable: Whether the error might succeed on retry
         details: Additional error context
     """
+
     code: str
     message: str
     step: str
-    traceback_path: Optional[str] = None
+    traceback_path: str | None = None
     recoverable: bool = False
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         d = asdict(self)
         # Remove None values for cleaner output
@@ -75,6 +76,7 @@ class StepError:
 # ============================================================================
 # ERROR CLASSIFICATION
 # ============================================================================
+
 
 def classify_error(exception: Exception) -> tuple[str, bool]:
     """
@@ -90,7 +92,11 @@ def classify_error(exception: Exception) -> tuple[str, bool]:
     exc_msg = str(exception).lower()
 
     # Memory errors - potentially recoverable with smaller model
-    if exc_type in ("OutOfMemoryError", "MemoryError") or "cuda out of memory" in exc_msg or "oom" in exc_msg:
+    if (
+        exc_type in ("OutOfMemoryError", "MemoryError")
+        or "cuda out of memory" in exc_msg
+        or "oom" in exc_msg
+    ):
         return E_MODEL_OOM, False  # OOM usually not recoverable without config change
 
     # Model not found
@@ -137,7 +143,7 @@ def format_traceback(exception: Exception) -> str:
 def create_step_error(
     exception: Exception,
     step: str,
-    traceback_path: Optional[str] = None,
+    traceback_path: str | None = None,
 ) -> StepError:
     """
     Create a StepError from an exception.
@@ -160,5 +166,5 @@ def create_step_error(
         recoverable=recoverable,
         details={
             "exception_type": type(exception).__name__,
-        }
+        },
     )

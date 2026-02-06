@@ -4,18 +4,19 @@ Eval loading helper with canonical location preference.
 Canonical: run_dir/eval.json
 Fallback: run_dir/bundle/eval.json (legacy)
 """
-from pathlib import Path
-from typing import Dict, Any, Optional
+
 import json
+from pathlib import Path
+from typing import Any
 
 
-def load_eval(run_root: Path) -> Optional[Dict[str, Any]]:
+def load_eval(run_root: Path) -> dict[str, Any] | None:
     """
     Load eval.json from run directory.
-    
+
     Prefers run_root/eval.json (canonical).
     Falls back to run_root/bundle/eval.json (legacy).
-    
+
     Returns None if not found or malformed.
     """
     # Try canonical location first
@@ -27,5 +28,5 @@ def load_eval(run_root: Path) -> Optional[Dict[str, Any]]:
         except Exception:
             # Malformed JSON, try next location
             continue
-    
+
     return None

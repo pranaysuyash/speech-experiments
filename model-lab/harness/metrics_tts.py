@@ -3,10 +3,11 @@ TTS evaluation metrics for model comparison.
 Implements audio similarity, naturalness, and timing metrics.
 """
 
-import numpy as np
-from typing import Tuple, Dict, Any, List, Optional
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -14,21 +15,20 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TTSResult:
     """Container for TTS evaluation results."""
+
     audio_path: str
     text: str
     audio_duration_s: float
     latency_ms: float
     similarity_score: float  # Audio similarity with reference
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class TTSMetrics:
     """Calculate TTS evaluation metrics."""
 
     @staticmethod
-    def calculate_mfcc_similarity(audio1: np.ndarray,
-                                  audio2: np.ndarray,
-                                  sr: int) -> float:
+    def calculate_mfcc_similarity(audio1: np.ndarray, audio2: np.ndarray, sr: int) -> float:
         """
         Calculate MFCC-based audio similarity.
         Higher values indicate more similar audio.
@@ -55,27 +55,21 @@ class TTSMetrics:
 
         # Calculate MFCCs
         mfcc_transform = torchaudio.transforms.MFCC(
-            sample_rate=sr,
-            n_mfcc=13,
-            melkwargs={'n_mels': 40, 'n_fft': 512}
+            sample_rate=sr, n_mfcc=13, melkwargs={"n_mels": 40, "n_fft": 512}
         )
 
         mfcc1 = mfcc_transform(audio1_tensor.unsqueeze(0))
         mfcc2 = mfcc_transform(audio2_tensor.unsqueeze(0))
 
         # Calculate cosine similarity
-        similarity = torch.nn.functional.cosine_similarity(
-            mfcc1.flatten(),
-            mfcc2.flatten(),
-            dim=0
-        )
+        similarity = torch.nn.functional.cosine_similarity(mfcc1.flatten(), mfcc2.flatten(), dim=0)
 
         return similarity.item()
 
     @staticmethod
-    def calculate_timing_metrics(generated_audio: np.ndarray,
-                                 reference_audio: np.ndarray,
-                                 sr: int) -> Dict[str, float]:
+    def calculate_timing_metrics(
+        generated_audio: np.ndarray, reference_audio: np.ndarray, sr: int
+    ) -> dict[str, float]:
         """
         Calculate timing-related metrics.
         """
@@ -86,19 +80,21 @@ class TTSMetrics:
         duration_diff = gen_duration - ref_duration
 
         return {
-            'duration_ratio': duration_ratio,
-            'duration_diff_s': duration_diff,
-            'generated_duration_s': gen_duration,
-            'reference_duration_s': ref_duration
+            "duration_ratio": duration_ratio,
+            "duration_diff_s": duration_diff,
+            "generated_duration_s": gen_duration,
+            "reference_duration_s": ref_duration,
         }
 
     @staticmethod
-    def evaluate(generated_audio: np.ndarray,
-                 reference_audio: np.ndarray,
-                 text: str,
-                 sr: int,
-                 latency_s: float,
-                 metadata: Optional[Dict[str, Any]] = None) -> TTSResult:
+    def evaluate(
+        generated_audio: np.ndarray,
+        reference_audio: np.ndarray,
+        text: str,
+        sr: int,
+        latency_s: float,
+        metadata: dict[str, Any] | None = None,
+    ) -> TTSResult:
         """
         Comprehensive TTS evaluation.
 
@@ -114,27 +110,23 @@ class TTSMetrics:
             TTSResult with all metrics
         """
         # Calculate similarity
-        similarity = TTSMetrics.calculate_mfcc_similarity(
-            generated_audio, reference_audio, sr
-        )
+        similarity = TTSMetrics.calculate_mfcc_similarity(generated_audio, reference_audio, sr)
 
         # Calculate timing metrics
-        timing = TTSMetrics.calculate_timing_metrics(
-            generated_audio, reference_audio, sr
-        )
+        timing = TTSMetrics.calculate_timing_metrics(generated_audio, reference_audio, sr)
 
         latency_ms = latency_s * 1000
 
         result = TTSResult(
             audio_path="generated_audio",  # Could save to file
             text=text,
-            audio_duration_s=timing['generated_duration_s'],
+            audio_duration_s=timing["generated_duration_s"],
             latency_ms=latency_ms,
             similarity_score=similarity,
-            metadata={**timing, **(metadata or {})}
+            metadata={**timing, **(metadata or {})},
         )
 
-        logger.info(f"TTS Evaluation:")
+        logger.info("TTS Evaluation:")
         logger.info(f"  Similarity: {similarity:.3f}")
         logger.info(f"  Duration ratio: {timing['duration_ratio']:.3f}")
         logger.info(f"  Latency: {latency_ms:.1f}ms")
@@ -161,8 +153,8 @@ class VoiceQualityMetrics:
         magnitude = torch.abs(fft).mean(dim=0)
 
         # Centroid calculation
-        freqs = torch.fft.fftfreq(len(audio_tensor), 1/sr)[:len(audio_tensor)//2]
-        magnitude_half = magnitude[:len(audio_tensor)//2]
+        freqs = torch.fft.fftfreq(len(audio_tensor), 1 / sr)[: len(audio_tensor) // 2]
+        magnitude_half = magnitude[: len(audio_tensor) // 2]
 
         if magnitude_half.sum() > 0:
             centroid = (freqs * magnitude_half).sum() / magnitude_half.sum()
@@ -184,12 +176,12 @@ class VoiceQualityMetrics:
         return torch.sqrt(torch.mean(audio_tensor**2)).item()
 
     @staticmethod
-    def assess_voice_characteristics(audio: np.ndarray, sr: int) -> Dict[str, float]:
+    def assess_voice_characteristics(audio: np.ndarray, sr: int) -> dict[str, float]:
         """Assess various voice quality metrics."""
         return {
-            'spectral_centroid': VoiceQualityMetrics.calculate_spectral_centroid(audio, sr),
-            'rms_energy': VoiceQualityMetrics.calculate_energy(audio),
-            'duration_s': len(audio) / sr
+            "spectral_centroid": VoiceQualityMetrics.calculate_spectral_centroid(audio, sr),
+            "rms_energy": VoiceQualityMetrics.calculate_energy(audio),
+            "duration_s": len(audio) / sr,
         }
 
 
@@ -197,19 +189,20 @@ class VoiceQualityMetrics:
 # TTS Failure Detection - Production gates
 # =============================================================================
 
-def detect_audio_issues(audio: np.ndarray, sr: int) -> Dict[str, Any]:
+
+def detect_audio_issues(audio: np.ndarray, sr: int) -> dict[str, Any]:
     """
     Detect TTS failure modes for production gating.
-    
+
     Detects:
         - Clipping: audio exceeds safe amplitude
         - Silence: too much of the audio is silent
         - DC offset: broken pipeline producing offset audio
-    
+
     Args:
         audio: Audio waveform (numpy array)
         sr: Sample rate
-    
+
     Returns:
         Dict with failure metrics and flags
     """
@@ -218,62 +211,64 @@ def detect_audio_issues(audio: np.ndarray, sr: int) -> Dict[str, Any]:
         audio = audio.astype(np.float32) / 32768.0
     elif audio.dtype == np.int32:
         audio = audio.astype(np.float32) / 2147483648.0
-    
+
     audio = np.asarray(audio, dtype=np.float32)
-    
+
     # Basic amplitude metrics
     peak_amplitude = float(np.abs(audio).max()) if len(audio) > 0 else 0.0
     rms_loudness = float(np.sqrt(np.mean(audio**2))) if len(audio) > 0 else 0.0
     dc_offset = float(np.mean(audio)) if len(audio) > 0 else 0.0
-    
+
     # Clipping detection (vectorized)
     clipping_ratio = float(np.mean(np.abs(audio) > 0.99)) if len(audio) > 0 else 0.0
-    
+
     # Silence detection (vectorized with frame stride)
     # Use 25ms frames with 10ms hop
     frame_size = int(0.025 * sr)
     hop_size = int(0.010 * sr)
-    
+
     if len(audio) >= frame_size:
         # Vectorized frame energy calculation using stride tricks
         n_frames = (len(audio) - frame_size) // hop_size + 1
-        
+
         # Compute frame energies efficiently
-        frame_energies = np.array([
-            np.sqrt(np.mean(audio[i * hop_size:i * hop_size + frame_size]**2))
-            for i in range(min(n_frames, 1000))  # Cap at 1000 frames for speed
-        ])
-        
+        frame_energies = np.array(
+            [
+                np.sqrt(np.mean(audio[i * hop_size : i * hop_size + frame_size] ** 2))
+                for i in range(min(n_frames, 1000))  # Cap at 1000 frames for speed
+            ]
+        )
+
         silence_threshold = 0.01
         silence_ratio = float(np.mean(frame_energies < silence_threshold))
     else:
         silence_ratio = 1.0 if rms_loudness < 0.01 else 0.0
-    
+
     # Duration
     duration_s = len(audio) / sr if sr > 0 else 0.0
-    
+
     # Failure flags
     is_mostly_silent = silence_ratio > 0.5
     has_clipping = clipping_ratio > 0.01
     has_dc_offset = abs(dc_offset) > 0.1
     is_empty = len(audio) == 0 or duration_s < 0.1
-    
+
     issues = {
-        'peak_amplitude': peak_amplitude,
-        'rms_loudness': rms_loudness,
-        'dc_offset': dc_offset,
-        'clipping_ratio': clipping_ratio,
-        'silence_ratio': silence_ratio,
-        'duration_s': duration_s,
-        'is_mostly_silent': is_mostly_silent,
-        'has_clipping': has_clipping,
-        'has_dc_offset': has_dc_offset,
-        'is_empty': is_empty,
-        'has_failure': is_mostly_silent or has_clipping or has_dc_offset or is_empty,
+        "peak_amplitude": peak_amplitude,
+        "rms_loudness": rms_loudness,
+        "dc_offset": dc_offset,
+        "clipping_ratio": clipping_ratio,
+        "silence_ratio": silence_ratio,
+        "duration_s": duration_s,
+        "is_mostly_silent": is_mostly_silent,
+        "has_clipping": has_clipping,
+        "has_dc_offset": has_dc_offset,
+        "is_empty": is_empty,
+        "has_failure": is_mostly_silent or has_clipping or has_dc_offset or is_empty,
     }
-    
+
     # Log if failure detected
-    if issues['has_failure']:
+    if issues["has_failure"]:
         failures = []
         if is_empty:
             failures.append("EMPTY")
@@ -284,7 +279,7 @@ def detect_audio_issues(audio: np.ndarray, sr: int) -> Dict[str, Any]:
         if has_dc_offset:
             failures.append(f"DC_OFFSET ({dc_offset:.3f})")
         logger.warning(f"TTS audio issues: {', '.join(failures)}")
-    
+
     return issues
 
 

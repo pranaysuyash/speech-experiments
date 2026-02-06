@@ -10,9 +10,10 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from enum import Enum
-from typing import AsyncIterator, Optional, cast
+from typing import cast
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +34,9 @@ class ASRSegment:
     t1: float
     confidence: float
     is_final: bool
-    source: Optional[AudioSource] = None
-    language: Optional[str] = None
-    speaker: Optional[str] = None
+    source: AudioSource | None = None
+    language: str | None = None
+    speaker: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,7 +46,7 @@ class ASRConfig:
     model_name: str = "base"
     device: str = "auto"
     compute_type: str = "int8"
-    language: Optional[str] = None  # None = auto-detect
+    language: str | None = None  # None = auto-detect
     chunk_seconds: int = 4
     vad_enabled: bool = False
 
@@ -72,7 +73,7 @@ class ASRProvider(ABC):
         self,
         pcm_stream: AsyncIterator[bytes],
         sample_rate: int = 16000,
-        source: Optional[AudioSource] = None,
+        source: AudioSource | None = None,
     ) -> AsyncIterator[ASRSegment]:
         if False:
             yield cast(ASRSegment, None)
@@ -87,10 +88,10 @@ class ASRProviderRegistry:
 
     _providers: dict[str, type[ASRProvider]] = {}
     _instances: dict[str, ASRProvider] = {}
-    _lock: "threading.Lock | None" = None
+    _lock: threading.Lock | None = None
 
     @classmethod
-    def _get_lock(cls) -> "threading.Lock":
+    def _get_lock(cls) -> threading.Lock:
         if cls._lock is None:
             import threading
 
@@ -110,8 +111,8 @@ class ASRProviderRegistry:
 
     @classmethod
     def get_provider(
-        cls, name: Optional[str] = None, config: Optional[ASRConfig] = None
-    ) -> Optional[ASRProvider]:
+        cls, name: str | None = None, config: ASRConfig | None = None
+    ) -> ASRProvider | None:
         provider_name = name or os.getenv("MODEL_LAB_ASR_PROVIDER", "faster_whisper")
         if provider_name not in cls._providers:
             return None
@@ -123,4 +124,3 @@ class ASRProviderRegistry:
             if key not in cls._instances:
                 cls._instances[key] = cls._providers[provider_name](cfg)
             return cls._instances[key]
-

@@ -1,10 +1,20 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 import logging
 import logging.config
 
-from server.api import runs, results, workbench, experiments, candidates, lifecycle, pipelines, ws_runs
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from server.api import (
+    candidates,
+    experiments,
+    lifecycle,
+    pipelines,
+    results,
+    runs,
+    workbench,
+    ws_runs,
+)
 
 # Logging configuration - balance visibility with noise reduction
 LOGGING_CONFIG = {
@@ -68,14 +78,17 @@ app.include_router(lifecycle.router)
 app.include_router(pipelines.router)
 app.include_router(ws_runs.router)
 
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
 
 @app.get("/api/health")
 def api_health_check():
     """Health check accessible via /api/health for consistency with proxy"""
     return {"status": "ok"}
+
 
 if __name__ == "__main__":
     # Local dev entry point
@@ -85,6 +98,5 @@ if __name__ == "__main__":
         port=8000,
         reload=True,
         log_config=LOGGING_CONFIG,  # Pass config to uvicorn
-        access_log=True  # Show API requests
+        access_log=True,  # Show API requests
     )
-

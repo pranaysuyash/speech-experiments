@@ -3,16 +3,16 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import logging
 import os
-import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class IngestConfig:
@@ -45,7 +45,7 @@ class IngestConfig:
     # Mono mix
     mono_mix: bool = False
 
-    def to_json_obj(self) -> Dict[str, Any]:
+    def to_json_obj(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
 
 
@@ -66,7 +66,9 @@ def sha256_bytes(b: bytes) -> str:
 
 def json_sha256(obj: Any) -> str:
     # Strict, stable JSON encoding
-    payload = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    payload = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
     return sha256_bytes(payload)
 
 
@@ -86,8 +88,8 @@ def get_ffmpeg_version() -> str:
         return "unknown"
 
 
-def build_ffmpeg_filter_chain(cfg: IngestConfig) -> Optional[str]:
-    filters: List[str] = []
+def build_ffmpeg_filter_chain(cfg: IngestConfig) -> str | None:
+    filters: list[str] = []
 
     if cfg.trim_silence:
         th = f"{cfg.silence_threshold_db}dB"
@@ -101,13 +103,15 @@ def build_ffmpeg_filter_chain(cfg: IngestConfig) -> Optional[str]:
 
     if cfg.normalize:
         if cfg.loudnorm_mode != "single_pass":
-            raise ValueError(f"Unsupported loudnorm_mode={cfg.loudnorm_mode} (expected single_pass)")
+            raise ValueError(
+                f"Unsupported loudnorm_mode={cfg.loudnorm_mode} (expected single_pass)"
+            )
         # Single pass loudnorm. Documented trade-off.
         filters.append("loudnorm=I=-16:LRA=11:TP=-1.5")
 
     # Denoise using highpass + lowpass filter chain (basic noise reduction)
-    if getattr(cfg, 'denoise', False):
-        strength = getattr(cfg, 'denoise_strength', 0.5)
+    if getattr(cfg, "denoise", False):
+        strength = getattr(cfg, "denoise_strength", 0.5)
         # Use highpass to remove low-frequency rumble and lowpass for high-frequency hiss
         # Strength 0-1 maps to cutoff frequencies
         highpass_freq = int(80 + (strength * 120))  # 80-200Hz
@@ -116,7 +120,7 @@ def build_ffmpeg_filter_chain(cfg: IngestConfig) -> Optional[str]:
         filters.append(f"lowpass=f={lowpass_freq}")
 
     # Speed adjustment using atempo filter
-    if getattr(cfg, 'speed', None) and getattr(cfg, 'speed', 1.0) != 1.0:
+    if getattr(cfg, "speed", None) and getattr(cfg, "speed", 1.0) != 1.0:
         speed = cfg.speed
         # atempo only supports 0.5-2.0, chain multiple for extreme values
         if 0.5 <= speed <= 2.0:
@@ -137,23 +141,23 @@ def build_ffmpeg_filter_chain(cfg: IngestConfig) -> Optional[str]:
                 filters.append(f"atempo={speed}")
 
     # Peak normalization using dynaudnorm
-    if getattr(cfg, 'peak_normalize', False):
-        target_db = getattr(cfg, 'peak_target_db', -1.0)
+    if getattr(cfg, "peak_normalize", False):
+        target_db = getattr(cfg, "peak_target_db", -1.0)
         filters.append(f"dynaudnorm=p={10 ** (target_db / 20):.4f}")
 
     # Stereo to mono downmix
-    if getattr(cfg, 'mono_mix', False):
+    if getattr(cfg, "mono_mix", False):
         filters.append("pan=mono|c0=0.5*c0+0.5*c1")
 
     # Dynamic range compression
-    if getattr(cfg, 'compress_dynamics', False):
-        threshold_db = getattr(cfg, 'compress_threshold_db', -20.0)
-        ratio = getattr(cfg, 'compress_ratio', 4.0)
+    if getattr(cfg, "compress_dynamics", False):
+        threshold_db = getattr(cfg, "compress_threshold_db", -20.0)
+        ratio = getattr(cfg, "compress_ratio", 4.0)
         filters.append(f"acompressor=threshold={threshold_db}dB:ratio={ratio}")
 
     # Noise gate
-    if getattr(cfg, 'gate_noise', False):
-        threshold_db = getattr(cfg, 'gate_threshold_db', -40.0)
+    if getattr(cfg, "gate_noise", False):
+        threshold_db = getattr(cfg, "gate_threshold_db", -40.0)
         filters.append(f"agate=threshold={threshold_db}dB")
 
     if not filters:
@@ -171,7 +175,7 @@ def extract_audio_ffmpeg(
     input_media: Path,
     output_wav: Path,
     cfg: IngestConfig,
-) -> Tuple[List[str], str]:
+) -> tuple[list[str], str]:
     """
     Writes output_wav atomically via temp file.
     Returns (ffmpeg_argv, ffmpeg_version).
@@ -183,11 +187,13 @@ def extract_audio_ffmpeg(
     # temp file in same directory to keep rename atomic across filesystems
     tmp_dir = output_wav.parent
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(prefix="processed_audio.", suffix=".wav.tmp", dir=str(tmp_dir), delete=False) as tf:
+    with tempfile.NamedTemporaryFile(
+        prefix="processed_audio.", suffix=".wav.tmp", dir=str(tmp_dir), delete=False
+    ) as tf:
         tmp_path = Path(tf.name)
 
     try:
-        argv: List[str] = [
+        argv: list[str] = [
             "ffmpeg",
             "-y",
             "-hide_banner",
@@ -209,7 +215,8 @@ def extract_audio_ffmpeg(
             str(cfg.sample_rate),
             "-c:a",
             cfg.sample_fmt,
-            "-f", "wav",
+            "-f",
+            "wav",
             str(tmp_path),
         ]
 
@@ -219,7 +226,11 @@ def extract_audio_ffmpeg(
         return argv, ffmpeg_version
     except subprocess.CalledProcessError as e:
         # Keep stderr for debugging
-        stderr = (e.stderr or b"").decode("utf-8", errors="replace") if isinstance(e.stderr, (bytes, bytearray)) else str(e.stderr)
+        stderr = (
+            (e.stderr or b"").decode("utf-8", errors="replace")
+            if isinstance(e.stderr, (bytes, bytearray))
+            else str(e.stderr)
+        )
         raise RuntimeError(f"ffmpeg failed: {stderr}") from e
     finally:
         if tmp_path.exists():
@@ -233,7 +244,7 @@ def compute_audio_fingerprint(
     processed_wav: Path,
     cfg: IngestConfig,
     ffmpeg_version: str,
-) -> Tuple[str, str, str]:
+) -> tuple[str, str, str]:
     audio_content_hash = sha256_file(processed_wav)
     preprocess_hash = json_sha256(
         {
@@ -249,17 +260,17 @@ def compute_audio_fingerprint(
 class IngestResult:
     source_media_path: str
     source_media_hash: str
-    preprocessing_config: Dict[str, Any]
+    preprocessing_config: dict[str, Any]
     ffmpeg_version: str
-    ffmpeg_argv: List[str]
+    ffmpeg_argv: list[str]
     processed_audio_path: str
     audio_content_hash: str
     preprocess_hash: str
     audio_fingerprint: str
-    
+
     duration_s: float
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
 
 
@@ -267,7 +278,7 @@ def ingest_media(
     input_path: Path,
     artifacts_dir: Path,
     cfg: IngestConfig,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Produces:
       artifacts/ingest/processed_audio.wav
@@ -299,7 +310,8 @@ def ingest_media(
 
     # Compute duration
     import wave
-    with wave.open(str(processed_audio), 'rb') as f:
+
+    with wave.open(str(processed_audio), "rb") as f:
         frames = f.getnframes()
         rate = f.getframerate()
         duration_s = frames / float(rate)

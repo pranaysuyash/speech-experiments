@@ -16,136 +16,154 @@ Quality metrics are None unless labeled datasets exist.
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
 class SummaryOutput:
     """Constrained summary output - no freeform generation."""
-    sentences: List[str]              # Individual summary sentences
-    total_sentences: int              # Count for validation
-    source_word_count: int            # Words in source transcript
-    compression_ratio: float          # source_words / summary_words
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    sentences: list[str]  # Individual summary sentences
+    total_sentences: int  # Count for validation
+    source_word_count: int  # Words in source transcript
+    compression_ratio: float  # source_words / summary_words
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'sentences': self.sentences,
-            'total_sentences': self.total_sentences,
-            'source_word_count': self.source_word_count,
-            'compression_ratio': round(self.compression_ratio, 2),
+            "sentences": self.sentences,
+            "total_sentences": self.total_sentences,
+            "source_word_count": self.source_word_count,
+            "compression_ratio": round(self.compression_ratio, 2),
         }
 
 
 @dataclass
 class EvidenceSpan:
     """Evidence span from transcript supporting an extraction."""
-    quote: str                         # Exact quote from transcript
-    start_word: Optional[int] = None   # Start word index
-    end_word: Optional[int] = None     # End word index
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    quote: str  # Exact quote from transcript
+    start_word: int | None = None  # Start word index
+    end_word: int | None = None  # End word index
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'quote': self.quote,
-            'start_word': self.start_word,
-            'end_word': self.end_word,
+            "quote": self.quote,
+            "start_word": self.start_word,
+            "end_word": self.end_word,
         }
 
 
 @dataclass
 class ActionItem:
     """Extracted action item from meeting."""
-    text: str                          # Action item text (required, non-empty)
-    assignee: Optional[str] = None     # Who should do it
-    due: Optional[str] = None          # When (ISO format or description)
-    priority: Optional[str] = None     # high/medium/low
-    evidence: List[Dict] = field(default_factory=list)  # Source spans
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    text: str  # Action item text (required, non-empty)
+    assignee: str | None = None  # Who should do it
+    due: str | None = None  # When (ISO format or description)
+    priority: str | None = None  # high/medium/low
+    evidence: list[dict] = field(default_factory=list)  # Source spans
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'text': self.text,
-            'assignee': self.assignee,
-            'due': self.due,
-            'priority': self.priority,
-            'evidence': self.evidence,
+            "text": self.text,
+            "assignee": self.assignee,
+            "due": self.due,
+            "priority": self.priority,
+            "evidence": self.evidence,
         }
 
 
 @dataclass
 class ActionItemsOutput:
     """Constrained action items output with operability thresholds."""
-    action_items: List[ActionItem]
+
+    action_items: list[ActionItem]
     total_items: int
     source_word_count: int
-    
+
     # Operability thresholds
     MAX_ITEMS = 20
     MIN_TEXT_LENGTH = 5
-    
-    def validate(self) -> List[str]:
+
+    def validate(self) -> list[str]:
         """Validate operability thresholds. Returns list of violations."""
         violations = []
-        
+
         if len(self.action_items) > self.MAX_ITEMS:
             violations.append(f"Too many items: {len(self.action_items)} > {self.MAX_ITEMS}")
-        
+
         for i, item in enumerate(self.action_items):
             if not item.text or len(item.text.strip()) < self.MIN_TEXT_LENGTH:
                 violations.append(f"Item {i}: text too short or empty")
             if len(item.text) > 500:
                 violations.append(f"Item {i}: text too long ({len(item.text)} chars)")
-        
+
         return violations
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'action_items': [item.to_dict() for item in self.action_items],
-            'total_items': self.total_items,
-            'source_word_count': self.source_word_count,
+            "action_items": [item.to_dict() for item in self.action_items],
+            "total_items": self.total_items,
+            "source_word_count": self.source_word_count,
         }
 
+
 # Fixed entity type set
-ENTITY_TYPES = {'PERSON', 'ORG', 'LOC', 'DATE', 'TIME', 'MONEY', 'EMAIL', 'PHONE', 'URL', 'PRODUCT', 'OTHER'}
+ENTITY_TYPES = {
+    "PERSON",
+    "ORG",
+    "LOC",
+    "DATE",
+    "TIME",
+    "MONEY",
+    "EMAIL",
+    "PHONE",
+    "URL",
+    "PRODUCT",
+    "OTHER",
+}
 
 
 @dataclass
 class Entity:
     """Named entity from transcript."""
-    text: str                          # Entity text (normalized)
-    type: str                          # Must be in ENTITY_TYPES
-    count: int = 1                     # Occurrences across transcript
-    source_chunk_ids: List[int] = field(default_factory=list)
-    confidence: float = 1.0            # 1.0 for regex, < 1 for LLM
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    text: str  # Entity text (normalized)
+    type: str  # Must be in ENTITY_TYPES
+    count: int = 1  # Occurrences across transcript
+    source_chunk_ids: list[int] = field(default_factory=list)
+    confidence: float = 1.0  # 1.0 for regex, < 1 for LLM
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'text': self.text,
-            'type': self.type,
-            'count': self.count,
-            'source_chunk_ids': self.source_chunk_ids,
-            'confidence': round(self.confidence, 2),
+            "text": self.text,
+            "type": self.type,
+            "count": self.count,
+            "source_chunk_ids": self.source_chunk_ids,
+            "confidence": round(self.confidence, 2),
         }
 
 
 @dataclass
 class NEROutput:
     """Constrained NER output with operability thresholds."""
-    entities: List[Entity]
+
+    entities: list[Entity]
     total_entities: int
     source_word_count: int
-    entity_type_counts: Dict[str, int] = field(default_factory=dict)
-    
+    entity_type_counts: dict[str, int] = field(default_factory=dict)
+
     # Operability thresholds
     MAX_ENTITIES = 200
-    
-    def validate(self) -> List[str]:
+
+    def validate(self) -> list[str]:
         """Validate operability thresholds."""
         violations = []
-        
+
         if len(self.entities) > self.MAX_ENTITIES:
             violations.append(f"Too many entities: {len(self.entities)} > {self.MAX_ENTITIES}")
-        
+
         for i, entity in enumerate(self.entities):
             if entity.type not in ENTITY_TYPES:
                 violations.append(f"Entity {i}: invalid type '{entity.type}'")
@@ -153,133 +171,137 @@ class NEROutput:
                 violations.append(f"Entity {i}: empty text")
             if len(entity.text) > 200:
                 violations.append(f"Entity {i}: text too long ({len(entity.text)} chars)")
-        
+
         return violations
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'entities': [e.to_dict() for e in self.entities],
-            'total_entities': self.total_entities,
-            'source_word_count': self.source_word_count,
-            'entity_type_counts': self.entity_type_counts,
+            "entities": [e.to_dict() for e in self.entities],
+            "total_entities": self.total_entities,
+            "source_word_count": self.source_word_count,
+            "entity_type_counts": self.entity_type_counts,
         }
 
 
 @dataclass
 class NLPRunContext:
     """Run context for NLP tasks."""
-    task: str                          # summarize, action_items, ner
-    nlp_model_id: str                  # Model used for NLP
+
+    task: str  # summarize, action_items, ner
+    nlp_model_id: str  # Model used for NLP
     timestamp: str
-    git_hash: Optional[str] = None
-    command: List[str] = field(default_factory=list)
-    
-    def to_dict(self) -> Dict[str, Any]:
+    git_hash: str | None = None
+    command: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'task': self.task,
-            'nlp_model_id': self.nlp_model_id,
-            'timestamp': self.timestamp,
-            'git_hash': self.git_hash,
-            'command': self.command,
+            "task": self.task,
+            "nlp_model_id": self.nlp_model_id,
+            "timestamp": self.timestamp,
+            "git_hash": self.git_hash,
+            "command": self.command,
         }
 
 
 @dataclass
 class NLPInputs:
     """Inputs for NLP task - provenance linkage."""
-    parent_artifact_path: str          # Path to source artifact
-    parent_artifact_hash: str          # SHA256 of parent artifact file
-    asr_model_id: str                  # ASR model that produced transcript
-    asr_text_hash: str                 # Hash of transcript text
+
+    parent_artifact_path: str  # Path to source artifact
+    parent_artifact_hash: str  # SHA256 of parent artifact file
+    asr_model_id: str  # ASR model that produced transcript
+    asr_text_hash: str  # Hash of transcript text
     transcript_word_count: int
     audio_duration_s: float
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'parent_artifact_path': self.parent_artifact_path,
-            'parent_artifact_hash': self.parent_artifact_hash,
-            'asr_model_id': self.asr_model_id,
-            'asr_text_hash': self.asr_text_hash,
-            'transcript_word_count': self.transcript_word_count,
-            'audio_duration_s': self.audio_duration_s,
+            "parent_artifact_path": self.parent_artifact_path,
+            "parent_artifact_hash": self.parent_artifact_hash,
+            "asr_model_id": self.asr_model_id,
+            "asr_text_hash": self.asr_text_hash,
+            "transcript_word_count": self.transcript_word_count,
+            "audio_duration_s": self.audio_duration_s,
         }
 
 
 @dataclass
 class NLPProvenance:
     """Provenance for NLP processing."""
-    prompt_template: str               # Template used (not the filled prompt)
-    prompt_hash: str                   # Hash of template
-    has_ground_truth: bool = False     # Usually false
+
+    prompt_template: str  # Template used (not the filled prompt)
+    prompt_hash: str  # Hash of template
+    has_ground_truth: bool = False  # Usually false
     metrics_valid: bool = True
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'prompt_template': self.prompt_template,
-            'prompt_hash': self.prompt_hash,
-            'has_ground_truth': self.has_ground_truth,
-            'metrics_valid': self.metrics_valid,
+            "prompt_template": self.prompt_template,
+            "prompt_hash": self.prompt_hash,
+            "has_ground_truth": self.has_ground_truth,
+            "metrics_valid": self.metrics_valid,
         }
 
 
-@dataclass 
+@dataclass
 class NLPArtifact:
     """
     Artifact for audio-derived NLP tasks.
-    
+
     Links back to parent ASR artifact for full provenance chain.
     """
+
     run_context: NLPRunContext
     inputs: NLPInputs
     provenance: NLPProvenance
-    output: Dict[str, Any]             # Task-specific output (SummaryOutput, etc.)
-    metrics_structural: Dict[str, Any]  # Latency, token counts, etc.
-    gates: Dict[str, Any] = field(default_factory=dict)
-    errors: List[str] = field(default_factory=list)
-    
-    def to_dict(self) -> Dict[str, Any]:
+    output: dict[str, Any]  # Task-specific output (SummaryOutput, etc.)
+    metrics_structural: dict[str, Any]  # Latency, token counts, etc.
+    gates: dict[str, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'run_context': self.run_context.to_dict(),
-            'inputs': self.inputs.to_dict(),
-            'provenance': self.provenance.to_dict(),
-            'output': self.output,
-            'metrics_structural': self.metrics_structural,
-            'gates': self.gates,
-            'errors': self.errors,
+            "run_context": self.run_context.to_dict(),
+            "inputs": self.inputs.to_dict(),
+            "provenance": self.provenance.to_dict(),
+            "output": self.output,
+            "metrics_structural": self.metrics_structural,
+            "gates": self.gates,
+            "errors": self.errors,
         }
 
 
 def compute_text_hash(text: str, length: int = 16) -> str:
     """Compute hash of text content."""
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()[:length]
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:length]
 
 
 def compute_file_hash(path: Path, length: int = 16) -> str:
     """Compute hash of file contents."""
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()[:length]
 
 
-def load_asr_artifact(path: Path) -> Dict[str, Any]:
+def load_asr_artifact(path: Path) -> dict[str, Any]:
     """Load and validate an ASR artifact."""
     if not path.exists():
         raise FileNotFoundError(f"ASR artifact not found: {path}")
-    
+
     with open(path) as f:
         artifact = json.load(f)
-    
+
     # Validate it's an ASR artifact
-    task = artifact.get('run_context', {}).get('task')
-    if task != 'asr':
+    task = artifact.get("run_context", {}).get("task")
+    if task != "asr":
         raise ValueError(f"Expected ASR artifact, got task='{task}'")
-    
+
     # Extract transcript
-    output = artifact.get('output', {})
-    transcript = output.get('text', '')
-    
+    output = artifact.get("output", {})
+    transcript = output.get("text", "")
+
     if not transcript:
         raise ValueError("ASR artifact has no transcript text")
-    
+
     return artifact
 
 
@@ -288,10 +310,10 @@ def validate_nlp_artifact(artifact: NLPArtifact) -> None:
     # Parent linkage required
     if not artifact.inputs.parent_artifact_hash:
         raise ValueError("NLP artifact must have parent_artifact_hash")
-    
+
     if not artifact.inputs.asr_text_hash:
         raise ValueError("NLP artifact must have asr_text_hash")
-    
+
     # Prompt provenance required
     if not artifact.provenance.prompt_hash:
         raise ValueError("NLP artifact must have prompt_hash")

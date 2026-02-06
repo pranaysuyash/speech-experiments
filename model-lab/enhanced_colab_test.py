@@ -4,26 +4,30 @@ Enhanced Colab Compatibility Test with TPU Support
 Tests model loading and inference on Google Colab with GPU/TPU support.
 """
 
-import sys
 import os
-import time
-from pathlib import Path
+
 
 def check_colab_environment():
     """Check if running in Google Colab environment."""
     try:
         import google.colab
+
         return True
     except ImportError:
         return False
+
 
 def install_dependencies():
     """Install required dependencies for Colab with TPU support."""
     print("📦 Installing dependencies...")
 
     # Install core packages
-    os.system("pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
-    os.system("pip install torch_xla[tpu] -f https://storage.googleapis.com/libtpu-releases/index.html")
+    os.system(
+        "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121"
+    )
+    os.system(
+        "pip install torch_xla[tpu] -f https://storage.googleapis.com/libtpu-releases/index.html"
+    )
     os.system("pip install transformers")
     os.system("pip install openai-whisper")
     os.system("pip install faster-whisper")
@@ -32,6 +36,7 @@ def install_dependencies():
     os.system("pip install numpy scipy")
 
     print("✅ Dependencies installed (including TPU support)")
+
 
 def test_hardware_acceleration():
     """Test hardware acceleration availability including TPU."""
@@ -46,6 +51,7 @@ def test_hardware_acceleration():
     tpu_available = False
     try:
         import torch_xla.core.xla_model as xm
+
         tpu_available = xm.xla_device_count() > 0
         print(f"TPU available: {tpu_available}")
         if tpu_available:
@@ -66,6 +72,7 @@ def test_hardware_acceleration():
     else:
         print("Using CPU (no GPU/TPU available)")
         return "cpu"
+
 
 def main():
     print("🚀 Enhanced Colab Compatibility Test with TPU Support")
@@ -99,6 +106,7 @@ def main():
     print("1. Run model loading tests")
     print("2. Run inference benchmarks")
     print("3. Compare performance across devices")
+
 
 if __name__ == "__main__":
     main()

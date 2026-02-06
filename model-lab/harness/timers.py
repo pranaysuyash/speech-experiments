@@ -3,15 +3,17 @@ Performance timing and monitoring utilities.
 Ensures consistent performance measurement across models.
 """
 
-import time
-import psutil
-import os
 import gc
-from contextlib import contextmanager
-from typing import Dict, Any, List, Tuple, Generator
-from dataclasses import dataclass
 import logging
+import os
+import time
+from collections.abc import Generator
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
+import psutil
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TimingResult:
     """Container for timing results."""
+
     elapsed_time_s: float
     elapsed_time_ms: float
     memory_before_mb: float
@@ -26,7 +29,7 @@ class TimingResult:
     memory_delta_mb: float
     cpu_percent_before: float
     cpu_percent_after: float
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class PerformanceTimer:
@@ -44,8 +47,9 @@ class PerformanceTimer:
         return self.process.cpu_percent()
 
     @contextmanager
-    def time_operation(self, operation_name: str = "operation",
-                       collect_gc: bool = True) -> Generator[Dict[str, Any], None, None]:
+    def time_operation(
+        self, operation_name: str = "operation", collect_gc: bool = True
+    ) -> Generator[dict[str, Any], None, None]:
         """
         Context manager for timing operations with resource monitoring.
 
@@ -66,7 +70,7 @@ class PerformanceTimer:
         start_time = time.perf_counter()
 
         # Create a mutable container for the result
-        result_container: Dict[str, Any] = {'result': None}
+        result_container: dict[str, Any] = {"result": None}
 
         try:
             yield result_container
@@ -86,15 +90,17 @@ class PerformanceTimer:
                 memory_delta_mb=memory_after - memory_before,
                 cpu_percent_before=cpu_before,
                 cpu_percent_after=cpu_after,
-                metadata={'operation_name': operation_name}
+                metadata={"operation_name": operation_name},
             )
 
-            result_container['result'] = result
+            result_container["result"] = result
 
-            logger.debug(f"⏱️  {operation_name}: {elapsed_time*1000:.1f}ms")
-            logger.debug(f"  Memory: {memory_before:.1f}MB → {memory_after:.1f}MB (Δ{memory_after-memory_before:.1f}MB)")
+            logger.debug(f"⏱️  {operation_name}: {elapsed_time * 1000:.1f}ms")
+            logger.debug(
+                f"  Memory: {memory_before:.1f}MB → {memory_after:.1f}MB (Δ{memory_after - memory_before:.1f}MB)"
+            )
 
-    def measure_inference(self, func, *args, **kwargs) -> Tuple[Any, TimingResult]:
+    def measure_inference(self, func, *args, **kwargs) -> tuple[Any, TimingResult]:
         """
         Measure inference function performance.
 
@@ -104,7 +110,7 @@ class PerformanceTimer:
         with self.time_operation(func.__name__) as timer:
             result = func(*args, **kwargs)
 
-        return result, timer['result']
+        return result, timer["result"]
 
 
 class LatencyProfiler:
@@ -113,30 +119,30 @@ class LatencyProfiler:
     def __init__(self, num_runs: int = 10):
         self.num_runs = num_runs
         self.timer = PerformanceTimer()
-        self.latencies_ms: List[float] = []
+        self.latencies_ms: list[float] = []
 
     @contextmanager
     def profile_run(self, run_index: int):
         """Profile a single run."""
         with self.timer.time_operation(f"run_{run_index}") as timing:  # type: Dict[str, Any]
             yield timing
-        self.latencies_ms.append(timing['result'].elapsed_time_ms)
+        self.latencies_ms.append(timing["result"].elapsed_time_ms)
 
-    def get_statistics(self) -> Dict[str, float]:
+    def get_statistics(self) -> dict[str, float]:
         """Calculate latency statistics."""
         if not self.latencies_ms:
             return {}
 
         latencies = np.array(self.latencies_ms)
         return {
-            'mean_ms': np.mean(latencies),
-            'std_ms': np.std(latencies),
-            'min_ms': np.min(latencies),
-            'max_ms': np.max(latencies),
-            'median_ms': np.median(latencies),
-            'p95_ms': np.percentile(latencies, 95),
-            'p99_ms': np.percentile(latencies, 99),
-            'num_runs': len(latencies)
+            "mean_ms": np.mean(latencies),
+            "std_ms": np.std(latencies),
+            "min_ms": np.min(latencies),
+            "max_ms": np.max(latencies),
+            "median_ms": np.median(latencies),
+            "p95_ms": np.percentile(latencies, 95),
+            "p99_ms": np.percentile(latencies, 99),
+            "num_runs": len(latencies),
         }
 
 
@@ -144,20 +150,19 @@ class MemoryProfiler:
     """Profile memory usage patterns."""
 
     @staticmethod
-    def get_system_memory_info() -> Dict[str, float]:
+    def get_system_memory_info() -> dict[str, float]:
         """Get system-wide memory information."""
         vm = psutil.virtual_memory()
         return {
-            'total_gb': vm.total / 1e9,
-            'available_gb': vm.available / 1e9,
-            'used_gb': vm.used / 1e9,
-            'free_gb': vm.free / 1e9,
-            'percent_used': vm.percent
+            "total_gb": vm.total / 1e9,
+            "available_gb": vm.available / 1e9,
+            "used_gb": vm.used / 1e9,
+            "free_gb": vm.free / 1e9,
+            "percent_used": vm.percent,
         }
 
     @staticmethod
-    def check_memory_constraints(required_mb: float,
-                                  safety_margin_gb: float = 2.0) -> bool:
+    def check_memory_constraints(required_mb: float, safety_margin_gb: float = 2.0) -> bool:
         """
         Check if enough memory is available for operation.
 
@@ -169,7 +174,7 @@ class MemoryProfiler:
             True if enough memory available
         """
         mem_info = MemoryProfiler.get_system_memory_info()
-        available_mb = mem_info['available_gb'] * 1024
+        available_mb = mem_info["available_gb"] * 1024
 
         required_with_margin = required_mb + (safety_margin_gb * 1024)
 

@@ -139,3 +139,202 @@ When reading audit documents and finding actionable issues:
 The audit-to-ticket gap exists because: No systematic workflow for converting audit findings → tickets. Silent backlog building — Audit docs contain "roadmaps" and "improvement plans" but aren't tracked. Discovery disconnect — Finding issues (Phase 1) isn't tracked, only remediation (Phase 2) is.
 
 ---
+
+## Quality Gates
+
+### Audit Gate
+
+Pass if:
+
+- [ ] Discovery appendix complete
+- [ ] Evidence labels correct (Observed/Inferred/Unknown)
+- [ ] Patch plan is scoped + testable
+- [ ] Artifact exists in docs/audit/
+
+### Implementation Gate
+
+Pass if:
+
+- [ ] Diff limited to scoped files + tests
+- [ ] Each change maps to finding ID
+- [ ] Invariants preserved (or Behavior change: YES)
+- [ ] Tests/verification artifacts for HIGH/MED findings
+- [ ] Docs/claims match diff
+
+### PR Review Gate
+
+Pass if:
+
+- [ ] Diff-only scope
+- [ ] Findings-driven review
+- [ ] Tests pass
+- [ ] CI status noted
+
+---
+
+## Naming Conventions
+
+### Ticket IDs
+
+```
+TCK-YYYYMMDD-###
+
+Examples:
+TCK-20260205-001
+TCK-20260205-002
+```
+
+### Claim IDs
+
+```
+CLM-YYYYMMDD-###
+
+Examples:
+CLM-20260205-001
+```
+
+### Audit Files
+
+```
+docs/audit/<descriptive-name>.md
+
+Examples:
+docs/audit/comprehensive-audit-20260204.md
+docs/audit/security-review-api-20260205.md
+```
+
+---
+
+## Communication Protocol
+
+### When Starting Work
+
+```markdown
+**Agent**: [Agent Name]
+**Action**: Starting [work type] on [target]
+**Ticket**: TCK-YYYYMMDD-###
+**Scope**: [brief description]
+**Base**: master@[commit-sha]
+```
+
+### When Completing Work
+
+```markdown
+**Agent**: [Agent Name]
+**Action**: Completed [work type] on [target]
+**Ticket**: TCK-YYYYMMDD-###
+**Status**: [OPEN/IN_PROGRESS/BLOCKED/DONE/DROPPED]
+**Evidence**: [link to evidence/outputs]
+**Next**: [next action or agent]
+```
+
+### When Blocked
+
+```markdown
+**Agent**: [Agent Name]
+**Blocked On**: [specific issue]
+**Evidence**: [what was attempted]
+**Help Needed**: [specific question]
+**Ticket**: TCK-YYYYMMDD-###
+```
+
+---
+
+## Resources
+
+### Prompts Directory
+
+See `prompts/README.md` for full index. Key prompts:
+
+```
+prompts/
+├── audit/comprehensive-audit-v1.0.md
+├── remediation/implementation-v1.0.md
+├── review/pr-review-v1.0.md
+├── qa/test-plan-v1.0.md
+├── model/model-evaluation-v1.0.md
+├── security/security-review-v1.0.md
+└── workflow/agent-entrypoint-v1.0.md
+```
+
+### Process Documentation
+
+- `docs/process/COMMANDS.md` - Common commands
+- `docs/process/PROMPT_STYLE_GUIDE.md` - Prompt conventions
+- `docs/process/CODE_PRESERVATION_GUIDELINES.md` - Deletion vs implementation
+- `docs/process/OWNERSHIP_POLICY.md` - Code ownership
+
+### Tracking
+
+- `docs/WORKLOG_TICKETS.md` - Work tracking
+- `docs/CLAIMS.md` - Model performance claims (append-only)
+- `docs/audit/*.md` - Audit artifacts
+
+### Templates
+
+- `docs/templates/CHANGE_CLASSIFICATION.md` - Classify changes
+
+---
+
+## Quick Reference
+
+### Common Commands
+
+```bash
+# Check git status
+git status --porcelain
+
+# Stage changes
+git add -A
+
+# Run core tests
+PYTHONPATH=. pytest -q tests/integration/test_backend_invariants.py
+PYTHONPATH=. pytest -q tests/api/test_artifact_download_security.py
+
+# Build frontend
+cd client && npm run build
+
+# Type check
+PYTHONPATH=. mypy server/ harness/ --ignore-missing-imports
+
+# Model smoke test
+PYTHONPATH=. python -m harness.run --model whisper-tiny --quick
+
+# Find references
+rg -n "symbol_name" server/
+```
+
+### Hooks Setup
+
+```bash
+# Enable repo hooks
+git config core.hooksPath .githooks
+```
+
+---
+
+## Prohibited Actions
+
+1. **Never** commit secrets to git
+2. **Never** upgrade Inferred to Observed without verification
+3. **Never** mix unrelated fixes in one PR
+4. **Never** delete contributor code without investigation
+5. **Never** skip worklog updates
+6. **Never** claim "ready" without evidence
+7. **Never** expand scope without explicit approval
+8. **Never** modify docs/CHANGELOG.md
+9. **Never** create branches without user request
+10. **Never** delete other agents' work without approval
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 2.0 | 2026-02-05 | Added quality gates, naming conventions, communication protocol, resources section, quick reference |
+| 1.0 | 2026-02-04 | Initial version |
+
+---
+
+**Remember**: Evidence first. Scope discipline. Preservation over perfection.

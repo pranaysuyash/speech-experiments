@@ -1,6 +1,5 @@
 import json
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -15,22 +14,25 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
 
     # Patch SessionRunner.run to avoid real processing while preserving the contract:
     # create run dir + RUNNING manifest, then block briefly so worker remains busy.
-    import harness.session
-    import server.services.lifecycle as lifecycle
     import server.api.workbench as workbench
+    import server.services.lifecycle as lifecycle
 
     # Reset worker count to ensure test starts fresh
     lifecycle._ACTIVE_RUNS_COUNT = 0
-    
+
     # Mock launch_run_worker to avoid subprocess spawning
     def mock_launch(runner, run_request_data, background=True):
         runner.session_dir.mkdir(parents=True, exist_ok=True)
-        runner.manifest_path.write_text(json.dumps({
-            "run_id": runner.run_id,
-            "status": "RUNNING",
-            "started_at": "now",
-            "updated_at": "now",
-        }))
+        runner.manifest_path.write_text(
+            json.dumps(
+                {
+                    "run_id": runner.run_id,
+                    "status": "RUNNING",
+                    "started_at": "now",
+                    "updated_at": "now",
+                }
+            )
+        )
         # Write run_request.json like the real function does
         request_path = runner.session_dir / "run_request.json"
         run_request_data["run_id"] = runner.run_id
@@ -39,10 +41,11 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
         # Release worker since we're not actually launching a subprocess
         lifecycle.release_worker()
         return {"worker_pid": 12345}
-    
+
     monkeypatch.setattr(workbench, "launch_run_worker", mock_launch)
 
     from fastapi.testclient import TestClient
+
     import server.main
 
     client = TestClient(server.main.app)
@@ -72,7 +75,7 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
 
 def test_create_workbench_run_busy_returns_409(monkeypatch, tmp_path):
     """Test that a second request returns 409 when worker is busy.
-    
+
     Uses direct mocking of try_acquire_worker to avoid race conditions.
     """
     monkeypatch.setenv("MODEL_LAB_INPUTS_ROOT", str(tmp_path / "inputs"))
@@ -81,8 +84,9 @@ def test_create_workbench_run_busy_returns_409(monkeypatch, tmp_path):
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
     from fastapi.testclient import TestClient
-    import server.main
+
     import server.api.workbench as workbench
+    import server.main
 
     client = TestClient(server.main.app)
 

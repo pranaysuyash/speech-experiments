@@ -3,10 +3,9 @@ Entity Error Rate metrics for production-focused ASR evaluation.
 Captures errors that matter most: names, dates, numbers, amounts.
 """
 
-import re
-from typing import List, Dict, Tuple
-from dataclasses import dataclass
 import logging
+import re
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +13,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EntityErrorResult:
     """Container for entity error analysis."""
+
     entity_error_rate: float
     total_entities: int
     correct_entities: int
-    entity_types: Dict[str, Dict[str, int]]
-    errors: List[Dict[str, str]]
+    entity_types: dict[str, dict[str, int]]
+    errors: list[dict[str, str]]
 
 
 class EntityMetrics:
@@ -26,39 +26,29 @@ class EntityMetrics:
 
     # Entity patterns (basic - can be extended)
     PATTERNS = {
-        'dates': [
-            r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b',  # MM/DD/YYYY, DD-MM-YY
-            r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b',
-            r'\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b'     # YYYY-MM-DD
+        "dates": [
+            r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",  # MM/DD/YYYY, DD-MM-YY
+            r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b",
+            r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",  # YYYY-MM-DD
         ],
-        'numbers': [
-            r'\b\d+(?:\.\d+)?\b',                     # Decimal numbers
-            r'\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\b'     # Numbers with commas
+        "numbers": [
+            r"\b\d+(?:\.\d+)?\b",  # Decimal numbers
+            r"\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\b",  # Numbers with commas
         ],
-        'money': [
-            r'\$\d+(?:\.\d{2})?\b',                  # $10.50
-            r'\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?\b'   # $1,000.00
+        "money": [
+            r"\$\d+(?:\.\d{2})?\b",  # $10.50
+            r"\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?\b",  # $1,000.00
         ],
-        'times': [
-            r'\b\d{1,2}:\d{2}(?::\d{2})?(?:AM|PM|am|pm)?\b',
-            r'\b\d{1,2}(?:AM|PM|am|pm)\b'
-        ],
-        'emails': [
-            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        ],
-        'urls': [
-            r'\bhttps?://[^\s<>\[\]("`\']+\b'
-        ],
-        'phones': [
-            r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
-            r'\b\(\d{3}\)\s*\d{3}[-.]?\d{4}\b'
-        ]
+        "times": [r"\b\d{1,2}:\d{2}(?::\d{2})?(?:AM|PM|am|pm)?\b", r"\b\d{1,2}(?:AM|PM|am|pm)\b"],
+        "emails": [r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"],
+        "urls": [r'\bhttps?://[^\s<>\[\]("`\']+\b'],
+        "phones": [r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", r"\b\(\d{3}\)\s*\d{3}[-.]?\d{4}\b"],
     }
 
     @staticmethod
-    def extract_entities(text: str) -> Dict[str, List[str]]:
+    def extract_entities(text: str) -> dict[str, list[str]]:
         """Extract entities by category from text."""
-        entities: Dict[str, List[str]] = {category: [] for category in EntityMetrics.PATTERNS}
+        entities: dict[str, list[str]] = {category: [] for category in EntityMetrics.PATTERNS}
 
         for category, patterns in EntityMetrics.PATTERNS.items():
             for pattern in patterns:
@@ -68,8 +58,9 @@ class EntityMetrics:
         return entities
 
     @staticmethod
-    def compare_entities(reference_entities: Dict[str, List[str]],
-                        hypothesis_entities: Dict[str, List[str]]) -> Tuple[int, int, List[Dict]]:
+    def compare_entities(
+        reference_entities: dict[str, list[str]], hypothesis_entities: dict[str, list[str]]
+    ) -> tuple[int, int, list[dict]]:
         """
         Compare entities between reference and hypothesis.
 
@@ -96,18 +87,10 @@ class EntityMetrics:
             extra = hyp_set - ref_set
 
             for entity in missed:
-                errors.append({
-                    'type': 'missed',
-                    'category': category,
-                    'entity': entity
-                })
+                errors.append({"type": "missed", "category": category, "entity": entity})
 
             for entity in extra:
-                errors.append({
-                    'type': 'extra',
-                    'category': category,
-                    'entity': entity
-                })
+                errors.append({"type": "extra", "category": category, "entity": entity})
 
         return correct, total, errors
 
@@ -132,9 +115,9 @@ class EntityMetrics:
             hyp_count = len(hyp_entities[category])
 
             entity_types[category] = {
-                'reference_count': ref_count,
-                'hypothesis_count': hyp_count,
-                'correct': len(set(ref_entities[category]) & set(hyp_entities[category]))
+                "reference_count": ref_count,
+                "hypothesis_count": hyp_count,
+                "correct": len(set(ref_entities[category]) & set(hyp_entities[category])),
             }
 
         result = EntityErrorResult(
@@ -142,7 +125,7 @@ class EntityMetrics:
             total_entities=total,
             correct_entities=correct,
             entity_types=entity_types,
-            errors=errors[:10]  # Limit errors for display
+            errors=errors[:10],  # Limit errors for display
         )
 
         logger.info(f"Entity Error Rate: {entity_error_rate:.3f} ({correct}/{total} entities)")
@@ -155,8 +138,8 @@ class EntitySpecificMetrics:
     @staticmethod
     def calculate_number_accuracy(reference: str, hypothesis: str) -> float:
         """Calculate accuracy specifically for numerical entities."""
-        ref_nums = EntityMetrics.extract_entities(reference)['numbers']
-        hyp_nums = EntityMetrics.extract_entities(hypothesis)['numbers']
+        ref_nums = EntityMetrics.extract_entities(reference)["numbers"]
+        hyp_nums = EntityMetrics.extract_entities(hypothesis)["numbers"]
 
         if not ref_nums:
             return 1.0  # Perfect if no numbers to detect
@@ -167,8 +150,8 @@ class EntitySpecificMetrics:
     @staticmethod
     def calculate_date_accuracy(reference: str, hypothesis: str) -> float:
         """Calculate accuracy specifically for date entities."""
-        ref_dates = EntityMetrics.extract_entities(reference)['dates']
-        hyp_dates = EntityMetrics.extract_entities(hypothesis)['dates']
+        ref_dates = EntityMetrics.extract_entities(reference)["dates"]
+        hyp_dates = EntityMetrics.extract_entities(hypothesis)["dates"]
 
         if not ref_dates:
             return 1.0  # Perfect if no dates to detect
@@ -179,8 +162,8 @@ class EntitySpecificMetrics:
     @staticmethod
     def calculate_money_accuracy(reference: str, hypothesis: str) -> float:
         """Calculate accuracy specifically for money entities."""
-        ref_money = EntityMetrics.extract_entities(reference)['money']
-        hyp_money = EntityMetrics.extract_entities(hypothesis)['money']
+        ref_money = EntityMetrics.extract_entities(reference)["money"]
+        hyp_money = EntityMetrics.extract_entities(hypothesis)["money"]
 
         if not ref_money:
             return 1.0  # Perfect if no money to detect
@@ -191,11 +174,13 @@ class EntitySpecificMetrics:
 
 def format_entity_result(result: EntityErrorResult) -> str:
     """Format entity error result for logging."""
-    type_summary = ", ".join([
-        f"{cat}: {info['correct']}/{info['reference_count']}"
-        for cat, info in result.entity_types.items()
-        if info['reference_count'] > 0
-    ])
+    type_summary = ", ".join(
+        [
+            f"{cat}: {info['correct']}/{info['reference_count']}"
+            for cat, info in result.entity_types.items()
+            if info["reference_count"] > 0
+        ]
+    )
 
     return (
         f"EER: {result.entity_error_rate:.3f} "

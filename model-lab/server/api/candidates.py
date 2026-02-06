@@ -7,15 +7,14 @@ Provides:
 
 All candidates are executable with today's runner surfaces.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-
-from server.api.workbench import PRESETS
-
 
 router = APIRouter(prefix="/api", tags=["candidates"])
 
@@ -24,32 +23,35 @@ router = APIRouter(prefix="/api", tags=["candidates"])
 # DATA MODELS
 # ============================================================================
 
+
 @dataclass
 class UseCase:
     """A problem domain with supported steps presets."""
+
     use_case_id: str
     title: str
     description: str
-    supported_steps_presets: List[str]
+    supported_steps_presets: list[str]
 
 
 @dataclass
 class Candidate:
     """A specific configuration for a use case."""
+
     candidate_id: str
     label: str
     use_case_id: str
     steps_preset: str
-    params: Dict[str, Any]
-    expected_artifacts: List[str]
-    description: Optional[str] = None
+    params: dict[str, Any]
+    expected_artifacts: list[str]
+    description: str | None = None
 
 
 # ============================================================================
 # REGISTRY (source of truth)
 # ============================================================================
 
-USE_CASES: Dict[str, UseCase] = {
+USE_CASES: dict[str, UseCase] = {
     "meeting_smoke": UseCase(
         use_case_id="meeting_smoke",
         title="Meeting Smoke Test",
@@ -88,7 +90,7 @@ USE_CASES: Dict[str, UseCase] = {
     ),
 }
 
-CANDIDATES: Dict[str, Candidate] = {
+CANDIDATES: dict[str, Candidate] = {
     # Meeting smoke candidates
     "meeting_ingest_fast": Candidate(
         candidate_id="meeting_ingest_fast",
@@ -202,17 +204,17 @@ CANDIDATES: Dict[str, Candidate] = {
 }
 
 
-def get_candidates_for_use_case(use_case_id: str) -> List[Candidate]:
+def get_candidates_for_use_case(use_case_id: str) -> list[Candidate]:
     """Get all candidates for a use case."""
     return [c for c in CANDIDATES.values() if c.use_case_id == use_case_id]
 
 
-def get_candidate(candidate_id: str) -> Optional[Candidate]:
+def get_candidate(candidate_id: str) -> Candidate | None:
     """Get a candidate by ID."""
     return CANDIDATES.get(candidate_id)
 
 
-def get_candidate_snapshot(candidate_id: str) -> Optional[Dict[str, Any]]:
+def get_candidate_snapshot(candidate_id: str) -> dict[str, Any] | None:
     """Get a snapshot of candidate config for reproducibility."""
     candidate = get_candidate(candidate_id)
     if not candidate:
@@ -228,6 +230,7 @@ def get_candidate_snapshot(candidate_id: str) -> Optional[Dict[str, Any]]:
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
+
 
 @router.get("/use-cases")
 def list_use_cases() -> JSONResponse:
@@ -249,7 +252,7 @@ def list_candidates_for_use_case(use_case_id: str) -> JSONResponse:
     """List all candidates for a use case."""
     if use_case_id not in USE_CASES:
         raise HTTPException(status_code=404, detail="Use case not found")
-    
+
     candidates = get_candidates_for_use_case(use_case_id)
     return JSONResponse(content=[asdict(c) for c in candidates])
 

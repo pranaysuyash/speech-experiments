@@ -4,26 +4,25 @@ Speech Quality Gate - Single-command regression test for STT/TTS
 Implements audio integrity checks + ASR quality gates vs baselines.
 """
 
-import json
-import os
-import re
-import sys
-import time
-import math
-import shutil
-import subprocess
 import argparse
 import hashlib
+import json
+import math
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 from scipy.io import wavfile
 
-
 # ----------------------------
 # Text normalization + edit distance
 # ----------------------------
+
 
 def normalize_for_wer(text: str) -> str:
     text = text.lower()
@@ -31,11 +30,13 @@ def normalize_for_wer(text: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
-def tokenize_words(text: str) -> List[str]:
+
+def tokenize_words(text: str) -> list[str]:
     t = normalize_for_wer(text)
     return t.split() if t else []
 
-def levenshtein(a: List[str], b: List[str]) -> int:
+
+def levenshtein(a: list[str], b: list[str]) -> int:
     # classic DP, O(len(a)*len(b)), good enough for small tests
     n, m = len(a), len(b)
     if n == 0:
@@ -50,12 +51,13 @@ def levenshtein(a: List[str], b: List[str]) -> int:
             cur = dp[j]
             cost = 0 if a[i - 1] == b[j - 1] else 1
             dp[j] = min(
-                dp[j] + 1,        # deletion
-                dp[j - 1] + 1,    # insertion
-                prev + cost       # substitution
+                dp[j] + 1,  # deletion
+                dp[j - 1] + 1,  # insertion
+                prev + cost,  # substitution
             )
             prev = cur
     return dp[m]
+
 
 def wer(ref: str, hyp: str) -> float:
     r = tokenize_words(ref)
@@ -65,6 +67,7 @@ def wer(ref: str, hyp: str) -> float:
     dist = levenshtein(r, h)
     return dist / len(r)
 
+
 def cer(ref: str, hyp: str) -> float:
     r = normalize_for_wer(ref).replace(" ", "")
     h = normalize_for_wer(hyp).replace(" ", "")
@@ -73,21 +76,23 @@ def cer(ref: str, hyp: str) -> float:
     dist = levenshtein(list(r), list(h))
     return dist / len(r)
 
-def glossary_hits(text: str, terms: List[str]) -> Dict[str, bool]:
+
+def glossary_hits(text: str, terms: list[str]) -> dict[str, bool]:
     n = normalize_for_wer(text)
     hits = {}
     for t in terms:
         # keep hyphenated terms: normalize term similarly, but allow either hyphen or space in hyp
         tn = normalize_for_wer(t)
         # e.g. "self-supervised" -> "self supervised" after normalize; treat as phrase match
-        hits[t] = (tn in n)
+        hits[t] = tn in n
     return hits
 
-def number_hits(text: str, anchors: List[str]) -> Dict[str, bool]:
+
+def number_hits(text: str, anchors: list[str]) -> dict[str, bool]:
     raw = text
     hits = {}
     for a in anchors:
-        hits[a] = (a in raw)
+        hits[a] = a in raw
     return hits
 
 
@@ -95,21 +100,29 @@ def number_hits(text: str, anchors: List[str]) -> Dict[str, bool]:
 # ffmpeg helpers for loudness + normalization
 # ----------------------------
 
+
 def require_ffmpeg():
     if shutil.which("ffmpeg") is None:
         raise RuntimeError("ffmpeg not found in PATH")
     if shutil.which("ffprobe") is None:
         raise RuntimeError("ffprobe not found in PATH")
 
-def ffmpeg_loudness_json(wav_path: str) -> Dict:
+
+def ffmpeg_loudness_json(wav_path: str) -> dict:
     """
     Uses ffmpeg loudnorm filter to measure LUFS and true peak.
     """
     cmd = [
-        "ffmpeg", "-hide_banner", "-nostats",
-        "-i", wav_path,
-        "-af", "loudnorm=I=-20:TP=-1:LRA=11:print_format=json",
-        "-f", "null", "-"
+        "ffmpeg",
+        "-hide_banner",
+        "-nostats",
+        "-i",
+        wav_path,
+        "-af",
+        "loudnorm=I=-20:TP=-1:LRA=11:print_format=json",
+        "-f",
+        "null",
+        "-",
     ]
     p = subprocess.run(cmd, capture_output=True, text=True)
     stderr = p.stderr
@@ -121,7 +134,10 @@ def ffmpeg_loudness_json(wav_path: str) -> Dict:
     j = json.loads(m[-1])
     return j
 
-def ffmpeg_normalize_to_target(wav_path: str, out_path: str, target_lufs: float, tp_limit: float) -> Dict:
+
+def ffmpeg_normalize_to_target(
+    wav_path: str, out_path: str, target_lufs: float, tp_limit: float
+) -> dict:
     """
     Two-pass loudnorm: pass 1 to measure, pass 2 to normalize.
     Returns measurement JSON.
@@ -135,12 +151,19 @@ def ffmpeg_normalize_to_target(wav_path: str, out_path: str, target_lufs: float,
         f"offset={meas['target_offset']}:linear=true:print_format=summary"
     )
     cmd = [
-        "ffmpeg", "-hide_banner", "-nostats",
-        "-i", wav_path,
-        "-af", af,
-        "-ar", "16000",
-        "-ac", "1",
-        "-y", out_path
+        "ffmpeg",
+        "-hide_banner",
+        "-nostats",
+        "-i",
+        wav_path,
+        "-af",
+        af,
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        "-y",
+        out_path,
     ]
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
@@ -151,6 +174,7 @@ def ffmpeg_normalize_to_target(wav_path: str, out_path: str, target_lufs: float,
 # ----------------------------
 # Simple audio integrity signals
 # ----------------------------
+
 
 @dataclass
 class IntegrityResult:
@@ -163,7 +187,8 @@ class IntegrityResult:
     normalized_used: bool
     normalized_path: str
 
-def read_wav_mono_float(wav_path: str) -> Tuple[int, np.ndarray]:
+
+def read_wav_mono_float(wav_path: str) -> tuple[int, np.ndarray]:
     sr, x = wavfile.read(wav_path)
     if x.ndim > 1:
         x = x[:, 0]
@@ -176,19 +201,17 @@ def read_wav_mono_float(wav_path: str) -> Tuple[int, np.ndarray]:
         x = x.astype(np.float32)
     return sr, x
 
-def compute_wav_fingerprint(wav_path: str) -> Dict:
+
+def compute_wav_fingerprint(wav_path: str) -> dict:
     """Compute SHA256, duration, and sample rate for fixture stability."""
     with open(wav_path, "rb") as f:
         sha256 = hashlib.sha256(f.read()).hexdigest()
-    
+
     sr, x = read_wav_mono_float(wav_path)
     duration_sec = len(x) / sr if sr > 0 else 0.0
-    
-    return {
-        "sha256": sha256,
-        "duration_sec": round(float(duration_sec), 2),
-        "sample_rate": int(sr)
-    }
+
+    return {"sha256": sha256, "duration_sec": round(float(duration_sec), 2), "sample_rate": int(sr)}
+
 
 def frame_rms(x: np.ndarray, frame: int, hop: int) -> np.ndarray:
     if len(x) < frame:
@@ -197,9 +220,10 @@ def frame_rms(x: np.ndarray, frame: int, hop: int) -> np.ndarray:
     rms = np.empty(n, dtype=np.float32)
     for i in range(n):
         s = i * hop
-        w = x[s:s+frame]
-        rms[i] = float(np.sqrt(np.mean(w*w) + 1e-12))
+        w = x[s : s + frame]
+        rms[i] = float(np.sqrt(np.mean(w * w) + 1e-12))
     return rms
+
 
 def estimate_snr_db(x: np.ndarray, sr: int) -> float:
     # crude but stable: compare top 10% frame RMS vs bottom 10% frame RMS
@@ -213,6 +237,7 @@ def estimate_snr_db(x: np.ndarray, sr: int) -> float:
     snr = 20.0 * math.log10((hi + 1e-9) / (lo + 1e-9))
     return float(snr)
 
+
 def estimate_speech_ratio(x: np.ndarray, sr: int) -> float:
     # energy-based VAD proxy: frames above percentile threshold
     frame = int(0.03 * sr)
@@ -224,7 +249,8 @@ def estimate_speech_ratio(x: np.ndarray, sr: int) -> float:
     voiced = (rms >= thr).sum()
     return float(voiced / rms.size)
 
-def integrity_gate(wav_path: str, policy: Dict, reports_dir: str) -> IntegrityResult:
+
+def integrity_gate(wav_path: str, policy: dict, reports_dir: str) -> IntegrityResult:
     require_ffmpeg()
 
     meas = ffmpeg_loudness_json(wav_path)
@@ -257,7 +283,7 @@ def integrity_gate(wav_path: str, policy: Dict, reports_dir: str) -> IntegrityRe
         input_lufs=float(input_lufs),
         input_tp=float(input_tp),
         normalized_used=normalized_used,
-        normalized_path=normalized_path
+        normalized_path=normalized_path,
     )
 
 
@@ -265,7 +291,8 @@ def integrity_gate(wav_path: str, policy: Dict, reports_dir: str) -> IntegrityRe
 # ASR (optional) via faster-whisper
 # ----------------------------
 
-def transcribe_faster_whisper(wav_path: str, asr_cfg: Dict) -> str:
+
+def transcribe_faster_whisper(wav_path: str, asr_cfg: dict) -> str:
     try:
         from faster_whisper import WhisperModel
     except Exception as e:
@@ -288,27 +315,32 @@ def transcribe_faster_whisper(wav_path: str, asr_cfg: Dict) -> str:
 # Gate evaluation
 # ----------------------------
 
+
 @dataclass
 class GateOutcome:
     status: str  # PASS/WARN/FAIL
-    reasons: List[str]
+    reasons: list[str]
+
 
 def merge_status(a: str, b: str) -> str:
     order = {"PASS": 0, "WARN": 1, "FAIL": 2}
     return a if order[a] >= order[b] else b
 
+
 def main():
-    ap = argparse.ArgumentParser(description="Speech quality gate with audio integrity and ASR regression checks")
+    ap = argparse.ArgumentParser(
+        description="Speech quality gate with audio integrity and ASR regression checks"
+    )
     ap.add_argument(
         "--init-baseline",
         action="store_true",
-        help="Populate baselines.json expected metrics from current measured results (no gating)."
+        help="Populate baselines.json expected metrics from current measured results (no gating).",
     )
     ap.add_argument(
         "--only",
         nargs="*",
         default=None,
-        help="Run only these fixture relative paths, e.g. fixtures/tts_voice1_clean.wav"
+        help="Run only these fixture relative paths, e.g. fixtures/tts_voice1_clean.wav",
     )
     args = ap.parse_args()
 
@@ -318,7 +350,7 @@ def main():
     reports_dir = os.path.join(root, "reports")
     os.makedirs(reports_dir, exist_ok=True)
 
-    with open(baselines_path, "r", encoding="utf-8") as f:
+    with open(baselines_path, encoding="utf-8") as f:
         cfg = json.load(f)
 
     policy_ai = cfg["policy"]["audio_integrity"]
@@ -332,7 +364,7 @@ def main():
         "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
         "version": cfg.get("version", 1),
         "results": {},
-        "run_id": time.strftime("%Y%m%d_%H%M%S")
+        "run_id": time.strftime("%Y%m%d_%H%M%S"),
     }
 
     run_dir = os.path.join(reports_dir, report["run_id"])
@@ -357,7 +389,7 @@ def main():
             continue
 
         expected = meta["expected"]
-        
+
         # Check for frozen reference text (per-fixture .ref.txt)
         ref_frozen_path = wav_path.replace(".wav", ".ref.txt")
         if not os.path.exists(ref_frozen_path):
@@ -367,14 +399,14 @@ def main():
             overall.status = merge_status(overall.status, status)
             overall.reasons.extend(reasons)
             continue
-        
-        with open(ref_frozen_path, "r", encoding="utf-8") as f:
+
+        with open(ref_frozen_path, encoding="utf-8") as f:
             ref_text = f.read()
-        
+
         # Check fixture fingerprint
         current_fp = compute_wav_fingerprint(wav_path)
         stored_fp = meta.get("fingerprint", {})
-        
+
         if args.init_baseline:
             # Populate fingerprint during init
             meta["fingerprint"] = current_fp
@@ -382,8 +414,14 @@ def main():
             # Verify fingerprint if present
             if current_fp["sha256"] != stored_fp["sha256"]:
                 status = "FAIL"
-                reasons = [f"Fixture changed: SHA256 mismatch (expected {stored_fp['sha256'][:8]}..., got {current_fp['sha256'][:8]}...)"]
-                report["results"][res_key] = {"status": status, "reasons": reasons, "fingerprint": current_fp}
+                reasons = [
+                    f"Fixture changed: SHA256 mismatch (expected {stored_fp['sha256'][:8]}..., got {current_fp['sha256'][:8]}...)"
+                ]
+                report["results"][res_key] = {
+                    "status": status,
+                    "reasons": reasons,
+                    "fingerprint": current_fp,
+                }
                 overall.status = merge_status(overall.status, status)
                 overall.reasons.extend(reasons)
                 continue
@@ -397,7 +435,9 @@ def main():
         # hard fail: clipping risk based on measured true peak
         if integ.input_tp > policy_ai["true_peak_fail_dbTP"]:
             status = "FAIL"
-            reasons.append(f"True peak too high ({integ.input_tp:.2f} dBTP > {policy_ai['true_peak_fail_dbTP']})")
+            reasons.append(
+                f"True peak too high ({integ.input_tp:.2f} dBTP > {policy_ai['true_peak_fail_dbTP']})"
+            )
 
         # warn: low SNR
         if integ.snr_db < policy_ai["snr_warn_db"]:
@@ -408,7 +448,9 @@ def main():
         if meta["kind"] in ("single_speaker", "multi_speaker"):
             if integ.speech_ratio < policy_ai["speech_coverage_min_ratio"]:
                 status = "FAIL"
-                reasons.append(f"Low speech coverage ({integ.speech_ratio:.2f} < {policy_ai['speech_coverage_min_ratio']})")
+                reasons.append(
+                    f"Low speech coverage ({integ.speech_ratio:.2f} < {policy_ai['speech_coverage_min_ratio']})"
+                )
 
         # ASR (optional, but default is required for this gate)
         hyp_text = ""
@@ -425,7 +467,7 @@ def main():
                 "status": status,
                 "reasons": reasons,
                 "integrity": integ.__dict__,
-                "asr": {"error": asr_error}
+                "asr": {"error": asr_error},
             }
             overall.status = merge_status(overall.status, status)
             overall.reasons.extend(reasons)
@@ -462,26 +504,38 @@ def main():
         # WER delta gating
         if (not args.init_baseline) and wer_delta_pp > policy_asr["wer_warn_delta_pp"]:
             status = "FAIL"
-            reasons.append(f"WER regression {wer_delta_pp:.2f} pp (> {policy_asr['wer_warn_delta_pp']})")
+            reasons.append(
+                f"WER regression {wer_delta_pp:.2f} pp (> {policy_asr['wer_warn_delta_pp']})"
+            )
         elif (not args.init_baseline) and wer_delta_pp > policy_asr["wer_pass_delta_pp"]:
             status = merge_status(status, "WARN")
-            reasons.append(f"WER regression {wer_delta_pp:.2f} pp (> {policy_asr['wer_pass_delta_pp']})")
+            reasons.append(
+                f"WER regression {wer_delta_pp:.2f} pp (> {policy_asr['wer_pass_delta_pp']})"
+            )
 
         # Glossary gating
         if (not args.init_baseline) and g_missing >= policy_asr["glossary_fail_missing"]:
             status = "FAIL"
-            reasons.append(f"Glossary missing {g_missing} terms (>= {policy_asr['glossary_fail_missing']})")
+            reasons.append(
+                f"Glossary missing {g_missing} terms (>= {policy_asr['glossary_fail_missing']})"
+            )
         elif (not args.init_baseline) and g_missing >= policy_asr["glossary_warn_missing"]:
             status = merge_status(status, "WARN")
-            reasons.append(f"Glossary missing {g_missing} terms (>= {policy_asr['glossary_warn_missing']})")
+            reasons.append(
+                f"Glossary missing {g_missing} terms (>= {policy_asr['glossary_warn_missing']})"
+            )
 
         # Numbers gating
         if (not args.init_baseline) and n_missing >= policy_asr["numbers_fail_missing"]:
             status = "FAIL"
-            reasons.append(f"Numbers missing {n_missing} anchors (>= {policy_asr['numbers_fail_missing']})")
+            reasons.append(
+                f"Numbers missing {n_missing} anchors (>= {policy_asr['numbers_fail_missing']})"
+            )
         elif (not args.init_baseline) and n_missing >= policy_asr["numbers_warn_missing"]:
             status = merge_status(status, "WARN")
-            reasons.append(f"Numbers missing {n_missing} anchors (>= {policy_asr['numbers_warn_missing']})")
+            reasons.append(
+                f"Numbers missing {n_missing} anchors (>= {policy_asr['numbers_warn_missing']})"
+            )
 
         report["results"][res_key] = {
             "status": status,
@@ -495,17 +549,17 @@ def main():
                 "glossary_hits": g_count,
                 "glossary_baseline": g_base,
                 "numbers_hits": n_count,
-                "numbers_baseline": n_base
+                "numbers_baseline": n_base,
             },
             "fingerprint": current_fp,
-            "hypothesis_preview": hyp_text[:500]
+            "hypothesis_preview": hyp_text[:500],
         }
-        
+
         # Save per-fixture transcript
         fixture_name = os.path.basename(wav_rel).replace(".wav", "")
         hyp_path = os.path.join(run_dir, f"{fixture_name}.hyp.txt")
         norm_hyp_path = os.path.join(run_dir, f"{fixture_name}.norm.hyp.txt")
-        
+
         with open(hyp_path, "w", encoding="utf-8") as f:
             f.write(hyp_text)
         with open(norm_hyp_path, "w", encoding="utf-8") as f:
@@ -523,7 +577,7 @@ def main():
     out_path = os.path.join(reports_dir, "latest.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
-    
+
     # Symlink to latest run directory
     latest_run_link = os.path.join(reports_dir, "latest")
     if os.path.islink(latest_run_link):

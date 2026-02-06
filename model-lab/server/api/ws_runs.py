@@ -9,7 +9,6 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -23,7 +22,7 @@ def _runs_root() -> Path:
     return Path("data/runs")
 
 
-def _get_run_dir(run_id: str) -> Optional[Path]:
+def _get_run_dir(run_id: str) -> Path | None:
     """
     Find the run directory for a given run_id.
 
@@ -67,10 +66,7 @@ async def run_websocket(websocket: WebSocket, run_id: str):
 
     run_dir = _get_run_dir(run_id)
     if not run_dir:
-        await websocket.send_json({
-            "type": "error",
-            "message": f"Run not found: {run_id}"
-        })
+        await websocket.send_json({"type": "error", "message": f"Run not found: {run_id}"})
         await websocket.close(code=4004)
         return
 
@@ -110,7 +106,11 @@ async def run_websocket(websocket: WebSocket, run_id: str):
                                 # Check if run completed
                                 try:
                                     event = json.loads(line)
-                                    if event.get("type") in ("run_completed", "run_failed", "run_cancelled"):
+                                    if event.get("type") in (
+                                        "run_completed",
+                                        "run_failed",
+                                        "run_cancelled",
+                                    ):
                                         logger.info(f"Run {run_id} completed, closing WebSocket")
                                         await websocket.close(code=1000)
                                         return
@@ -123,10 +123,7 @@ async def run_websocket(websocket: WebSocket, run_id: str):
             if heartbeat_counter >= 10:
                 heartbeat_counter = 0
                 try:
-                    await websocket.send_json({
-                        "type": "heartbeat",
-                        "run_id": run_id
-                    })
+                    await websocket.send_json({"type": "heartbeat", "run_id": run_id})
                 except Exception:
                     break  # Connection closed
 
@@ -137,12 +134,14 @@ async def run_websocket(websocket: WebSocket, run_id: str):
                     status = manifest.get("status", "")
                     if status in ("COMPLETED", "FAILED", "CANCELLED", "STALE"):
                         # Send final status event if not already sent via events file
-                        await websocket.send_json({
-                            "type": "run_completed",
-                            "run_id": run_id,
-                            "status": status,
-                            "source": "manifest_fallback"
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "run_completed",
+                                "run_id": run_id,
+                                "status": status,
+                                "source": "manifest_fallback",
+                            }
+                        )
                         logger.info(f"Run {run_id} status is {status}, closing WebSocket")
                         await websocket.close(code=1000)
                         return

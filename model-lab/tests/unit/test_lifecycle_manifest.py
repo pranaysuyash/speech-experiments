@@ -2,8 +2,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
 
 class DummyPopen:
     def __init__(self, *args, **kwargs):
@@ -72,7 +70,10 @@ def test_launch_run_worker_writes_provenance_manifest(monkeypatch):
         assert pipeline.get("steps_custom") == ["ingest", "asr", "diarization"]
         assert pipeline.get("pipeline_template") == "full_meeting"
         assert pipeline.get("preprocessing") == ["trim_silence"]
-        assert pipeline.get("pipeline_config") == {"name": "full_meeting", "steps": ["ingest", "asr"]}
+        assert pipeline.get("pipeline_config") == {
+            "name": "full_meeting",
+            "steps": ["ingest", "asr"],
+        }
         assert pipeline.get("config_overrides") == {"device_preference": ["cpu"]}
 
         input_meta = manifest.get("input_metadata", {})

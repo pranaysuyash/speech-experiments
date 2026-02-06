@@ -19,7 +19,6 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-
 URL_RE = re.compile(r"(https?://\S+)")
 
 

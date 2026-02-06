@@ -8,29 +8,30 @@ import sys
 from pathlib import Path
 
 # Add harness to path
-harness_path = Path(__file__).parent.parent / 'harness'
+harness_path = Path(__file__).parent.parent / "harness"
 sys.path.insert(0, str(harness_path))
+
 
 def test_imports():
     """Test if all harness modules can be imported."""
     print("=== Testing Harness Imports ===")
 
     try:
-        from audio_io import AudioLoader
+
         print("✓ AudioLoader")
     except Exception as e:
         print(f"✗ AudioLoader: {e}")
         return False
 
     try:
-        from metrics_asr import ASRMetrics
+
         print("✓ ASRMetrics")
     except Exception as e:
         print(f"✗ ASRMetrics: {e}")
         return False
 
     try:
-        from protocol import RunContract, NormalizationValidator
+
         print("✓ Protocol modules")
     except Exception as e:
         print(f"✗ Protocol: {e}")
@@ -38,24 +39,26 @@ def test_imports():
 
     return True
 
+
 def test_lfm_import():
     """Test if LFM model can be imported."""
     print("\n=== Testing LFM2.5-Audio Import ===")
 
     try:
-        from liquid_audio import LFM2AudioModel, LFM2AudioProcessor
+
         print("✓ LFM2AudioModel and LFM2AudioProcessor")
         return True
     except Exception as e:
         print(f"✗ LFM import: {e}")
         return False
 
+
 def test_smoke_dataset():
     """Test if smoke dataset exists."""
     print("\n=== Testing Smoke Dataset ===")
 
-    smoke_audio = Path('data/audio/SMOKE/conversation_2ppl_10s.wav')
-    smoke_text = Path('data/text/SMOKE/conversation_2ppl_10s.txt')
+    smoke_audio = Path("data/audio/SMOKE/conversation_2ppl_10s.wav")
+    smoke_text = Path("data/text/SMOKE/conversation_2ppl_10s.txt")
 
     if smoke_audio.exists():
         print(f"✓ Smoke audio: {smoke_audio}")
@@ -65,7 +68,7 @@ def test_smoke_dataset():
 
     if smoke_text.exists():
         print(f"✓ Smoke text: {smoke_text}")
-        with open(smoke_text, 'r') as f:
+        with open(smoke_text) as f:
             content = f.read()
             print(f"  Content: {content[:100]}...")
     else:
@@ -74,12 +77,13 @@ def test_smoke_dataset():
 
     return True
 
+
 def test_protocol_validation():
     """Test protocol validation."""
     print("\n=== Testing Protocol Validation ===")
 
     try:
-        from protocol import NormalizationValidator, EntityExtractionProtocol
+        from protocol import EntityExtractionProtocol, NormalizationValidator
 
         # Test normalization
         test_text = "Hello World! Number: 123, Date: 01/08/2024, Price: $19.99"
@@ -97,6 +101,7 @@ def test_protocol_validation():
     except Exception as e:
         print(f"✗ Protocol validation: {e}")
         return False
+
 
 def main():
     """Run all validation tests."""
@@ -139,5 +144,6 @@ def main():
         print("🔧 Fix issues before running model tests")
         return 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())

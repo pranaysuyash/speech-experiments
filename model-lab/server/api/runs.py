@@ -1,19 +1,21 @@
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse, Response
-from typing import List, Dict, Any, Optional
 import hashlib
 import json
-import zipfile
 import os
-from pathlib import Path
 import re
+import zipfile
+from datetime import UTC
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, Response
 
 from server.services.runs_index import get_index
-from server.services.safe_files import safe_file_path
-from server.services.results_v1 import compute_result_v1
 from server.services.runs_service import RunsService
+from server.services.safe_files import safe_file_path
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
+
 
 @router.get("/{run_id}/results")
 def get_run_results(run_id: str):
@@ -27,23 +29,28 @@ def get_run_results(run_id: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         import logging
+
         logging.getLogger("server.api").error(f"Error computing results for {run_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to compute results")
+
 
 @router.get("")
 def list_runs(refresh: bool = False):
     """List all available runs from the in-memory index."""
     return RunsService.list_runs(refresh)
 
+
 @router.post("/refresh")
 def refresh_runs():
     """Force a refresh of the runs index."""
     return RunsService.refresh_runs()
 
+
 @router.get("/by-input/{input_hash}")
 def get_runs_by_input(input_hash: str):
     """Returns all runs for a given input file hash, sorted by created_at desc."""
     return RunsService.get_runs_by_input(input_hash)
+
 
 @router.get("/compare")
 def compare_runs(run_a: str = Query(...), run_b: str = Query(...)):
@@ -54,9 +61,8 @@ def compare_runs(run_a: str = Query(...), run_b: str = Query(...)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-
 @router.post("/{run_id}/rerun")
-def rerun_pipeline(run_id: str, config_overrides: Optional[Dict[str, Any]] = None):
+def rerun_pipeline(run_id: str, config_overrides: dict[str, Any] | None = None):
     """Re-run a pipeline with optional config changes."""
     try:
         return RunsService.rerun_pipeline(run_id, config_overrides)
@@ -68,8 +74,6 @@ def rerun_pipeline(run_id: str, config_overrides: Optional[Dict[str, Any]] = Non
         raise HTTPException(status_code=500, detail=f"Failed to rerun pipeline: {e}")
 
 
-
-
 @router.get("/{run_id}/status")
 def get_run_status(run_id: str):
     """Get lightweight status for a run with stale detection."""
@@ -79,13 +83,15 @@ def get_run_status(run_id: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         import logging
+
         logging.getLogger("server.api").error(f"Error getting status for {run_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get run status")
+
 
 @router.get("/{run_id}/details")
 def get_run_details_v2(run_id: str):
     """Get full manifest for a specific run, with enhanced details."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     run = get_index().get_run(run_id)
     if not run:
@@ -115,19 +121,19 @@ def get_run_details_v2(run_id: str):
     if status == "RUNNING" and updated_at:
         try:
             last_update = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             elapsed = (now - last_update).total_seconds()
-            
+
             if elapsed > STALE_THRESHOLD_SECONDS:
                 status = "STALE"
                 is_stalled = True
         except Exception:
-            pass # Ignore parsing errors for updated_at
+            pass  # Ignore parsing errors for updated_at
 
     # Input metadata
     input_meta = manifest.get("input_metadata", {})
     if not input_meta and run.get("input_metadata"):
-        input_meta = run["input_metadata"] # Fallback to index if manifest is empty
+        input_meta = run["input_metadata"]  # Fallback to index if manifest is empty
 
     # Artifacts availability (global index)
     artifacts = manifest.get("artifacts_by_type", {})
@@ -144,41 +150,43 @@ def get_run_details_v2(run_id: str):
                 "duration_ms": step_data.get("duration_ms"),
                 "resolved_config": step_data.get("resolved_config"),
             }
-            
+
             # Add artifacts (filter out internal fields like path, content_type)
             raw_artifacts = step_data.get("artifacts", [])
             api_artifacts = []
             for art in raw_artifacts:
                 if "id" in art:
                     # New semantic schema - expose safe fields only
-                    api_artifacts.append({
-                        "id": art.get("id"),
-                        "filename": art.get("filename"),
-                        "role": art.get("role"),
-                        "produced_by": art.get("produced_by"),
-                        "size_bytes": art.get("size_bytes"),
-                        "downloadable": art.get("downloadable", False),
-                    })
+                    api_artifacts.append(
+                        {
+                            "id": art.get("id"),
+                            "filename": art.get("filename"),
+                            "role": art.get("role"),
+                            "produced_by": art.get("produced_by"),
+                            "size_bytes": art.get("size_bytes"),
+                            "downloadable": art.get("downloadable", False),
+                        }
+                    )
                 # Legacy format artifacts are not exposed to prevent confusion
-            
+
             if api_artifacts:
                 step_info["artifacts"] = api_artifacts
-            
+
             # Add error details if step failed
             if step_info["status"] == "FAILED":
                 error_info = {}
                 if "error" in step_data:
                     error_info["type"] = step_data["error"].get("type", "UnknownError")
-                    error_info["message"] = step_data["error"].get("message", "No error message available")
+                    error_info["message"] = step_data["error"].get(
+                        "message", "No error message available"
+                    )
                 else:
                     # Fallback if error field missing
                     error_info["type"] = "UnknownError"
                     error_info["message"] = "Step failed without error details"
                 step_info["error"] = error_info
-            
+
             steps.append(step_info)
-
-
 
     return {
         "run_id": run_id,
@@ -193,8 +201,9 @@ def get_run_details_v2(run_id: str):
         "input_metadata": input_meta,
         "config": manifest.get("config", {}),
         "artifacts_availability": artifacts,
-        "steps": steps
+        "steps": steps,
     }
+
 
 @router.get("/{run_id}")
 def get_run_details(run_id: str):
@@ -206,6 +215,7 @@ def get_run_details(run_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/{run_id}/transcript")
 def get_run_transcript(run_id: str):
     """
@@ -215,14 +225,15 @@ def get_run_transcript(run_id: str):
     try:
         transcript = get_index().get_transcript(run_id)
         if not transcript:
-             if get_index().get_run(run_id):
-                 return { "run_id": run_id, "segments": [], "chapters": [] }
-             raise HTTPException(status_code=404, detail="Run not found")
+            if get_index().get_run(run_id):
+                return {"run_id": run_id, "segments": [], "chapters": []}
+            raise HTTPException(status_code=404, detail="Run not found")
         return transcript
     except RuntimeError as e:
         if "E_ARTIFACT_REGISTRY_MISSING" in str(e):
-             raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e))
         raise e
+
 
 @router.get("/{run_id}/search")
 def search_run(run_id: str, q: str = Query(..., min_length=2), limit: int = 50):
@@ -231,9 +242,10 @@ def search_run(run_id: str, q: str = Query(..., min_length=2), limit: int = 50):
     """
     run = get_index().get_run(run_id)
     if not run:
-         raise HTTPException(status_code=404, detail="Run not found")
-    
+        raise HTTPException(status_code=404, detail="Run not found")
+
     return get_index().search_run(run_id, q, limit)
+
 
 @router.get("/{run_id}/audio")
 def stream_audio(run_id: str):
@@ -243,16 +255,17 @@ def stream_audio(run_id: str):
     # That path might be absolute.
     # We prefer relative to run dir if possible.
     # But Ingest stores absolute paths typically.
-    
+
     # Secure approach: Look for 'artifacts/ingest/*.wav' or use specific name.
     # Current pipeline: 'artifacts/ingest/processed_audio.wav'
-    
+
     try:
         path = safe_file_path(run_id, "artifacts/ingest/processed_audio.wav")
         return FileResponse(path, media_type="audio/wav")
     except HTTPException:
         # Fallback to finding ANY wav in ingest?
         raise HTTPException(status_code=404, detail="Audio not found")
+
 
 @router.get("/{run_id}/bundle")
 def get_bundle_manifest(run_id: str):
@@ -278,7 +291,7 @@ def _validate_artifact_name(name: str) -> None:
         raise HTTPException(status_code=400, detail="Invalid artifact name")
 
 
-def _load_bundle_manifest(run_id: str) -> Dict[str, Any]:
+def _load_bundle_manifest(run_id: str) -> dict[str, Any]:
     p = safe_file_path(run_id, "bundle/bundle_manifest.json")
     try:
         return json.loads(p.read_text(encoding="utf-8"))
@@ -286,7 +299,7 @@ def _load_bundle_manifest(run_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to read bundle manifest: {e}")
 
 
-def _artifact_rel_path(entry: Dict[str, Any]) -> Optional[str]:
+def _artifact_rel_path(entry: dict[str, Any]) -> str | None:
     # v0.1 uses rel_path; older versions may use path.
     rp = entry.get("rel_path")
     if isinstance(rp, str) and rp:
@@ -297,7 +310,7 @@ def _artifact_rel_path(entry: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _resolve_manifest_listed_artifact(run_id: str, artifact_name: str) -> Dict[str, Any]:
+def _resolve_manifest_listed_artifact(run_id: str, artifact_name: str) -> dict[str, Any]:
     """
     Enforce allowlist-by-manifest: only artifacts listed in bundle_manifest.json can be served.
     Returns {rel_path, content_type}.
@@ -336,7 +349,11 @@ def _resolve_manifest_listed_artifact(run_id: str, artifact_name: str) -> Dict[s
 
 
 @router.get("/{run_id}/bundle/{artifact_name}")
-def download_bundle_artifact(run_id: str, artifact_name: str, max_bytes: Optional[int] = Query(default=None, ge=1, le=2_000_000)):
+def download_bundle_artifact(
+    run_id: str,
+    artifact_name: str,
+    max_bytes: int | None = Query(default=None, ge=1, le=2_000_000),
+):
     """Stream a single Meeting Pack artifact from bundle/ safely.
 
     If max_bytes is provided, returns at most that many bytes (for UI previews).
@@ -354,7 +371,10 @@ def download_bundle_artifact(run_id: str, artifact_name: str, max_bytes: Optiona
         if path.stat().st_size > max_bytes:
             raise HTTPException(
                 status_code=413,
-                detail={"error_code": "PREVIEW_TOO_LARGE", "message": "Preview too large; download instead."},
+                detail={
+                    "error_code": "PREVIEW_TOO_LARGE",
+                    "message": "Preview too large; download instead.",
+                },
             )
         with open(path, "rb") as f:
             data = f.read(max_bytes)
@@ -378,7 +398,7 @@ def download_bundle_zip(run_id: str):
     bundle_dir = run_dir / "bundle"
     zip_path = bundle_dir / f"meeting_pack_{manifest_sha256[:16]}.zip"
 
-    files: List[Dict[str, str]] = []
+    files: list[dict[str, str]] = []
     files.append({"name": "bundle_manifest.json", "path": str(manifest_path)})
     for a in bundle_manifest.get("artifacts", []):
         if not isinstance(a, dict):
@@ -430,7 +450,7 @@ def download_session_bundle_zip(run_id: str):
 def download_artifact(run_id: str, artifact_id: str):
     """
     Download an artifact by ID.
-    
+
     Phase 2.5 invariants (non-negotiable):
     1. Resolve ONLY via manifest - no filesystem probing
     2. Path traversal impossible - artifact_id is opaque lookup key
@@ -439,28 +459,29 @@ def download_artifact(run_id: str, artifact_id: str):
     5. Stream via FileResponse with correct Content-Type
     """
     import logging
+
     logger = logging.getLogger("server.api")
-    
+
     # 1. Get run from index
     run = get_index().get_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
-    
+
     # 2. Read manifest to find artifact
     manifest_path = Path(run["manifest_path"])
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Manifest not found")
-    
+
     try:
         manifest = json.loads(manifest_path.read_text())
     except Exception as e:
         logger.error(f"Failed to read manifest for {run_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to read manifest")
-    
+
     # 3. Search for artifact by ID across all steps
     session_dir = manifest_path.parent
     found_artifact = None
-    
+
     for step_name, step_data in manifest.get("steps", {}).items():
         for art in step_data.get("artifacts", []):
             # Only new schema artifacts have 'id'
@@ -469,19 +490,19 @@ def download_artifact(run_id: str, artifact_id: str):
                 break
         if found_artifact:
             break
-    
+
     if not found_artifact:
         raise HTTPException(status_code=404, detail="Artifact not found")
-    
+
     # 4. Check downloadable flag (403 if false)
     if not found_artifact.get("downloadable", False):
         raise HTTPException(status_code=403, detail="Artifact not downloadable")
-    
+
     # 5. Resolve file path (relative to session_dir, from manifest)
     relative_path = found_artifact.get("path")
     if not relative_path:
         raise HTTPException(status_code=500, detail="Artifact path missing")
-    
+
     # Security: ensure resolved path stays within session_dir (prevents ../, absolute paths, and symlink escape).
     session_dir_resolved = session_dir.resolve()
     file_path = (session_dir / relative_path).resolve()
@@ -490,16 +511,12 @@ def download_artifact(run_id: str, artifact_id: str):
     except ValueError:
         logger.warning(f"Path traversal attempt blocked: {relative_path}")
         raise HTTPException(status_code=403, detail="Invalid artifact path")
-    
+
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Artifact file not found on disk")
-    
+
     # 6. Return file with proper Content-Type
     content_type = found_artifact.get("content_type", "application/octet-stream")
     filename = found_artifact.get("filename", file_path.name)
-    
-    return FileResponse(
-        file_path,
-        media_type=content_type,
-        filename=filename
-    )
+
+    return FileResponse(file_path, media_type=content_type, filename=filename)

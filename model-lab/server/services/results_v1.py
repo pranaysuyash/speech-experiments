@@ -5,24 +5,24 @@ Pure projection of Run Artifacts into Meaningful Results.
 See docs/results_contract.md for schema and rules.
 """
 
-from typing import Dict, Any, Optional, List
+import hashlib
 import json
 import logging
-from pathlib import Path
 from datetime import datetime
-import hashlib
+from typing import Any
+
 from fastapi import HTTPException
 
 from server.services.runs_index import get_index
 from server.services.safe_files import safe_file_path
 
-
 logger = logging.getLogger("server.results")
 
-def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
+
+def compute_result_v1(run_id: str) -> dict[str, Any] | None:
     """
     Computes the v1 ResultSummary for a run.
-    
+
     This function is a PURE PROJECTION.
      It reads artifacts.
      It returns JSON.
@@ -32,11 +32,11 @@ def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
     run_summary = get_index().get_run(run_id)
     if not run_summary:
         return None
-        
+
     try:
         manifest_path = safe_file_path(run_id, "manifest.json")
         manifest = json.loads(manifest_path.read_text())
-        
+
         # 2. Load Experiment Snapshot (for Label)
         # We need identifying info from manifest to find experiment
         # Assuming run directory structure: .../<exp_id>/runs/<run_id>/...
@@ -48,7 +48,7 @@ def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
         # Actually structure: runs/sessions/<input_hash>/<run_id> OR experiments/<exp_id>/runs/<run_id>?
         # Wait, the experiment `create_experiment` logic separates them.
         # Experiment -> experiment_state.json -> list of runs.
-        # But where do runs live on disk? 
+        # But where do runs live on disk?
         # Looking at `runs.py`, `_runs_root().glob("sessions/*/*/manifest.json")`.
         # So runs are independent entities?
         # Ah, Experiment State links to Run IDs.
@@ -56,26 +56,32 @@ def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
         # If so, we can't easily get the snapshot label without passing experiment_id.
         # But the contract said "GET /api/runs/{id}/results".
         # If run doesn't know its experiment, we can't look up the snapshot.
-        
+
         # Let's check if manifest has experiment_id.
         experiment_id = manifest.get("experiment_id")
         candidate_label = "Unknown"
-        
+
         if experiment_id:
             from server.api.experiments import _load_experiment
+
             exp_data = _load_experiment(experiment_id)
             if exp_data:
                 # Find this run in the experiment to get the snapshot label
                 # Match by run_id
-                found_run = next((r for r in exp_data.get("runs", []) if r.get("run_id") == run_id), None)
+                found_run = next(
+                    (r for r in exp_data.get("runs", []) if r.get("run_id") == run_id), None
+                )
                 if found_run:
-                    # We need the candidate config. 
+                    # We need the candidate config.
                     # experiment_request inputs: "candidates" list.
                     # experiment_state "runs" list matches by index or candidate_id?
                     # `state["runs"]` has `candidate_id` and `candidate_ref`.
                     # `request["candidates"]` has `candidate_id` and `label`.
                     cid = found_run.get("candidate_id")
-                    candidate_config = next((c for c in exp_data.get("candidates", []) if c.get("candidate_id") == cid), None)
+                    candidate_config = next(
+                        (c for c in exp_data.get("candidates", []) if c.get("candidate_id") == cid),
+                        None,
+                    )
                     if candidate_config:
                         candidate_label = candidate_config.get("label", candidate_label)
 
@@ -84,18 +90,18 @@ def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
         ended_at = manifest.get("ended_at")
         duration_s = None
         if started_at and ended_at:
-             try:
-                 start_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-                 end_dt = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
-                 duration_s = (end_dt - start_dt).total_seconds()
-             except Exception:
-                 pass
+            try:
+                start_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+                end_dt = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+                duration_s = (end_dt - start_dt).total_seconds()
+            except Exception:
+                pass
 
         # Word Count & Confidence
         word_count = 0
         confidence_sum = 0.0
         segment_count = 0
-        
+
         # Try to load transcript
         try:
             transcript_path = safe_file_path(run_id, "bundle/transcript.json")
@@ -112,10 +118,10 @@ def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
             # Transcript missing or unparseable - expected for new or failed runs
             pass
 
-        confidence_avg = None # Not yet standard in our transcripts
-        
+        confidence_avg = None  # Not yet standard in our transcripts
+
         # 4. Input Duration
-        audio_duration_s = manifest.get("input_duration_s") # If available
+        audio_duration_s = manifest.get("input_duration_s")  # If available
 
         # 5. Quality Flags
         status = run_summary.get("status", "UNKNOWN")
@@ -128,11 +134,11 @@ def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
             if word_count > 0:
                 is_partial = True
                 warnings.append("Partial Result")
-        
+
         if status == "COMPLETED" and word_count == 0:
             is_empty = True
             warnings.append("Empty Transcript")
-            
+
         # 6. Provenance
         manifest_bytes = manifest_path.read_bytes()
         manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
@@ -159,8 +165,8 @@ def compute_result_v1(run_id: str) -> Optional[Dict[str, Any]]:
             "provenance": {
                 "manifest_hash": manifest_hash,
                 "computed_at": datetime.now().isoformat(),
-                "semantics_version": "v1"
-            }
+                "semantics_version": "v1",
+            },
         }
 
     except Exception as e:

@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import AsyncIterator, Optional
-
-from .providers import ASRConfig, ASRProviderRegistry, AudioSource
+from collections.abc import AsyncIterator
 
 # Import providers to trigger registration.
 from . import provider_faster_whisper  # noqa: F401
+from .providers import ASRConfig, ASRProviderRegistry, AudioSource
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ def _get_default_config() -> ASRConfig:
 async def stream_asr(
     pcm_stream: AsyncIterator[bytes],
     sample_rate: int = 16000,
-    source: Optional[str] = None,
+    source: str | None = None,
 ) -> AsyncIterator[dict]:
     config = _get_default_config()
     provider = ASRProviderRegistry.get_provider(config=config)
@@ -45,7 +44,7 @@ async def stream_asr(
             pass
         return
 
-    audio_source: Optional[AudioSource] = None
+    audio_source: AudioSource | None = None
     if source == "system":
         audio_source = AudioSource.SYSTEM
     elif source == "mic":
@@ -69,4 +68,3 @@ async def stream_asr(
         if segment.speaker:
             event["speaker"] = segment.speaker
         yield event
-

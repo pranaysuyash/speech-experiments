@@ -2,12 +2,10 @@
 
 import json
 import time
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from harness.session import StepProgress, SessionRunner, now_iso
+from harness.session import SessionRunner, StepProgress, now_iso
 
 
 class TestStepProgressDataclass:
@@ -101,7 +99,7 @@ class TestProgressDebouncing:
         """Create a temporary session directory with manifest."""
         session_dir = tmp_path / "sessions" / "testhash" / "test_run_id"
         session_dir.mkdir(parents=True)
-        
+
         manifest = {
             "run_id": "test_run_id",
             "status": "RUNNING",
@@ -122,18 +120,18 @@ class TestProgressDebouncing:
         # Create a dummy input file
         input_file = tmp_path / "test.wav"
         input_file.write_bytes(b"dummy audio content for testing" * 100)
-        
+
         runner = SessionRunner(
             input_path=str(input_file),
             output_dir=str(tmp_path),
-            config={"resume_from": str(temp_session_dir)}
+            config={"resume_from": str(temp_session_dir)},
         )
         return runner
 
     def test_first_update_writes_immediately(self, mock_runner, temp_session_dir):
         """First progress update should write immediately."""
         mock_runner.update_step_progress("asr", 10, "Starting...")
-        
+
         manifest = json.loads((temp_session_dir / "manifest.json").read_text())
         assert manifest["steps"]["asr"]["progress_pct"] == 10
         assert manifest["steps"]["asr"]["progress_message"] == "Starting..."
@@ -142,10 +140,10 @@ class TestProgressDebouncing:
         """Rapid updates within debounce window should be skipped."""
         # First update
         mock_runner.update_step_progress("asr", 10, "10%")
-        
+
         # Immediate second update (should be debounced)
         mock_runner.update_step_progress("asr", 20, "20%")
-        
+
         manifest = json.loads((temp_session_dir / "manifest.json").read_text())
         # Should still be 10% because second update was debounced
         assert manifest["steps"]["asr"]["progress_pct"] == 10
@@ -155,13 +153,13 @@ class TestProgressDebouncing:
         """Updates after debounce window should write."""
         # First update
         mock_runner.update_step_progress("asr", 10, "10%")
-        
+
         # Wait past debounce window
         time.sleep(1.1)
-        
+
         # Second update (should write)
         mock_runner.update_step_progress("asr", 50, "50%")
-        
+
         manifest = json.loads((temp_session_dir / "manifest.json").read_text())
         assert manifest["steps"]["asr"]["progress_pct"] == 50
         assert manifest["steps"]["asr"]["progress_message"] == "50%"
@@ -171,10 +169,10 @@ class TestProgressDebouncing:
         mock_runner.update_step_progress("asr", -10, "negative")
         manifest = json.loads((temp_session_dir / "manifest.json").read_text())
         assert manifest["steps"]["asr"]["progress_pct"] == 0
-        
+
         # Wait for debounce
         time.sleep(1.1)
-        
+
         mock_runner.update_step_progress("asr", 150, "over 100")
         manifest = json.loads((temp_session_dir / "manifest.json").read_text())
         assert manifest["steps"]["asr"]["progress_pct"] == 100
@@ -182,7 +180,7 @@ class TestProgressDebouncing:
     def test_estimated_remaining_s_written(self, mock_runner, temp_session_dir):
         """Estimated remaining time should be written to manifest."""
         mock_runner.update_step_progress("asr", 50, "Halfway", estimated_remaining_s=30)
-        
+
         manifest = json.loads((temp_session_dir / "manifest.json").read_text())
         assert manifest["steps"]["asr"]["estimated_remaining_s"] == 30
 
@@ -190,7 +188,7 @@ class TestProgressDebouncing:
         """Updates for nonexistent steps should be silently ignored."""
         # Should not raise
         mock_runner.update_step_progress("nonexistent_step", 50, "test")
-        
+
         manifest = json.loads((temp_session_dir / "manifest.json").read_text())
         assert "nonexistent_step" not in manifest["steps"]
 
@@ -202,7 +200,7 @@ class TestManifestProgressFields:
         """Test that manifest steps can contain progress fields."""
         session_dir = tmp_path / "sessions" / "hash" / "run_id"
         session_dir.mkdir(parents=True)
-        
+
         manifest = {
             "run_id": "run_id",
             "status": "RUNNING",
@@ -226,12 +224,12 @@ class TestManifestProgressFields:
                 },
             },
         }
-        
+
         manifest_path = session_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest))
-        
+
         loaded = json.loads(manifest_path.read_text())
-        
+
         # Verify all fields are preserved
         assert loaded["steps"]["ingest"]["progress_pct"] == 100
         assert loaded["steps"]["asr"]["progress_pct"] == 45
@@ -262,7 +260,7 @@ class TestManifestProgressFields:
                 "progress_pct": 0,
             },
         ]
-        
+
         # Verify structure matches expected API contract
         assert len(steps_progress) == 3
         assert steps_progress[0]["name"] == "ingest"

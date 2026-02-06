@@ -4,9 +4,9 @@ Colab Upload Helper
 Helps upload and run the Colab compatibility test notebook.
 """
 
-import os
 import webbrowser
 from pathlib import Path
+
 
 def open_colab_notebook():
     """Open the Colab compatibility test notebook in browser."""
@@ -34,6 +34,7 @@ def open_colab_notebook():
 
     print(f"\n📁 Notebook location: {notebook_path.absolute()}")
 
+
 def main():
     print("🚀 Model-Lab Colab Test Helper")
     print("=" * 40)
@@ -46,6 +47,7 @@ def main():
     print("3. Upload: model_lab_colab_test.ipynb")
     print("4. Change runtime: Runtime → Change runtime type → GPU")
     print("5. Run all cells: Runtime → Run all")
+
 
 if __name__ == "__main__":
     main()

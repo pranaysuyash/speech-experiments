@@ -22,16 +22,36 @@ def test_bundle_endpoint_lists_and_downloads(tmp_path: Path, monkeypatch):
 
     (bundle_dir / "summary.md").write_text("# Summary\n- Hello\n", encoding="utf-8")
     _write_json(bundle_dir / "transcript.json", {"segments": []})
-    (bundle_dir / "action_items.csv").write_text("assignee,priority,text\nA,high,Do X\n", encoding="utf-8")
+    (bundle_dir / "action_items.csv").write_text(
+        "assignee,priority,text\nA,high,Do X\n", encoding="utf-8"
+    )
 
     bundle_manifest = {
         "schema_version": "meeting_pack_bundle_manifest.v0.1",
         "run_id": run_id,
         "generated_at": "2026-01-01T00:00:00Z",
         "artifacts": [
-            {"name": "summary.md", "rel_path": "bundle/summary.md", "bytes": (bundle_dir / "summary.md").stat().st_size, "sha256": "x", "content_type": "text/markdown"},
-            {"name": "transcript.json", "rel_path": "bundle/transcript.json", "bytes": (bundle_dir / "transcript.json").stat().st_size, "sha256": "x", "content_type": "application/json"},
-            {"name": "action_items.csv", "rel_path": "bundle/action_items.csv", "bytes": (bundle_dir / "action_items.csv").stat().st_size, "sha256": "x", "content_type": "text/csv"},
+            {
+                "name": "summary.md",
+                "rel_path": "bundle/summary.md",
+                "bytes": (bundle_dir / "summary.md").stat().st_size,
+                "sha256": "x",
+                "content_type": "text/markdown",
+            },
+            {
+                "name": "transcript.json",
+                "rel_path": "bundle/transcript.json",
+                "bytes": (bundle_dir / "transcript.json").stat().st_size,
+                "sha256": "x",
+                "content_type": "application/json",
+            },
+            {
+                "name": "action_items.csv",
+                "rel_path": "bundle/action_items.csv",
+                "bytes": (bundle_dir / "action_items.csv").stat().st_size,
+                "sha256": "x",
+                "content_type": "text/csv",
+            },
         ],
         "absent": [{"name": "decisions.md", "reason": "missing"}],
     }
@@ -40,9 +60,9 @@ def test_bundle_endpoint_lists_and_downloads(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(runs_root))
 
     # Reload modules that may have captured env at import time.
-    import server.services.safe_files as safe_files
-    import server.services.runs_index as runs_index
     import server.main as server_main
+    import server.services.runs_index as runs_index
+    import server.services.safe_files as safe_files
 
     importlib.reload(safe_files)
     importlib.reload(runs_index)

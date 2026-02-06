@@ -7,8 +7,8 @@ Discipline:
 - Generates its own tiny WAV input (no hardcoded fixture paths)
 """
 
-import os
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -43,10 +43,11 @@ def test_eval_writer_emits_real_checks_based_on_artifacts():
     if not RUN_REAL_E2E:
         pytest.skip("RUN_REAL_E2E not set")
 
-    import requests
     import re
     import subprocess
     import sys
+
+    import requests
 
     repo_root = _repo_root()
     with tempfile.TemporaryDirectory() as tmpdir:

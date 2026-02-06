@@ -2,10 +2,12 @@
 """
 Generate a small terminal-style demo GIF for README showing starting backend + frontend.
 """
-from PIL import Image, ImageDraw, ImageFont
+
 import os
 
-OUT = os.path.join(os.path.dirname(__file__), '..', 'assets', 'demo.gif')
+from PIL import Image, ImageDraw, ImageFont
+
+OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "demo.gif")
 OUT = os.path.abspath(OUT)
 
 # Simple terminal font fallback
@@ -31,7 +33,7 @@ scenes = [
     ],
     [
         ("Starting backend -> http://127.0.0.1:8000",),
-        ("health: {\"status\": \"ok\"}",),
+        ('health: {"status": "ok"}',),
     ],
     [
         ("Starting frontend -> http://localhost:5173",),

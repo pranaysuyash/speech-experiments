@@ -14,6 +14,7 @@ The run directory must contain:
 
 All output goes to files in the run directory.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,7 +23,8 @@ import logging
 import sys
 import traceback
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
+
 
 # Set up logging to file in run directory
 def setup_logging(run_dir: Path) -> None:
@@ -36,47 +38,49 @@ def setup_logging(run_dir: Path) -> None:
         ],
     )
 
-def atomic_write_json(path: Path, data: Dict[str, Any]) -> None:
+
+def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     """Write JSON atomically via temp file."""
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
     tmp.replace(path)
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run session worker")
     parser.add_argument("--run-dir", required=True, help="Path to run directory")
     args = parser.parse_args()
-    
+
     run_dir = Path(args.run_dir).resolve()
-    
+
     if not run_dir.exists():
         print(f"ERROR: Run directory does not exist: {run_dir}", file=sys.stderr)
         return 1
-    
+
     setup_logging(run_dir)
     logger = logging.getLogger("run_worker")
-    
+
     manifest_path = run_dir / "manifest.json"
     request_path = run_dir / "run_request.json"
-    
+
     if not request_path.exists():
         logger.error(f"run_request.json not found in {run_dir}")
         return 1
-    
+
     try:
         request = json.loads(request_path.read_text(encoding="utf-8"))
         logger.info(f"Starting run: {request.get('run_id', 'unknown')}")
-        
+
         # Import SessionRunner here to avoid loading models at import time
         from harness.session import SessionRunner
-        
+
         # Get the input path from the request
         input_path = Path(request.get("input_path", ""))
         if not input_path.exists():
             # Try relative to runs root
             runs_root = run_dir.parent.parent  # runs/sessions/hash/run_id -> runs
             input_path = runs_root / request.get("input_rel_path", "")
-        
+
         if not input_path.exists():
             logger.error(f"Input file not found: {input_path}")
             # Write FAILED to manifest
@@ -88,35 +92,35 @@ def main() -> int:
             manifest["error"] = f"Input file not found: {input_path}"
             atomic_write_json(manifest_path, manifest)
             return 1
-        
+
         # Get steps from request
         steps = request.get("steps")
-        
+
         # Create runner - it will use the existing run directory
         # run_dir is base/sessions/hash/run_id
         # we need base
         runs_root = run_dir.parent.parent.parent
         runner = SessionRunner(
-            input_path, 
+            input_path,
             runs_root,
             steps=steps,
             config={
-                **request.get("config", {}), # Ingest config from request
-                "resume_from": str(run_dir)
+                **request.get("config", {}),  # Ingest config from request
+                "resume_from": str(run_dir),
             },
-            resume=True
+            resume=True,
         )
-        
+
         # Run the pipeline
         logger.info("Executing pipeline...")
         runner.run()
         logger.info("Pipeline completed successfully")
-        
+
         return 0
-        
+
     except Exception as e:
         logger.exception(f"Run failed with exception: {e}")
-        
+
         # Write FAILED to manifest
         try:
             if manifest_path.exists():
@@ -129,8 +133,9 @@ def main() -> int:
             atomic_write_json(manifest_path, manifest)
         except Exception:
             pass
-        
+
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

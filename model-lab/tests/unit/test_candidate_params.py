@@ -3,11 +3,10 @@
 These tests verify the deep merge logic without importing fastapi-dependent modules.
 """
 
-import pytest
-from typing import Any, Dict
+from typing import Any
 
 
-def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """
     Deep merge two dictionaries (copy of implementation for testing).
 
@@ -77,12 +76,7 @@ class TestDeepMerge:
         result = _deep_merge(base, override)
 
         assert result == {
-            "level1": {
-                "level2": {
-                    "level3": "base_value",
-                    "new_key": "override_value"
-                }
-            }
+            "level1": {"level2": {"level3": "base_value", "new_key": "override_value"}}
         }
 
 
@@ -99,7 +93,7 @@ class TestCandidateParamsMerging:
         # User overrides device preference from UI
         ui_config = {
             "device_preference": ["mps", "cpu"],
-            "asr": {"language": "auto"}  # User wants auto-detect
+            "asr": {"language": "auto"},  # User wants auto-detect
         }
 
         result = _deep_merge(candidate_params, ui_config)
@@ -122,13 +116,9 @@ class TestCandidateParamsMerging:
 
     def test_full_override_scenario(self):
         """Test complete override of nested config."""
-        candidate_params = {
-            "asr": {"model_type": "faster_whisper", "model_name": "large-v3"}
-        }
+        candidate_params = {"asr": {"model_type": "faster_whisper", "model_name": "large-v3"}}
         # Replace with completely different config
-        ui_config = {
-            "asr": {"model_type": "whisper", "model_name": "tiny"}
-        }
+        ui_config = {"asr": {"model_type": "whisper", "model_name": "tiny"}}
 
         result = _deep_merge(candidate_params, ui_config)
 
@@ -138,12 +128,8 @@ class TestCandidateParamsMerging:
 
     def test_diarization_config_merge(self):
         """Test merging diarization config."""
-        candidate_params = {
-            "diarization": {"model_name": "pyannote_diarization"}
-        }
-        ui_config = {
-            "diarization": {"max_speakers": 5}
-        }
+        candidate_params = {"diarization": {"model_name": "pyannote_diarization"}}
+        ui_config = {"diarization": {"max_speakers": 5}}
 
         result = _deep_merge(candidate_params, ui_config)
 

@@ -18,35 +18,37 @@ Example pipeline config:
         }
     }
 """
+
 from __future__ import annotations
 
 import json
-import re
-import yaml
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
 import logging
+import re
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
 
-def parse_preprocessing_op(op_str: str) -> Tuple[str, Dict[str, Any]]:
+def parse_preprocessing_op(op_str: str) -> tuple[str, dict[str, Any]]:
     """
     Parse a preprocessing operator string like "trim_silence(min_silence_ms=300)".
-    
+
     Returns (op_name, params_dict).
     """
     match = re.match(r"(\w+)(?:\(([^)]*)\))?", op_str.strip())
     if not match:
         return op_str.strip(), {}
-    
+
     op_name = match.group(1)
     params_str = match.group(2)
-    
+
     if not params_str:
         return op_name, {}
-    
+
     params = {}
     for param in params_str.split(","):
         if "=" in param:
@@ -64,13 +66,13 @@ def parse_preprocessing_op(op_str: str) -> Tuple[str, Dict[str, Any]]:
         else:
             # Positional arg - skip for now
             pass
-    
+
     return op_name, params
 
 
 # All available steps in the system with their dependencies
 # duration_estimate_s: Estimated duration per minute of audio (rough guide for UI)
-STEP_REGISTRY: Dict[str, Dict[str, Any]] = {
+STEP_REGISTRY: dict[str, dict[str, Any]] = {
     "ingest": {
         "deps": [],
         "description": "Audio normalization and preprocessing",
@@ -134,7 +136,7 @@ STEP_REGISTRY: Dict[str, Dict[str, Any]] = {
 }
 
 # Available preprocessing operators
-PREPROCESSING_REGISTRY: Dict[str, Dict[str, Any]] = {
+PREPROCESSING_REGISTRY: dict[str, dict[str, Any]] = {
     "trim_silence": {
         "description": "Remove silence from start/end",
         "params": {
@@ -214,170 +216,174 @@ PREPROCESSING_REGISTRY: Dict[str, Dict[str, Any]] = {
 @dataclass
 class PipelineConfig:
     """Configuration for a dynamic pipeline run."""
-    
+
     name: str = "custom"
     description: str = ""
-    
+
     # Steps to run (in dependency order)
-    steps: List[str] = field(default_factory=lambda: ["ingest", "asr"])
-    
+    steps: list[str] = field(default_factory=lambda: ["ingest", "asr"])
+
     # Preprocessing operators to apply (in order)
-    preprocessing: List[str] = field(default_factory=list)
-    
+    preprocessing: list[str] = field(default_factory=list)
+
     # Per-step configuration overrides
-    config: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    
+    config: dict[str, dict[str, Any]] = field(default_factory=dict)
+
     # Device preference
-    device_preference: List[str] = field(default_factory=lambda: ["mps", "cuda", "cpu"])
-    
+    device_preference: list[str] = field(default_factory=lambda: ["mps", "cuda", "cpu"])
+
     def __post_init__(self):
         # Validate steps exist
         for step in self.steps:
             if step not in STEP_REGISTRY:
                 raise ValueError(f"Unknown step: {step}. Available: {list(STEP_REGISTRY.keys())}")
-        
+
         # Validate preprocessing ops exist
         for op in self.preprocessing:
             # Handle parameterized ops like "trim_silence(min_silence_ms=300)"
             op_name = op.split("(")[0]
             if op_name not in PREPROCESSING_REGISTRY:
-                raise ValueError(f"Unknown preprocessing op: {op_name}. Available: {list(PREPROCESSING_REGISTRY.keys())}")
-    
-    def resolve_dependencies(self) -> List[str]:
+                raise ValueError(
+                    f"Unknown preprocessing op: {op_name}. Available: {list(PREPROCESSING_REGISTRY.keys())}"
+                )
+
+    def resolve_dependencies(self) -> list[str]:
         """
         Return steps in correct execution order, adding missing dependencies.
-        
+
         If user requests [diarization], this returns [ingest, diarization].
         If user requests [alignment], this returns [ingest, asr, diarization, alignment].
         """
-        resolved: List[str] = []
-        seen: Set[str] = set()
-        
+        resolved: list[str] = []
+        seen: set[str] = set()
+
         def add_with_deps(step: str):
             if step in seen:
                 return
-            
+
             # Add dependencies first
             step_info = STEP_REGISTRY.get(step, {})
             for dep in step_info.get("deps", []):
                 add_with_deps(dep)
-            
+
             seen.add(step)
             resolved.append(step)
-        
+
         # Always start with ingest
         add_with_deps("ingest")
-        
+
         # Add requested steps with their dependencies
         for step in self.steps:
             add_with_deps(step)
-        
+
         return resolved
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PipelineConfig":
+    def from_dict(cls, data: dict[str, Any]) -> PipelineConfig:
         return cls(**data)
-    
+
     @classmethod
-    def from_yaml(cls, path: Path) -> "PipelineConfig":
+    def from_yaml(cls, path: Path) -> PipelineConfig:
         with open(path) as f:
             data = yaml.safe_load(f)
         return cls.from_dict(data)
-    
+
     @classmethod
-    def from_json(cls, path: Path) -> "PipelineConfig":
+    def from_json(cls, path: Path) -> PipelineConfig:
         with open(path) as f:
             data = json.load(f)
         return cls.from_dict(data)
-    
+
     def to_yaml(self) -> str:
         return yaml.dump(self.to_dict(), default_flow_style=False)
-    
-    def to_ingest_config(self) -> "IngestConfig":
+
+    def to_ingest_config(self) -> IngestConfig:
         """
         Convert preprocessing operators to an IngestConfig for the harness.
-        
+
         Maps:
         - trim_silence -> trim_silence=True, silence_threshold_db, silence_duration_s
         - normalize_loudness -> normalize=True
         - resample -> sample_rate
         - extract_channel -> channels=1 (always mono in current impl)
-        
+
         Note: Some ops (denoise, speed) require ffmpeg filters not yet in IngestConfig.
         """
         from harness.media_ingest import IngestConfig
-        
+
         # Start with defaults
-        kwargs: Dict[str, Any] = {}
-        
+        kwargs: dict[str, Any] = {}
+
         for op_str in self.preprocessing:
             op_name, params = parse_preprocessing_op(op_str)
-            
+
             if op_name == "trim_silence":
                 kwargs["trim_silence"] = True
                 if "threshold_db" in params:
                     kwargs["silence_threshold_db"] = int(params["threshold_db"])
                 if "min_silence_ms" in params:
                     kwargs["silence_duration_s"] = params["min_silence_ms"] / 1000.0
-                    
+
             elif op_name == "normalize_loudness":
                 kwargs["normalize"] = True
                 # target_lufs could be added to IngestConfig if needed
-                
+
             elif op_name == "normalize_volume":
                 # Not directly supported by current IngestConfig - log warning
-                logger.warning("normalize_volume not yet wired to IngestConfig, using loudnorm instead")
+                logger.warning(
+                    "normalize_volume not yet wired to IngestConfig, using loudnorm instead"
+                )
                 kwargs["normalize"] = True
-                
+
             elif op_name == "resample":
                 if "target_sr" in params:
                     kwargs["sample_rate"] = params["target_sr"]
-                    
+
             elif op_name == "extract_channel":
                 # Always mono in current implementation
                 kwargs["channels"] = 1
-                
+
             elif op_name == "denoise":
                 kwargs["denoise"] = True
                 if "strength" in params:
                     kwargs["denoise_strength"] = float(params["strength"])
-                    
+
             elif op_name == "speed":
                 if "factor" in params:
                     kwargs["speed"] = float(params["factor"])
-                    
+
             elif op_name == "normalize_peak":
                 kwargs["peak_normalize"] = True
                 if "target_db" in params:
                     kwargs["peak_target_db"] = float(params["target_db"])
-                    
+
             elif op_name == "mono_mix":
                 kwargs["mono_mix"] = True
-                
+
             elif op_name == "compress_dynamics":
                 kwargs["compress_dynamics"] = True
                 if "threshold_db" in params:
                     kwargs["compress_threshold_db"] = float(params["threshold_db"])
                 if "ratio" in params:
                     kwargs["compress_ratio"] = float(params["ratio"])
-                    
+
             elif op_name == "gate_noise":
                 kwargs["gate_noise"] = True
                 if "threshold_db" in params:
                     kwargs["gate_threshold_db"] = float(params["threshold_db"])
-                    
+
             elif op_name == "convert_samplerate":
                 if "target_sr" in params:
                     kwargs["sample_rate"] = params["target_sr"]
-        
+
         return IngestConfig(**kwargs)
 
 
 # Built-in pipeline templates
-PIPELINE_TEMPLATES: Dict[str, PipelineConfig] = {
+PIPELINE_TEMPLATES: dict[str, PipelineConfig] = {
     "ingest_only": PipelineConfig(
         name="ingest_only",
         description="Audio preprocessing only - no transcription",
@@ -405,7 +411,16 @@ PIPELINE_TEMPLATES: Dict[str, PipelineConfig] = {
     "full_meeting": PipelineConfig(
         name="full_meeting",
         description="Complete meeting analysis pipeline",
-        steps=["ingest", "asr", "diarization", "alignment", "chapters", "summarize_by_speaker", "action_items_assignee", "bundle"],
+        steps=[
+            "ingest",
+            "asr",
+            "diarization",
+            "alignment",
+            "chapters",
+            "summarize_by_speaker",
+            "action_items_assignee",
+            "bundle",
+        ],
         preprocessing=["trim_silence", "normalize_loudness"],
     ),
     "quick_summary": PipelineConfig(
@@ -420,12 +435,12 @@ PIPELINE_TEMPLATES: Dict[str, PipelineConfig] = {
 }
 
 
-def get_pipeline_template(name: str) -> Optional[PipelineConfig]:
+def get_pipeline_template(name: str) -> PipelineConfig | None:
     """Get a built-in pipeline template by name."""
     return PIPELINE_TEMPLATES.get(name)
 
 
-def list_pipeline_templates() -> List[Dict[str, Any]]:
+def list_pipeline_templates() -> list[dict[str, Any]]:
     """List all available pipeline templates."""
     return [
         {
@@ -438,7 +453,7 @@ def list_pipeline_templates() -> List[Dict[str, Any]]:
     ]
 
 
-def list_available_steps() -> List[Dict[str, Any]]:
+def list_available_steps() -> list[dict[str, Any]]:
     """List all available steps with their metadata."""
     return [
         {
@@ -453,7 +468,7 @@ def list_available_steps() -> List[Dict[str, Any]]:
     ]
 
 
-def list_preprocessing_ops() -> List[Dict[str, Any]]:
+def list_preprocessing_ops() -> list[dict[str, Any]]:
     """List all available preprocessing operators."""
     return [
         {
@@ -465,33 +480,33 @@ def list_preprocessing_ops() -> List[Dict[str, Any]]:
     ]
 
 
-def validate_pipeline_config(config: Dict[str, Any]) -> List[str]:
+def validate_pipeline_config(config: dict[str, Any]) -> list[str]:
     """
     Validate a pipeline configuration and return list of errors.
-    
+
     Returns empty list if valid.
     """
     errors = []
-    
+
     # Check steps
     steps = config.get("steps", [])
     if not steps:
         errors.append("Pipeline must have at least one step")
-    
+
     for step in steps:
         if step not in STEP_REGISTRY:
             errors.append(f"Unknown step: {step}")
-    
+
     # Check preprocessing
     for op in config.get("preprocessing") or []:
         op_name = op.split("(")[0]
         if op_name not in PREPROCESSING_REGISTRY:
             errors.append(f"Unknown preprocessing operator: {op_name}")
-    
+
     # Validate step config keys
     step_config = config.get("config") or {}
     for step_name, step_cfg in step_config.items():
         if step_name not in STEP_REGISTRY:
             errors.append(f"Config for unknown step: {step_name}")
-    
+
     return errors

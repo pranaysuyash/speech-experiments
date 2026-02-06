@@ -4,10 +4,11 @@ Ensures consistent audio loading, preprocessing, and format handling across mode
 """
 
 import hashlib
-import numpy as np
-from pathlib import Path
-from typing import Tuple, Optional, Dict, Any
 import logging
+from pathlib import Path
+from typing import Any
+
+import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,12 +27,12 @@ class AudioLoader:
 
     # Canonical sample rates for different models
     SAMPLE_RATES = {
-        'lfm2_5_audio': 24000,
-        'whisper': 16000,
-        'seamlessm4t': 16000,
+        "lfm2_5_audio": 24000,
+        "whisper": 16000,
+        "seamlessm4t": 16000,
     }
 
-    def __init__(self, target_sample_rate: Optional[int] = None):
+    def __init__(self, target_sample_rate: int | None = None):
         """
         Initialize audio loader.
 
@@ -40,10 +41,9 @@ class AudioLoader:
         """
         self.target_sample_rate = target_sample_rate
 
-    def load_audio(self,
-                   audio_path: Path,
-                   model_type: str = 'lfm2_5_audio',
-                   convert_to_mono: bool = True) -> Tuple[np.ndarray, int, Dict[str, Any]]:
+    def load_audio(
+        self, audio_path: Path, model_type: str = "lfm2_5_audio", convert_to_mono: bool = True
+    ) -> tuple[np.ndarray, int, dict[str, Any]]:
         """
         Load audio file with standardized preprocessing.
 
@@ -66,7 +66,7 @@ class AudioLoader:
         try:
             audio, sample_rate = sf.read(audio_path)
         except Exception as e:
-            raise IOError(f"Failed to load audio file {audio_path}: {e}")
+            raise OSError(f"Failed to load audio file {audio_path}: {e}")
 
         # Handle channel conversion
         if audio.ndim > 1:
@@ -88,15 +88,17 @@ class AudioLoader:
 
         # Metadata - use original_sample_rate, not post-resample value
         metadata = {
-            'original_sample_rate': original_sample_rate,
-            'sample_rate': sample_rate,
-            'duration_seconds': len(audio) / sample_rate,
-            'num_samples': len(audio),
-            'channels': 1 if audio.ndim == 1 else audio.shape[0],
-            'path': str(audio_path)
+            "original_sample_rate": original_sample_rate,
+            "sample_rate": sample_rate,
+            "duration_seconds": len(audio) / sample_rate,
+            "num_samples": len(audio),
+            "channels": 1 if audio.ndim == 1 else audio.shape[0],
+            "path": str(audio_path),
         }
 
-        logger.debug(f"Loaded {audio_path.name}: {metadata['duration_seconds']:.1f}s @ {sample_rate}Hz")
+        logger.debug(
+            f"Loaded {audio_path.name}: {metadata['duration_seconds']:.1f}s @ {sample_rate}Hz"
+        )
         return audio, sample_rate, metadata
 
     def _resample_audio(self, audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
@@ -121,7 +123,8 @@ class AudioLoader:
 
     def save_audio(self, audio: np.ndarray, sample_rate: int, output_path: Path):
         """Save audio to file."""
-        import soundfile as sf # Lazy import
+        import soundfile as sf  # Lazy import
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
         sf.write(output_path, audio, sample_rate)
         logger.debug(f"Saved audio to {output_path}")
@@ -136,14 +139,14 @@ class GroundTruthLoader:
         if not text_path.exists():
             raise FileNotFoundError(f"Ground truth file not found: {text_path}")
 
-        with open(text_path, 'r', encoding='utf-8') as f:
+        with open(text_path, encoding="utf-8") as f:
             text = f.read().strip()
 
         logger.info(f"Loaded ground truth: {len(text)} chars from {text_path.name}")
         return text
 
     @staticmethod
-    def load_pair(audio_path: Path, text_path: Path) -> Tuple[np.ndarray, int, str]:
+    def load_pair(audio_path: Path, text_path: Path) -> tuple[np.ndarray, int, str]:
         """Load audio and corresponding ground truth text."""
         loader = AudioLoader()
         audio, sr, _ = loader.load_audio(audio_path)

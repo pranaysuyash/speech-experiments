@@ -1,9 +1,7 @@
 import json
 from pathlib import Path
 
-import pytest
-
-from harness.meeting_pack import build_meeting_pack, MEETING_PACK_SCHEMA_VERSION
+from harness.meeting_pack import MEETING_PACK_SCHEMA_VERSION, build_meeting_pack
 
 
 def _write_json(path: Path, obj) -> None:
@@ -102,8 +100,14 @@ def test_bundle_contains_expected_files_when_inputs_exist(tmp_path: Path):
             "ended_at": "2026-01-01T00:00:10",
             "steps": {
                 "alignment": {"status": "COMPLETED", "artifacts": [{"path": str(alignment_path)}]},
-                "summarize_by_speaker": {"status": "COMPLETED", "artifacts": [{"path": str(summary_path)}]},
-                "action_items_assignee": {"status": "COMPLETED", "artifacts": [{"path": str(action_items_path)}]},
+                "summarize_by_speaker": {
+                    "status": "COMPLETED",
+                    "artifacts": [{"path": str(summary_path)}],
+                },
+                "action_items_assignee": {
+                    "status": "COMPLETED",
+                    "artifacts": [{"path": str(action_items_path)}],
+                },
             },
         },
     )

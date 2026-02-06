@@ -1,12 +1,11 @@
-
-from pathlib import Path
-import os
 import sys
+from pathlib import Path
+
 
 def debug_find(run_id):
     runs_root = Path("runs").resolve() / "sessions"
     print(f"Searching in: {runs_root}")
-    
+
     found_run_dir = None
     if runs_root.exists():
         # Search for the run_id directory
@@ -17,7 +16,7 @@ def debug_find(run_id):
                 found_run_dir = path
                 print(f"FOUND: {found_run_dir}")
                 break
-    
+
     if not found_run_dir:
         print("NOT FOUND via glob")
         return
@@ -31,10 +30,11 @@ def debug_find(run_id):
         "artifacts/transcript.txt",
         "asr/transcript.txt",
     ]
-    
+
     for rel in candidates:
         p = found_run_dir / rel
         print(f"Checking candidate: {p} -> exists? {p.exists()}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

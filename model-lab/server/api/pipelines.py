@@ -8,29 +8,29 @@ Provides endpoints for:
 - Running ad-hoc pipelines with user-selected steps
 - User-defined pipeline templates (CRUD)
 """
+
 from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from typing import Any
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from harness.pipeline_config import (
-    PipelineConfig,
-    STEP_REGISTRY,
-    PREPROCESSING_REGISTRY,
     PIPELINE_TEMPLATES,
-    list_available_steps,
-    list_preprocessing_ops,
-    list_pipeline_templates,
-    validate_pipeline_config,
+    PREPROCESSING_REGISTRY,
+    STEP_REGISTRY,
+    PipelineConfig,
     get_pipeline_template,
+    list_available_steps,
+    list_pipeline_templates,
+    list_preprocessing_ops,
+    validate_pipeline_config,
 )
 
 router = APIRouter(prefix="/api/pipelines", tags=["pipelines"])
@@ -40,11 +40,12 @@ router = APIRouter(prefix="/api/pipelines", tags=["pipelines"])
 # User Templates Storage
 # ============================================================================
 
+
 def _user_templates_path() -> Path:
     return Path(os.environ.get("MODEL_LAB_DATA_ROOT", "data")).resolve() / "user_templates.json"
 
 
-def _load_user_templates() -> Dict[str, Dict[str, Any]]:
+def _load_user_templates() -> dict[str, dict[str, Any]]:
     path = _user_templates_path()
     if not path.exists():
         return {}
@@ -54,7 +55,7 @@ def _load_user_templates() -> Dict[str, Dict[str, Any]]:
         return {}
 
 
-def _save_user_templates(templates: Dict[str, Dict[str, Any]]) -> None:
+def _save_user_templates(templates: dict[str, dict[str, Any]]) -> None:
     path = _user_templates_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(templates, indent=2, sort_keys=True), encoding="utf-8")
@@ -64,53 +65,57 @@ def _save_user_templates(templates: Dict[str, Dict[str, Any]]) -> None:
 # Request/Response Models
 # ============================================================================
 
+
 class PipelineRunRequest(BaseModel):
     """Request body for creating a dynamic pipeline run."""
-    
+
     # Either use a template name OR provide custom steps
-    template: Optional[str] = None
-    
+    template: str | None = None
+
     # Custom step selection (if not using template)
-    steps: Optional[List[str]] = None
-    
+    steps: list[str] | None = None
+
     # Preprocessing operators to apply
-    preprocessing: Optional[List[str]] = None
-    
+    preprocessing: list[str] | None = None
+
     # Per-step configuration overrides
-    config: Optional[Dict[str, Dict[str, Any]]] = None
-    
+    config: dict[str, dict[str, Any]] | None = None
+
     # Device preference
-    device_preference: Optional[List[str]] = None
-    
+    device_preference: list[str] | None = None
+
     # Run metadata
-    name: Optional[str] = None
-    use_case_id: Optional[str] = None
+    name: str | None = None
+    use_case_id: str | None = None
 
 
 class PipelineValidateRequest(BaseModel):
     """Request body for validating a pipeline configuration."""
-    steps: List[str]
-    preprocessing: Optional[List[str]] = None
-    config: Optional[Dict[str, Dict[str, Any]]] = None
+
+    steps: list[str]
+    preprocessing: list[str] | None = None
+    config: dict[str, dict[str, Any]] | None = None
 
 
 class UserTemplateRequest(BaseModel):
     """Request body for creating/updating a user template."""
+
     name: str
-    steps: List[str]
-    preprocessing: Optional[List[str]] = None
-    description: Optional[str] = None
+    steps: list[str]
+    preprocessing: list[str] | None = None
+    description: str | None = None
 
 
 # ============================================================================
 # Endpoints
 # ============================================================================
 
+
 @router.get("/steps")
 def get_available_steps() -> JSONResponse:
     """
     List all available pipeline steps with their dependencies and metadata.
-    
+
     Returns:
         List of step definitions including:
         - name: Step identifier
@@ -126,7 +131,7 @@ def get_available_steps() -> JSONResponse:
 def get_preprocessing_operators() -> JSONResponse:
     """
     List all available preprocessing operators.
-    
+
     Returns:
         List of operator definitions including:
         - name: Operator identifier
@@ -140,7 +145,7 @@ def get_preprocessing_operators() -> JSONResponse:
 def get_pipeline_templates() -> JSONResponse:
     """
     List all built-in pipeline templates.
-    
+
     Templates are pre-configured pipelines for common use cases.
     """
     return JSONResponse(content=list_pipeline_templates())
@@ -155,34 +160,38 @@ def get_pipeline_template_detail(name: str) -> JSONResponse:
     if not template:
         raise HTTPException(
             status_code=404,
-            detail=f"Template '{name}' not found. Available: {list(PIPELINE_TEMPLATES.keys())}"
+            detail=f"Template '{name}' not found. Available: {list(PIPELINE_TEMPLATES.keys())}",
         )
-    
-    return JSONResponse(content={
-        **template.to_dict(),
-        "resolved_steps": template.resolve_dependencies(),
-    })
+
+    return JSONResponse(
+        content={
+            **template.to_dict(),
+            "resolved_steps": template.resolve_dependencies(),
+        }
+    )
 
 
 @router.post("/validate")
 def validate_pipeline(request: PipelineValidateRequest) -> JSONResponse:
     """
     Validate a pipeline configuration without running it.
-    
+
     Returns:
         - valid: Boolean indicating if config is valid
         - errors: List of validation errors (if any)
         - resolved_steps: Steps in execution order with dependencies resolved
     """
     errors = validate_pipeline_config(request.model_dump())
-    
+
     if errors:
-        return JSONResponse(content={
-            "valid": False,
-            "errors": errors,
-            "resolved_steps": [],
-        })
-    
+        return JSONResponse(
+            content={
+                "valid": False,
+                "errors": errors,
+                "resolved_steps": [],
+            }
+        )
+
     try:
         config = PipelineConfig(
             steps=request.steps,
@@ -190,25 +199,29 @@ def validate_pipeline(request: PipelineValidateRequest) -> JSONResponse:
             config=request.config or {},
         )
         resolved = config.resolve_dependencies()
-        
-        return JSONResponse(content={
-            "valid": True,
-            "errors": [],
-            "resolved_steps": resolved,
-        })
+
+        return JSONResponse(
+            content={
+                "valid": True,
+                "errors": [],
+                "resolved_steps": resolved,
+            }
+        )
     except ValueError as e:
-        return JSONResponse(content={
-            "valid": False,
-            "errors": [str(e)],
-            "resolved_steps": [],
-        })
+        return JSONResponse(
+            content={
+                "valid": False,
+                "errors": [str(e)],
+                "resolved_steps": [],
+            }
+        )
 
 
 @router.post("/resolve")
 def resolve_dependencies(request: PipelineValidateRequest) -> JSONResponse:
     """
     Resolve step dependencies and return execution order.
-    
+
     Given a list of steps, returns the complete list including
     all required dependencies in correct execution order.
     """
@@ -218,12 +231,14 @@ def resolve_dependencies(request: PipelineValidateRequest) -> JSONResponse:
             preprocessing=request.preprocessing or [],
         )
         resolved = config.resolve_dependencies()
-        
-        return JSONResponse(content={
-            "requested_steps": request.steps,
-            "resolved_steps": resolved,
-            "added_dependencies": [s for s in resolved if s not in request.steps],
-        })
+
+        return JSONResponse(
+            content={
+                "requested_steps": request.steps,
+                "resolved_steps": resolved,
+                "added_dependencies": [s for s in resolved if s not in request.steps],
+            }
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -236,26 +251,25 @@ def get_step_info(name: str) -> JSONResponse:
     if name not in STEP_REGISTRY:
         raise HTTPException(
             status_code=404,
-            detail=f"Step '{name}' not found. Available: {list(STEP_REGISTRY.keys())}"
+            detail=f"Step '{name}' not found. Available: {list(STEP_REGISTRY.keys())}",
         )
-    
+
     info = STEP_REGISTRY[name]
-    
+
     # Find which steps depend on this one
-    dependents = [
-        s for s, i in STEP_REGISTRY.items()
-        if name in i.get("deps", [])
-    ]
-    
-    return JSONResponse(content={
-        "name": name,
-        "deps": info.get("deps", []),
-        "dependents": dependents,
-        "description": info.get("description", ""),
-        "produces": info.get("produces", []),
-        "config_schema": info.get("config_schema"),
-        "required": info.get("required", False),
-    })
+    dependents = [s for s, i in STEP_REGISTRY.items() if name in i.get("deps", [])]
+
+    return JSONResponse(
+        content={
+            "name": name,
+            "deps": info.get("deps", []),
+            "dependents": dependents,
+            "description": info.get("description", ""),
+            "produces": info.get("produces", []),
+            "config_schema": info.get("config_schema"),
+            "required": info.get("required", False),
+        }
+    )
 
 
 @router.get("/preprocessing/{name}")
@@ -266,32 +280,35 @@ def get_preprocessing_info(name: str) -> JSONResponse:
     if name not in PREPROCESSING_REGISTRY:
         raise HTTPException(
             status_code=404,
-            detail=f"Operator '{name}' not found. Available: {list(PREPROCESSING_REGISTRY.keys())}"
+            detail=f"Operator '{name}' not found. Available: {list(PREPROCESSING_REGISTRY.keys())}",
         )
-    
+
     info = PREPROCESSING_REGISTRY[name]
-    
-    return JSONResponse(content={
-        "name": name,
-        "description": info.get("description", ""),
-        "params": info.get("params", {}),
-    })
+
+    return JSONResponse(
+        content={
+            "name": name,
+            "description": info.get("description", ""),
+            "params": info.get("params", {}),
+        }
+    )
 
 
 # ============================================================================
 # Helper for creating pipeline runs (used by workbench endpoint)
 # ============================================================================
 
+
 def build_pipeline_config(
-    template: Optional[str] = None,
-    steps: Optional[List[str]] = None,
-    preprocessing: Optional[List[str]] = None,
-    config: Optional[Dict[str, Dict[str, Any]]] = None,
-    device_preference: Optional[List[str]] = None,
+    template: str | None = None,
+    steps: list[str] | None = None,
+    preprocessing: list[str] | None = None,
+    config: dict[str, dict[str, Any]] | None = None,
+    device_preference: list[str] | None = None,
 ) -> PipelineConfig:
     """
     Build a PipelineConfig from request parameters.
-    
+
     Priority:
     1. If template is provided, use it as base
     2. Override with provided steps/preprocessing/config
@@ -300,7 +317,7 @@ def build_pipeline_config(
         base = get_pipeline_template(template)
         if not base:
             raise ValueError(f"Unknown template: {template}")
-        
+
         # Create a copy and override with provided values
         return PipelineConfig(
             name=template,
@@ -310,7 +327,7 @@ def build_pipeline_config(
             config={**base.config, **(config or {})},
             device_preference=device_preference or base.device_preference,
         )
-    
+
     # Custom pipeline
     return PipelineConfig(
         name="custom",
@@ -326,23 +343,26 @@ def build_pipeline_config(
 # User Templates Endpoints
 # ============================================================================
 
+
 @router.get("/user-templates")
 def list_user_templates() -> JSONResponse:
     """
     List all user-defined pipeline templates.
     """
     templates = _load_user_templates()
-    return JSONResponse(content=[
-        {
-            "name": name,
-            "steps": data.get("steps", []),
-            "preprocessing": data.get("preprocessing", []),
-            "description": data.get("description", ""),
-            "created_at": data.get("created_at"),
-            "updated_at": data.get("updated_at"),
-        }
-        for name, data in templates.items()
-    ])
+    return JSONResponse(
+        content=[
+            {
+                "name": name,
+                "steps": data.get("steps", []),
+                "preprocessing": data.get("preprocessing", []),
+                "description": data.get("description", ""),
+                "created_at": data.get("created_at"),
+                "updated_at": data.get("updated_at"),
+            }
+            for name, data in templates.items()
+        ]
+    )
 
 
 @router.post("/user-templates")
@@ -351,18 +371,20 @@ def create_user_template(request: UserTemplateRequest) -> JSONResponse:
     Create or update a user-defined pipeline template.
     """
     # Validate steps
-    errors = validate_pipeline_config({
-        "steps": request.steps,
-        "preprocessing": request.preprocessing or [],
-    })
+    errors = validate_pipeline_config(
+        {
+            "steps": request.steps,
+            "preprocessing": request.preprocessing or [],
+        }
+    )
     if errors:
         raise HTTPException(status_code=400, detail="; ".join(errors))
-    
+
     templates = _load_user_templates()
-    now = datetime.now(timezone.utc).isoformat()
-    
+    now = datetime.now(UTC).isoformat()
+
     is_update = request.name in templates
-    
+
     templates[request.name] = {
         "steps": request.steps,
         "preprocessing": request.preprocessing or [],
@@ -370,16 +392,16 @@ def create_user_template(request: UserTemplateRequest) -> JSONResponse:
         "created_at": templates.get(request.name, {}).get("created_at", now),
         "updated_at": now,
     }
-    
+
     _save_user_templates(templates)
-    
+
     return JSONResponse(
         status_code=200 if is_update else 201,
         content={
             "name": request.name,
             "created": not is_update,
             "updated": is_update,
-        }
+        },
     )
 
 
@@ -391,9 +413,9 @@ def get_user_template(name: str) -> JSONResponse:
     templates = _load_user_templates()
     if name not in templates:
         raise HTTPException(status_code=404, detail=f"User template '{name}' not found")
-    
+
     data = templates[name]
-    
+
     # Resolve dependencies for display
     try:
         config = PipelineConfig(
@@ -403,16 +425,18 @@ def get_user_template(name: str) -> JSONResponse:
         resolved = config.resolve_dependencies()
     except ValueError:
         resolved = data.get("steps", [])
-    
-    return JSONResponse(content={
-        "name": name,
-        "steps": data.get("steps", []),
-        "preprocessing": data.get("preprocessing", []),
-        "description": data.get("description", ""),
-        "resolved_steps": resolved,
-        "created_at": data.get("created_at"),
-        "updated_at": data.get("updated_at"),
-    })
+
+    return JSONResponse(
+        content={
+            "name": name,
+            "steps": data.get("steps", []),
+            "preprocessing": data.get("preprocessing", []),
+            "description": data.get("description", ""),
+            "resolved_steps": resolved,
+            "created_at": data.get("created_at"),
+            "updated_at": data.get("updated_at"),
+        }
+    )
 
 
 @router.delete("/user-templates/{name}")
@@ -423,8 +447,8 @@ def delete_user_template(name: str) -> JSONResponse:
     templates = _load_user_templates()
     if name not in templates:
         raise HTTPException(status_code=404, detail=f"User template '{name}' not found")
-    
+
     del templates[name]
     _save_user_templates(templates)
-    
+
     return JSONResponse(content={"deleted": name})

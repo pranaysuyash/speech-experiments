@@ -15,7 +15,6 @@ import argparse
 import csv
 from pathlib import Path
 
-
 REQUIRED_COLS = [
     "model_id",
     "category",

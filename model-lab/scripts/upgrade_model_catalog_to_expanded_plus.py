@@ -17,10 +17,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -253,7 +253,7 @@ def main() -> int:
     for model_id, r in cur_by_id.items():
         if model_id in merged:
             continue
-        expanded = {k: "" for k in base_header}
+        expanded = dict.fromkeys(base_header, "")
         for k in base_header:
             if k in r:
                 expanded[k] = r.get(k, "")
@@ -286,4 +286,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

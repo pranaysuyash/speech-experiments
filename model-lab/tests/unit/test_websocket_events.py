@@ -5,10 +5,9 @@ without requiring a running server.
 """
 
 import json
-import pytest
 import tempfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 
 def _create_event(event_type: str, run_id: str, **payload) -> dict:
@@ -17,7 +16,7 @@ def _create_event(event_type: str, run_id: str, **payload) -> dict:
         "ts": datetime.utcnow().isoformat() + "Z",
         "type": event_type,
         "run_id": run_id,
-        **payload
+        **payload,
     }
 
 
@@ -35,13 +34,7 @@ class TestEventWriting:
 
     def test_event_structure_step_started(self):
         """Test step_started event structure."""
-        event = _create_event(
-            "step_started",
-            "test-run-123",
-            step="asr",
-            index=1,
-            total=4
-        )
+        event = _create_event("step_started", "test-run-123", step="asr", index=1, total=4)
 
         assert event["type"] == "step_started"
         assert event["step"] == "asr"
@@ -55,7 +48,7 @@ class TestEventWriting:
             "test-run-123",
             step="asr",
             duration_ms=5432,
-            artifacts=["transcript.json"]
+            artifacts=["transcript.json"],
         )
 
         assert event["type"] == "step_completed"
@@ -71,7 +64,7 @@ class TestEventWriting:
             step="diarization",
             error_code="E_MODEL_OOM",
             error_message="CUDA out of memory",
-            duration_ms=1234
+            duration_ms=1234,
         )
 
         assert event["type"] == "step_failed"
@@ -87,7 +80,7 @@ class TestEventWriting:
             status="COMPLETED",
             total_duration_ms=120000,
             steps_completed=4,
-            steps_failed=0
+            steps_failed=0,
         )
 
         assert event["type"] == "run_completed"
@@ -103,7 +96,7 @@ class TestEventWriting:
             "test-run-123",
             step="asr",
             progress=0.5,
-            message="Transcribing audio..."
+            message="Transcribing audio...",
         )
 
         # Should not raise
@@ -126,8 +119,14 @@ class TestEventsFile:
                 _create_event("run_started", "test-123", steps=["ingest"]),
                 _create_event("step_started", "test-123", step="ingest", index=0, total=1),
                 _create_event("step_completed", "test-123", step="ingest", duration_ms=100),
-                _create_event("run_completed", "test-123", status="COMPLETED",
-                             total_duration_ms=100, steps_completed=1, steps_failed=0),
+                _create_event(
+                    "run_completed",
+                    "test-123",
+                    status="COMPLETED",
+                    total_duration_ms=100,
+                    steps_completed=1,
+                    steps_failed=0,
+                ),
             ]
 
             # Write events

@@ -4,10 +4,6 @@ These tests focus on the harness-level pipeline configuration logic
 which doesn't require FastAPI.
 """
 
-import json
-import pytest
-from pathlib import Path
-from datetime import datetime, timezone
 
 
 class TestPipelineConfig:
@@ -130,7 +126,15 @@ class TestStepRegistry:
         """Test that STEP_REGISTRY contains all core steps."""
         from harness.pipeline_config import STEP_REGISTRY
 
-        core_steps = ["ingest", "asr", "diarization", "alignment", "chapters", "summarize_by_speaker", "action_items_assignee"]
+        core_steps = [
+            "ingest",
+            "asr",
+            "diarization",
+            "alignment",
+            "chapters",
+            "summarize_by_speaker",
+            "action_items_assignee",
+        ]
 
         for step in core_steps:
             assert step in STEP_REGISTRY, f"Missing core step: {step}"
@@ -206,10 +210,7 @@ class TestIngestConfigConversion:
         """Test converting config with trim_silence."""
         from harness.pipeline_config import PipelineConfig
 
-        cfg = PipelineConfig(
-            steps=["ingest", "asr"],
-            preprocessing=["trim_silence"]
-        )
+        cfg = PipelineConfig(steps=["ingest", "asr"], preprocessing=["trim_silence"])
         ingest_cfg = cfg.to_ingest_config()
 
         assert ingest_cfg is not None
@@ -219,10 +220,7 @@ class TestIngestConfigConversion:
         """Test converting config with normalize_loudness."""
         from harness.pipeline_config import PipelineConfig
 
-        cfg = PipelineConfig(
-            steps=["ingest", "asr"],
-            preprocessing=["normalize_loudness"]
-        )
+        cfg = PipelineConfig(steps=["ingest", "asr"], preprocessing=["normalize_loudness"])
         ingest_cfg = cfg.to_ingest_config()
 
         assert ingest_cfg is not None
@@ -232,10 +230,7 @@ class TestIngestConfigConversion:
         """Test converting config with denoise."""
         from harness.pipeline_config import PipelineConfig
 
-        cfg = PipelineConfig(
-            steps=["ingest", "asr"],
-            preprocessing=["denoise"]
-        )
+        cfg = PipelineConfig(steps=["ingest", "asr"], preprocessing=["denoise"])
         ingest_cfg = cfg.to_ingest_config()
 
         assert ingest_cfg is not None
@@ -245,10 +240,7 @@ class TestIngestConfigConversion:
         """Test converting config with speed adjustment."""
         from harness.pipeline_config import PipelineConfig
 
-        cfg = PipelineConfig(
-            steps=["ingest", "asr"],
-            preprocessing=["speed(factor=1.5)"]
-        )
+        cfg = PipelineConfig(steps=["ingest", "asr"], preprocessing=["speed(factor=1.5)"])
         ingest_cfg = cfg.to_ingest_config()
 
         assert ingest_cfg is not None
@@ -258,10 +250,7 @@ class TestIngestConfigConversion:
         """Test converting config with dynamic range compression."""
         from harness.pipeline_config import PipelineConfig
 
-        cfg = PipelineConfig(
-            steps=["ingest", "asr"],
-            preprocessing=["compress_dynamics"]
-        )
+        cfg = PipelineConfig(steps=["ingest", "asr"], preprocessing=["compress_dynamics"])
         ingest_cfg = cfg.to_ingest_config()
 
         assert ingest_cfg is not None
@@ -271,10 +260,7 @@ class TestIngestConfigConversion:
         """Test converting config with noise gate."""
         from harness.pipeline_config import PipelineConfig
 
-        cfg = PipelineConfig(
-            steps=["ingest", "asr"],
-            preprocessing=["gate_noise"]
-        )
+        cfg = PipelineConfig(steps=["ingest", "asr"], preprocessing=["gate_noise"])
         ingest_cfg = cfg.to_ingest_config()
 
         assert ingest_cfg is not None
@@ -284,10 +270,7 @@ class TestIngestConfigConversion:
         """Test converting config with mono mix."""
         from harness.pipeline_config import PipelineConfig
 
-        cfg = PipelineConfig(
-            steps=["ingest", "asr"],
-            preprocessing=["mono_mix"]
-        )
+        cfg = PipelineConfig(steps=["ingest", "asr"], preprocessing=["mono_mix"])
         ingest_cfg = cfg.to_ingest_config()
 
         assert ingest_cfg is not None
@@ -298,8 +281,7 @@ class TestIngestConfigConversion:
         from harness.pipeline_config import PipelineConfig
 
         cfg = PipelineConfig(
-            steps=["ingest", "asr"],
-            preprocessing=["trim_silence", "normalize_loudness", "denoise"]
+            steps=["ingest", "asr"], preprocessing=["trim_silence", "normalize_loudness", "denoise"]
         )
         ingest_cfg = cfg.to_ingest_config()
 

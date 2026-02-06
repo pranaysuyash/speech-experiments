@@ -1,12 +1,11 @@
 import json
 import os
-import threading
-import time
-import subprocess
 import signal
+import subprocess
+import threading
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, List
-from datetime import datetime, timezone
+from typing import Any
 
 from harness.session import SessionRunner
 
@@ -14,11 +13,12 @@ from harness.session import SessionRunner
 _WORKER_LOCK = threading.Lock()
 _ACTIVE_RUNS_COUNT = 0
 _MAX_CONCURRENT_RUNS = 3
-_ACTIVE_RUN_ID: Optional[str] = None
+_ACTIVE_RUN_ID: str | None = None
 
 
 class RunnerBusyError(Exception):
     """Raised when runner is busy and cannot accept new runs."""
+
     pass
 
 
@@ -43,10 +43,8 @@ def release_worker() -> None:
 
 
 def launch_run_worker(
-    runner: SessionRunner,
-    run_request_data: Dict[str, Any],
-    background: bool = True
-) -> Dict[str, Any]:
+    runner: SessionRunner, run_request_data: dict[str, Any], background: bool = True
+) -> dict[str, Any]:
     """
     Launch a run worker subprocess.
     """
@@ -55,23 +53,23 @@ def launch_run_worker(
 
     # 1. Write run_request.json
     run_request_path = runner.session_dir / "run_request.json"
-    
+
     # If run_request.json already exists (retry), load it and merge
     if run_request_path.exists():
         existing_request = json.loads(run_request_path.read_text(encoding="utf-8"))
         existing_request.update(run_request_data)
         run_request_data = existing_request
-    
+
     # Ensure run_id / input path are set
     run_request_data["run_id"] = runner.run_id
     run_request_data["input_path"] = str(runner.input_path)
-    
+
     # Atomic write
     run_request_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = run_request_path.with_suffix(".json.tmp")
     tmp_path.write_text(json.dumps(run_request_data, indent=2, sort_keys=True), encoding="utf-8")
     tmp_path.replace(run_request_path)
-    
+
     # 2. Write initial manifest if not exists (or update status if retry)
     # For retry, we assume manifest exists and caller adjusted it.
     # For new run, we create it.
@@ -82,7 +80,7 @@ def launch_run_worker(
             "run_id": runner.run_id,
             "status": "RUNNING",
             "requested_at": run_request_data.get("requested_at"),
-            "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "started_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": run_request_data.get("source"),
             "use_case_id": run_request_data.get("use_case_id"),
             "pipeline": {
@@ -106,17 +104,19 @@ def launch_run_worker(
         }
         tmp_manifest = manifest_path.with_suffix(".json.tmp")
         tmp_manifest.parent.mkdir(parents=True, exist_ok=True)
-        tmp_manifest.write_text(json.dumps(initial_manifest, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_manifest.write_text(
+            json.dumps(initial_manifest, indent=2, sort_keys=True), encoding="utf-8"
+        )
         tmp_manifest.replace(manifest_path)
-    
+
     # 3. Spawn subprocess
     log_file = runner.session_dir / "worker.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Locate project root for python -m harness
     # Assuming this file is in server/services/lifecycle.py -> ../../../
     project_root = Path(__file__).parent.parent.parent
-    
+
     # We open file handle for stdout/stderr redirect
     # Note: caller is responsible for ensuring worker eventually exits or we depend on OS cleanup?
     # Actually, subprocess.Popen with start_new_session=True detaches it.
@@ -127,13 +127,18 @@ def launch_run_worker(
         tmp.parent.mkdir(parents=True, exist_ok=True)
         tmp.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
         tmp.replace(path)
-    
-    log_f = open(log_file, "a") # Append mode for retries
+
+    log_f = open(log_file, "a")  # Append mode for retries
     try:
         proc = subprocess.Popen(
             [
-                "uv", "run", "python", "-m", "harness.run_worker",
-                "--run-dir", str(runner.session_dir),
+                "uv",
+                "run",
+                "python",
+                "-m",
+                "harness.run_worker",
+                "--run-dir",
+                str(runner.session_dir),
             ],
             stdout=log_f,
             stderr=subprocess.STDOUT,
@@ -143,11 +148,11 @@ def launch_run_worker(
     except Exception as e:
         log_f.close()
         raise e
-        
+
     # 4. Store PID
     pid_file = runner.session_dir / "worker.pid"
     pid_file.write_text(str(proc.pid))
-    
+
     # 4b. Also store PID in manifest for resilience
     try:
         if manifest_path.exists():
@@ -156,28 +161,25 @@ def launch_run_worker(
             atomic_write_json(manifest_path, m)
     except Exception:
         pass
-    
+
     # 5. Handle Background Wait
     if background:
+
         def _wait_and_release() -> None:
             try:
                 proc.wait()
             finally:
                 release_worker()
                 log_f.close()
-        
+
         thread = threading.Thread(target=_wait_and_release, daemon=True)
         thread.start()
     else:
         # If foreground, we don't wait here, but caller must handle release?
         # Typically we always use background for API simplicity
         pass
-        
-    return {
-        "run_id": runner.run_id,
-        "run_dir": str(runner.session_dir),
-        "worker_pid": proc.pid
-    }
+
+    return {"run_id": runner.run_id, "run_dir": str(runner.session_dir), "worker_pid": proc.pid}
 
 
 def update_manifest_pid(manifest_path: Path, pid: int) -> None:
@@ -191,7 +193,9 @@ def update_manifest_pid(manifest_path: Path, pid: int) -> None:
         pass
 
 
-def update_manifest_status(manifest_path: Path, status: str, error: Optional[Dict[str, str]] = None) -> None:
+def update_manifest_status(
+    manifest_path: Path, status: str, error: dict[str, str] | None = None
+) -> None:
     """Helper to update status atomically."""
     try:
         if manifest_path.exists():
@@ -200,15 +204,14 @@ def update_manifest_status(manifest_path: Path, status: str, error: Optional[Dic
             current = m.get("status")
             if current in ["COMPLETED", "FAILED", "CANCELLED"] and status != "CANCELLED":
                 return
-                
+
             m["status"] = status
             if error:
                 m["error"] = error
-            m["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            m["updated_at"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             atomic_write_json(manifest_path, m)
     except Exception:
         pass
-
 
 
 def kill_run(run_id: str) -> tuple[bool, str]:
@@ -216,16 +219,17 @@ def kill_run(run_id: str) -> tuple[bool, str]:
     Kill a running job.
     Returns (success, outcome_code).
     """
-    run_dir = _runs_root() / "sessions" / "unknown" / run_id 
+    run_dir = _runs_root() / "sessions" / "unknown" / run_id
     from server.services.runs_index import get_index
+
     run = get_index().get_run(run_id)
     if not run:
         return False, "not_found"
-        
+
     manifest_path = Path(run["manifest_path"])
     run_dir = manifest_path.parent
     pid_file = run_dir / "worker.pid"
-    
+
     # Check if already terminal
     status = run.get("status")
     if status in ["COMPLETED", "FAILED", "CANCELLED", "STALE"]:
@@ -237,7 +241,7 @@ def kill_run(run_id: str) -> tuple[bool, str]:
             pid = int(pid_file.read_text().strip())
         except ValueError:
             pass
-            
+
     # Try looking in manifest if pid_file missing/bad
     if pid is None:
         try:
@@ -250,7 +254,7 @@ def kill_run(run_id: str) -> tuple[bool, str]:
         # Run says running but no PID found -> Forced cleanup
         kill_manifest_update(manifest_path)
         return True, "forced_cancel"
-        
+
     try:
         os.kill(pid, signal.SIGTERM)
         # We rely on worker to catch SIGTERM and exit cleanly, usually
@@ -271,7 +275,7 @@ def kill_manifest_update(manifest_path: Path):
         if m.get("status") in ["RUNNING", "STALE"]:
             m["status"] = "CANCELLED"
             m["error"] = {"type": "UserCancelled", "message": "Run cancelled by user."}
-            m["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            m["updated_at"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             tmp = manifest_path.with_suffix(".json.tmp")
             tmp.write_text(json.dumps(m, indent=2, sort_keys=True))
             os.replace(tmp, manifest_path)
@@ -279,15 +283,16 @@ def kill_manifest_update(manifest_path: Path):
         pass
 
 
-def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
+def retry_run(run_id: str, from_step: str | None = None) -> dict[str, Any]:
     """
     Retry a run.
     """
+
     def _iso_now() -> str:
-        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Pure-manifest invalidation: keep this lightweight (no model imports).
-    def _reset_step_entry(entry: Dict[str, Any]) -> None:
+    def _reset_step_entry(entry: dict[str, Any]) -> None:
         entry["status"] = "PENDING"
         entry["artifacts"] = []
         entry["warnings"] = []
@@ -299,7 +304,7 @@ def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
         entry.pop("error", None)
 
     # Step dependency graph (names only). Mirrors harness.session.SessionRunner._register_steps.
-    _DEPS: Dict[str, List[str]] = {
+    _DEPS: dict[str, list[str]] = {
         "ingest": [],
         "asr": ["ingest"],
         "diarization": ["ingest"],
@@ -318,8 +323,8 @@ def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
         ],
     }
 
-    def _collect_dependents(step_name: str) -> List[str]:
-        out: List[str] = []
+    def _collect_dependents(step_name: str) -> list[str]:
+        out: list[str] = []
         visited: set[str] = set()
 
         def dfs(s: str) -> None:
@@ -332,7 +337,7 @@ def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
         dfs(step_name)
         return out
 
-    def _invalidate_step_and_downstream(m: Dict[str, Any], step_name: str) -> None:
+    def _invalidate_step_and_downstream(m: dict[str, Any], step_name: str) -> None:
         steps = m.setdefault("steps", {})
 
         entry = steps.get(step_name)
@@ -345,6 +350,7 @@ def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
                 _reset_step_entry(d_entry)
 
     from server.services.runs_index import get_index
+
     run = get_index().get_run(run_id)
     if not run:
         raise ValueError("Run not found")

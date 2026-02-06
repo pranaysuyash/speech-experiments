@@ -3,10 +3,11 @@ ASR evaluation metrics for model comparison.
 Implements WER, CER, and related metrics with proper error tracking.
 """
 
-import numpy as np
-from typing import Tuple, List, Dict, Any, Optional
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -14,20 +15,21 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ASRResult:
     """Container for ASR evaluation results."""
+
     text: str
     ground_truth: str
     wer: float
     cer: float
     latency_ms: float
     rtv: float  # Real-Time Factor (processing time / audio duration)
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class ASRMetrics:
     """Calculate ASR evaluation metrics."""
 
     @staticmethod
-    def calculate_wer(reference: str, hypothesis: str) -> Tuple[float, int, int, int]:
+    def calculate_wer(reference: str, hypothesis: str) -> tuple[float, int, int, int]:
         """
         Calculate Word Error Rate (WER).
 
@@ -52,13 +54,13 @@ class ASRMetrics:
 
         for i in range(1, len(ref_words) + 1):
             for j in range(1, len(hyp_words) + 1):
-                if ref_words[i-1] == hyp_words[j-1]:
-                    dp[i, j] = dp[i-1, j-1]
+                if ref_words[i - 1] == hyp_words[j - 1]:
+                    dp[i, j] = dp[i - 1, j - 1]
                 else:
                     dp[i, j] = min(
-                        dp[i-1, j] + 1,    # deletion
-                        dp[i, j-1] + 1,    # insertion
-                        dp[i-1, j-1] + 1   # substitution
+                        dp[i - 1, j] + 1,  # deletion
+                        dp[i, j - 1] + 1,  # insertion
+                        dp[i - 1, j - 1] + 1,  # substitution
                     )
 
         # Backtrack to count error types
@@ -66,12 +68,12 @@ class ASRMetrics:
         substitutions = deletions = insertions = 0
 
         while i > 0 or j > 0:
-            if i > 0 and j > 0 and ref_words[i-1] == hyp_words[j-1]:
-                i, j = i-1, j-1
-            elif i > 0 and j > 0 and dp[i, j] == dp[i-1, j-1] + 1:
+            if i > 0 and j > 0 and ref_words[i - 1] == hyp_words[j - 1]:
+                i, j = i - 1, j - 1
+            elif i > 0 and j > 0 and dp[i, j] == dp[i - 1, j - 1] + 1:
                 substitutions += 1
-                i, j = i-1, j-1
-            elif i > 0 and dp[i, j] == dp[i-1, j] + 1:
+                i, j = i - 1, j - 1
+            elif i > 0 and dp[i, j] == dp[i - 1, j] + 1:
                 deletions += 1
                 i -= 1
             else:
@@ -101,24 +103,26 @@ class ASRMetrics:
 
         for i in range(1, len(ref_chars) + 1):
             for j in range(1, len(hyp_chars) + 1):
-                if ref_chars[i-1] == hyp_chars[j-1]:
-                    dp[i, j] = dp[i-1, j-1]
+                if ref_chars[i - 1] == hyp_chars[j - 1]:
+                    dp[i, j] = dp[i - 1, j - 1]
                 else:
                     dp[i, j] = min(
-                        dp[i-1, j] + 1,    # deletion
-                        dp[i, j-1] + 1,    # insertion
-                        dp[i-1, j-1] + 1   # substitution
+                        dp[i - 1, j] + 1,  # deletion
+                        dp[i, j - 1] + 1,  # insertion
+                        dp[i - 1, j - 1] + 1,  # substitution
                     )
 
         cer = dp[len(ref_chars), len(hyp_chars)] / max(1, len(ref_chars))
         return cer
 
     @staticmethod
-    def evaluate(transcription: str,
-                 ground_truth: str,
-                 audio_duration_s: float,
-                 latency_s: float,
-                 metadata: Optional[Dict[str, Any]] = None) -> ASRResult:
+    def evaluate(
+        transcription: str,
+        ground_truth: str,
+        audio_duration_s: float,
+        latency_s: float,
+        metadata: dict[str, Any] | None = None,
+    ) -> ASRResult:
         """
         Comprehensive ASR evaluation.
 
@@ -145,11 +149,11 @@ class ASRMetrics:
             cer=cer,
             latency_ms=latency_ms,
             rtv=rtv,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         # Log breakdown
-        logger.info(f"ASR Evaluation:")
+        logger.info("ASR Evaluation:")
         logger.info(f"  WER: {wer:.3f} (S:{sub}, D:{del_}, I:{ins})")
         logger.info(f"  CER: {cer:.3f}")
         logger.info(f"  Latency: {latency_ms:.1f}ms")
@@ -162,7 +166,7 @@ class ASRBatcher:
     """Batch evaluation for multiple tests."""
 
     @staticmethod
-    def evaluate_batch(results: List[ASRResult]) -> Dict[str, Any]:
+    def evaluate_batch(results: list[ASRResult]) -> dict[str, Any]:
         """
         Calculate aggregate metrics across multiple ASR results.
 
@@ -173,15 +177,15 @@ class ASRBatcher:
             return {}
 
         metrics = {
-            'wer_mean': np.mean([r.wer for r in results]),
-            'wer_std': np.std([r.wer for r in results]),
-            'cer_mean': np.mean([r.cer for r in results]),
-            'cer_std': np.std([r.cer for r in results]),
-            'latency_ms_mean': np.mean([r.latency_ms for r in results]),
-            'latency_ms_std': np.std([r.latency_ms for r in results]),
-            'rtv_mean': np.mean([r.rtv for r in results]),
-            'rtv_std': np.std([r.rtv for r in results]),
-            'num_samples': len(results)
+            "wer_mean": np.mean([r.wer for r in results]),
+            "wer_std": np.std([r.wer for r in results]),
+            "cer_mean": np.mean([r.cer for r in results]),
+            "cer_std": np.std([r.cer for r in results]),
+            "latency_ms_mean": np.mean([r.latency_ms for r in results]),
+            "latency_ms_std": np.std([r.latency_ms for r in results]),
+            "rtv_mean": np.mean([r.rtv for r in results]),
+            "rtv_std": np.std([r.rtv for r in results]),
+            "num_samples": len(results),
         }
 
         logger.info(f"Batch evaluation ({len(results)} samples):")
@@ -210,7 +214,7 @@ import re
 from collections import Counter
 
 
-def _ngrams(tokens: List[str], n: int = 3) -> List[tuple]:
+def _ngrams(tokens: list[str], n: int = 3) -> list[tuple]:
     """Generate n-grams from token list."""
     if len(tokens) < n:
         return []
@@ -226,45 +230,45 @@ def repeat_3gram_rate(text: str) -> float:
     grams = _ngrams(tokens, 3)
     if not grams:
         return 0.0
-    
+
     counts = Counter(grams)
     repeats = sum(v - 1 for v in counts.values() if v > 1)
     return repeats / max(len(grams), 1)
 
 
-def diagnose_output_quality(reference: str, hypothesis: str) -> Dict[str, Any]:
+def diagnose_output_quality(reference: str, hypothesis: str) -> dict[str, Any]:
     """
     Diagnose ASR output quality to detect failure modes.
-    
+
     Detects:
         - Truncation: model dropped content (length_ratio < 0.7)
         - Hallucination: model inserted content (length_ratio > 1.3)
         - Repetition: model is stuck in loop (unique_ratio < 0.4 or repeat_3gram > 0.2)
-    
+
     Args:
         reference: Ground truth text
         hypothesis: Model output text
-    
+
     Returns:
         Dict with diagnostic metrics and failure flags
     """
     ref_words = re.findall(r"\w+", reference)
     hyp_words = re.findall(r"\w+", hypothesis)
-    
+
     # Core ratios
     length_ratio = len(hyp_words) / max(len(ref_words), 1)
     char_ratio = len(hypothesis) / max(len(reference), 1)
-    
+
     # Repetition detection
     hyp_words_lower = [w.lower() for w in hyp_words]
     unique_token_ratio = len(set(hyp_words_lower)) / max(len(hyp_words), 1)
     rep3 = repeat_3gram_rate(hypothesis)
-    
+
     # Failure flags with tightened thresholds
     is_truncated = length_ratio < 0.7
     is_hallucinating = length_ratio > 1.3
     is_repetitive = (unique_token_ratio < 0.4) or (rep3 > 0.2)
-    
+
     diagnosis = {
         "ref_word_count": len(ref_words),
         "hyp_word_count": len(hyp_words),
@@ -277,7 +281,7 @@ def diagnose_output_quality(reference: str, hypothesis: str) -> Dict[str, Any]:
         "is_repetitive": is_repetitive,
         "has_failure": is_truncated or is_hallucinating or is_repetitive,
     }
-    
+
     # Log if failure detected
     if diagnosis["has_failure"]:
         failures = []
@@ -288,30 +292,31 @@ def diagnose_output_quality(reference: str, hypothesis: str) -> Dict[str, Any]:
         if is_repetitive:
             failures.append(f"REPETITIVE (unique={unique_token_ratio:.2f}, 3gram={rep3:.2f})")
         logger.warning(f"Output quality issues: {', '.join(failures)}")
-    
+
     return diagnosis
 
 
-def diagnose_output_no_reference(hypothesis: str, expected_chars_per_sec: float = 15.0, 
-                                  audio_duration_s: float = 0.0) -> Dict[str, Any]:
+def diagnose_output_no_reference(
+    hypothesis: str, expected_chars_per_sec: float = 15.0, audio_duration_s: float = 0.0
+) -> dict[str, Any]:
     """
     Diagnose output quality when no ground truth is available.
     Uses heuristics based on expected output density.
-    
+
     Args:
         hypothesis: Model output text
         expected_chars_per_sec: Expected character rate (default ~15 for English speech)
         audio_duration_s: Audio duration in seconds
-    
+
     Returns:
         Dict with diagnostic metrics
     """
     hyp_words = re.findall(r"\w+", hypothesis)
     hyp_words_lower = [w.lower() for w in hyp_words]
-    
+
     unique_token_ratio = len(set(hyp_words_lower)) / max(len(hyp_words), 1)
     rep3 = repeat_3gram_rate(hypothesis)
-    
+
     # Coverage proxy: chars per second of audio
     if audio_duration_s > 0:
         chars_per_sec = len(hypothesis) / audio_duration_s
@@ -319,10 +324,10 @@ def diagnose_output_no_reference(hypothesis: str, expected_chars_per_sec: float 
     else:
         chars_per_sec = 0.0
         coverage_ratio = 0.0
-    
+
     is_repetitive = (unique_token_ratio < 0.4) or (rep3 > 0.2)
     is_sparse = coverage_ratio < 0.5 if audio_duration_s > 0 else False
-    
+
     return {
         "hyp_word_count": len(hyp_words),
         "hyp_char_count": len(hypothesis),

@@ -1,6 +1,5 @@
 """Tests for ASR configuration resolution."""
 
-import pytest
 
 
 class TestResolveASRConfig:
@@ -31,10 +30,12 @@ class TestResolveASRConfig:
         """Test that model_name takes precedence over model_size."""
         from harness.asr import resolve_asr_config
 
-        resolved = resolve_asr_config({
-            "model_name": "medium",
-            "model_size": "base"  # Should be ignored
-        })
+        resolved = resolve_asr_config(
+            {
+                "model_name": "medium",
+                "model_size": "base",  # Should be ignored
+            }
+        )
 
         assert "medium" in resolved.model_id
         assert resolved.model_id == "faster_whisper:medium"
@@ -44,10 +45,9 @@ class TestResolveASRConfig:
         from harness.asr import resolve_asr_config
 
         # MPS preference with faster_whisper should fall back to cpu
-        resolved = resolve_asr_config({
-            "model_type": "faster_whisper",
-            "device_preference": ["mps", "cpu"]
-        })
+        resolved = resolve_asr_config(
+            {"model_type": "faster_whisper", "device_preference": ["mps", "cpu"]}
+        )
 
         # faster_whisper doesn't support MPS, should use cpu
         assert resolved.device == "cpu"
@@ -56,10 +56,9 @@ class TestResolveASRConfig:
         """Test CUDA device selection."""
         from harness.asr import resolve_asr_config
 
-        resolved = resolve_asr_config({
-            "model_type": "whisper",
-            "device_preference": ["cuda", "cpu"]
-        })
+        resolved = resolve_asr_config(
+            {"model_type": "whisper", "device_preference": ["cuda", "cpu"]}
+        )
 
         # Regular whisper supports CUDA
         assert resolved.device == "cuda"
@@ -90,11 +89,9 @@ class TestResolveASRConfig:
         """Test serialization to dict."""
         from harness.asr import resolve_asr_config
 
-        resolved = resolve_asr_config({
-            "model_size": "small",
-            "language": "es",
-            "device_preference": ["cpu"]
-        })
+        resolved = resolve_asr_config(
+            {"model_size": "small", "language": "es", "device_preference": ["cpu"]}
+        )
 
         d = resolved.to_dict()
 
@@ -123,14 +120,9 @@ class TestASRConfigIntegration:
         # This test verifies the config shape is compatible
 
         ui_config = {
-            "asr": {
-                "model_size": "base",
-                "language": "en"
-            },
-            "diarization": {
-                "model_name": "pyannote_diarization"
-            },
-            "device_preference": ["mps", "cpu"]
+            "asr": {"model_size": "base", "language": "en"},
+            "diarization": {"model_name": "pyannote_diarization"},
+            "device_preference": ["mps", "cpu"],
         }
 
         # Extract ASR config as SessionRunner would
@@ -138,6 +130,7 @@ class TestASRConfigIntegration:
 
         # Verify it can be resolved
         from harness.asr import resolve_asr_config
+
         resolved = resolve_asr_config(asr_config)
 
         assert resolved.model_id == "faster_whisper:base"

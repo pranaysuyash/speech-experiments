@@ -1,6 +1,5 @@
 import json
 import os
-from pathlib import Path
 
 import pytest
 
@@ -9,6 +8,7 @@ def test_artifact_download_path_traversal(monkeypatch, tmp_path):
     monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(tmp_path / "runs"))
 
     import server.services.runs_index as runs_index
+
     runs_index.RunsIndex._instance = None
 
     run_id = "artifact_traversal_test"
@@ -50,9 +50,12 @@ def test_artifact_download_path_traversal(monkeypatch, tmp_path):
             }
         },
     }
-    (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    (run_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     from fastapi.testclient import TestClient
+
     import server.main
 
     client = TestClient(server.main.app)
@@ -88,7 +91,9 @@ def test_artifact_download_path_traversal(monkeypatch, tmp_path):
             "downloadable": True,
         }
     )
-    (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    (run_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     # Clear index cache so updated manifest is picked up reliably.
     runs_index.RunsIndex._instance = None

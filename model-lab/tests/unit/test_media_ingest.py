@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.media_ingest import IngestConfig, ingest_media, sha256_file, get_ffmpeg_version
+from harness.media_ingest import IngestConfig, get_ffmpeg_version, ingest_media, sha256_file
 
 
 def test_get_ffmpeg_version_returns_string():
@@ -78,4 +78,3 @@ def test_ingest_missing_file_raises(tmp_path: Path):
     cfg = IngestConfig()
     with pytest.raises(FileNotFoundError):
         ingest_media(tmp_path / "nope.wav", tmp_path / "artifacts", cfg)
-

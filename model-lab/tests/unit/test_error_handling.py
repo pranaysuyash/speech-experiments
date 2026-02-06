@@ -1,6 +1,5 @@
 """Tests for structured error handling."""
 
-import pytest
 
 
 class TestErrorClassification:
@@ -8,7 +7,7 @@ class TestErrorClassification:
 
     def test_classify_oom_error(self):
         """Test OOM error classification."""
-        from harness.errors import classify_error, E_MODEL_OOM
+        from harness.errors import E_MODEL_OOM, classify_error
 
         # CUDA OOM
         exc = RuntimeError("CUDA out of memory. Tried to allocate 2.00 GiB")
@@ -18,7 +17,7 @@ class TestErrorClassification:
 
     def test_classify_memory_error(self):
         """Test MemoryError classification."""
-        from harness.errors import classify_error, E_MODEL_OOM
+        from harness.errors import E_MODEL_OOM, classify_error
 
         exc = MemoryError("Unable to allocate array")
         code, recoverable = classify_error(exc)
@@ -27,7 +26,7 @@ class TestErrorClassification:
 
     def test_classify_model_not_found(self):
         """Test model not found classification."""
-        from harness.errors import classify_error, E_MODEL_NOT_FOUND
+        from harness.errors import E_MODEL_NOT_FOUND, classify_error
 
         exc = FileNotFoundError("Model checkpoint not found: /path/to/model.pt")
         code, recoverable = classify_error(exc)
@@ -36,7 +35,7 @@ class TestErrorClassification:
 
     def test_classify_audio_corrupt(self):
         """Test audio corruption classification."""
-        from harness.errors import classify_error, E_AUDIO_CORRUPT
+        from harness.errors import E_AUDIO_CORRUPT, classify_error
 
         exc = RuntimeError("Failed to decode audio: corrupt wav header")
         code, recoverable = classify_error(exc)
@@ -45,7 +44,7 @@ class TestErrorClassification:
 
     def test_classify_timeout(self):
         """Test timeout classification."""
-        from harness.errors import classify_error, E_STEP_TIMEOUT
+        from harness.errors import E_STEP_TIMEOUT, classify_error
 
         exc = TimeoutError("Step exceeded time limit")
         code, recoverable = classify_error(exc)
@@ -54,7 +53,7 @@ class TestErrorClassification:
 
     def test_classify_disk_full(self):
         """Test disk full classification."""
-        from harness.errors import classify_error, E_DISK_FULL
+        from harness.errors import E_DISK_FULL, classify_error
 
         exc = OSError("No space left on device")
         code, recoverable = classify_error(exc)
@@ -63,7 +62,7 @@ class TestErrorClassification:
 
     def test_classify_permission_denied(self):
         """Test permission denied classification."""
-        from harness.errors import classify_error, E_PERMISSION_DENIED
+        from harness.errors import E_PERMISSION_DENIED, classify_error
 
         exc = PermissionError("Permission denied: /path/to/file")
         code, recoverable = classify_error(exc)
@@ -72,7 +71,7 @@ class TestErrorClassification:
 
     def test_classify_network_error(self):
         """Test network error classification."""
-        from harness.errors import classify_error, E_NETWORK_ERROR
+        from harness.errors import E_NETWORK_ERROR, classify_error
 
         exc = ConnectionError("Connection refused")
         code, recoverable = classify_error(exc)
@@ -81,7 +80,7 @@ class TestErrorClassification:
 
     def test_classify_unknown_error(self):
         """Test unknown error classification."""
-        from harness.errors import classify_error, E_UNKNOWN
+        from harness.errors import E_UNKNOWN, classify_error
 
         exc = ValueError("Some random error")
         code, recoverable = classify_error(exc)
@@ -94,7 +93,7 @@ class TestStepError:
 
     def test_step_error_creation(self):
         """Test creating a StepError."""
-        from harness.errors import StepError, E_MODEL_OOM
+        from harness.errors import E_MODEL_OOM, StepError
 
         error = StepError(
             code=E_MODEL_OOM,
@@ -110,7 +109,7 @@ class TestStepError:
 
     def test_step_error_to_dict(self):
         """Test StepError serialization."""
-        from harness.errors import StepError, E_STEP_TIMEOUT
+        from harness.errors import E_STEP_TIMEOUT, StepError
 
         error = StepError(
             code=E_STEP_TIMEOUT,
@@ -134,7 +133,7 @@ class TestCreateStepError:
 
     def test_create_step_error_from_exception(self):
         """Test creating StepError from exception."""
-        from harness.errors import create_step_error, E_MODEL_OOM
+        from harness.errors import E_MODEL_OOM, create_step_error
 
         exc = RuntimeError("CUDA out of memory")
         error = create_step_error(exc, step="asr")

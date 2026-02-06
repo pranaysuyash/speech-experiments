@@ -18,9 +18,10 @@ import json
 import os
 import sys
 import time
+from collections.abc import AsyncIterator
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, AsyncIterator, Optional
+from typing import Any
 
 MODEL_LAB_DIR = Path(__file__).resolve().parents[1]
 if str(MODEL_LAB_DIR) not in sys.path:
@@ -63,7 +64,7 @@ class ChunkStat:
     wall_end_s: float
     events: int
     chars: int
-    first_event_latency_ms: Optional[float]
+    first_event_latency_ms: float | None
 
 
 class _ChunkStream:
@@ -103,7 +104,7 @@ async def _run_bench(
     chunk_seconds: int,
     sample_rate: int,
     realtime: bool,
-    source: Optional[str],
+    source: str | None,
 ) -> dict[str, Any]:
     # Import here so a plain `python ...` shows a clean error if harness isn't on path.
     from harness.streaming_asr import stream_asr
@@ -154,7 +155,9 @@ async def _run_bench(
     ordered = [chunk_stats[i] for i in sorted(chunk_stats.keys())]
     chunk_wall_durations_ms: list[float] = []
     for i in range(len(ordered) - 1):
-        chunk_wall_durations_ms.append((ordered[i + 1].wall_start_s - ordered[i].wall_start_s) * 1000.0)
+        chunk_wall_durations_ms.append(
+            (ordered[i + 1].wall_start_s - ordered[i].wall_start_s) * 1000.0
+        )
     if ordered:
         chunk_wall_durations_ms.append((t1 - ordered[-1].wall_start_s) * 1000.0)
 
@@ -200,7 +203,9 @@ async def _run_bench(
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--input", required=True, help="Path to input audio (wav/flac/etc)")
-    p.add_argument("--out", help="Output JSON path (default: runs/streaming_bench/<timestamp>.json)")
+    p.add_argument(
+        "--out", help="Output JSON path (default: runs/streaming_bench/<timestamp>.json)"
+    )
     p.add_argument("--chunk-seconds", type=int, default=4)
     p.add_argument("--sample-rate", type=int, default=16000)
     p.add_argument("--realtime", action="store_true", help="Sleep chunk_seconds between chunks")

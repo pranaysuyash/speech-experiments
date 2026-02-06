@@ -8,11 +8,10 @@ Provides:
 
 import json
 import threading
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 # ============================================================================
 # EVENT TYPES
@@ -36,14 +35,16 @@ EVENT_HEARTBEAT = "heartbeat"
 # EVENT DATA CLASSES
 # ============================================================================
 
+
 @dataclass
 class RunEvent:
     """Base event structure."""
+
     ts: str
     type: str
     run_id: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     def to_json(self) -> str:
@@ -53,23 +54,26 @@ class RunEvent:
 @dataclass
 class StepProgressEvent(RunEvent):
     """Event for step progress updates."""
+
     step: str
     progress: float  # 0.0 to 1.0
-    message: Optional[str] = None
-    estimated_remaining_s: Optional[int] = None
+    message: str | None = None
+    estimated_remaining_s: int | None = None
 
 
 @dataclass
 class StepCompletedEvent(RunEvent):
     """Event for step completion."""
+
     step: str
     duration_ms: int
-    artifacts: Optional[list] = None
+    artifacts: list | None = None
 
 
 @dataclass
 class StepFailedEvent(RunEvent):
     """Event for step failure."""
+
     step: str
     error_code: str
     error_message: str
@@ -79,6 +83,7 @@ class StepFailedEvent(RunEvent):
 @dataclass
 class RunCompletedEvent(RunEvent):
     """Event for run completion."""
+
     status: str  # COMPLETED | FAILED | CANCELLED
     total_duration_ms: int
     steps_completed: int
@@ -88,6 +93,7 @@ class RunCompletedEvent(RunEvent):
 # ============================================================================
 # EVENT WRITER
 # ============================================================================
+
 
 class EventWriter:
     """
@@ -115,7 +121,7 @@ class EventWriter:
 
     def _now_iso(self) -> str:
         """Get current time in ISO format."""
-        return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
     def emit(self, event_type: str, **payload) -> None:
         """
@@ -125,12 +131,7 @@ class EventWriter:
             event_type: Type of event (use EVENT_* constants)
             **payload: Additional event data
         """
-        event = {
-            "ts": self._now_iso(),
-            "type": event_type,
-            "run_id": self.run_id,
-            **payload
-        }
+        event = {"ts": self._now_iso(), "type": event_type, "run_id": self.run_id, **payload}
 
         with self._lock:
             with self.events_file.open("a", encoding="utf-8") as f:
@@ -142,11 +143,7 @@ class EventWriter:
         self.emit(EVENT_RUN_STARTED, steps=steps)
 
     def emit_run_completed(
-        self,
-        status: str,
-        total_duration_ms: int,
-        steps_completed: int = 0,
-        steps_failed: int = 0
+        self, status: str, total_duration_ms: int, steps_completed: int = 0, steps_failed: int = 0
     ) -> None:
         """Emit run completed event."""
         self.emit(
@@ -154,7 +151,7 @@ class EventWriter:
             status=status,
             total_duration_ms=total_duration_ms,
             steps_completed=steps_completed,
-            steps_failed=steps_failed
+            steps_failed=steps_failed,
         )
 
     def emit_step_started(self, step: str) -> None:
@@ -165,8 +162,8 @@ class EventWriter:
         self,
         step: str,
         progress: float,
-        message: Optional[str] = None,
-        estimated_remaining_s: Optional[int] = None
+        message: str | None = None,
+        estimated_remaining_s: int | None = None,
     ) -> None:
         """
         Emit step progress event.
@@ -185,10 +182,7 @@ class EventWriter:
         self.emit(EVENT_STEP_PROGRESS, **payload)
 
     def emit_step_completed(
-        self,
-        step: str,
-        duration_ms: int,
-        artifacts: Optional[list] = None
+        self, step: str, duration_ms: int, artifacts: list | None = None
     ) -> None:
         """Emit step completed event."""
         payload = {"step": step, "duration_ms": duration_ms, "progress": 1.0}
@@ -197,11 +191,7 @@ class EventWriter:
         self.emit(EVENT_STEP_COMPLETED, **payload)
 
     def emit_step_failed(
-        self,
-        step: str,
-        error_code: str,
-        error_message: str,
-        duration_ms: int
+        self, step: str, error_code: str, error_message: str, duration_ms: int
     ) -> None:
         """Emit step failed event."""
         self.emit(
@@ -209,10 +199,10 @@ class EventWriter:
             step=step,
             error_code=error_code,
             error_message=error_message[:200],  # Truncate
-            duration_ms=duration_ms
+            duration_ms=duration_ms,
         )
 
-    def emit_heartbeat(self, current_step: Optional[str] = None) -> None:
+    def emit_heartbeat(self, current_step: str | None = None) -> None:
         """Emit heartbeat event to keep connection alive."""
         payload = {}
         if current_step:
@@ -225,7 +215,7 @@ def get_events_file(run_dir: Path) -> Path:
     return run_dir / "events.jsonl"
 
 
-def read_events(run_dir: Path) -> list[Dict[str, Any]]:
+def read_events(run_dir: Path) -> list[dict[str, Any]]:
     """
     Read all events from a run's events file.
 

@@ -4,6 +4,7 @@ VS Code Colab Kernel Setup Demo
 Demonstrates the workflow for connecting to Colab from VS Code
 """
 
+
 def show_colab_workflow():
     """Show the step-by-step Colab connection process."""
     print("🚀 VS Code Colab Connection Workflow")
@@ -35,6 +36,7 @@ def show_colab_workflow():
     print("   - Test cross-platform compatibility")
     print("   - Benchmark cloud performance")
 
+
 def check_vscode_setup():
     """Check if VS Code Colab extension is available."""
     print("\n🔧 VS Code Setup Check")
@@ -49,6 +51,7 @@ def check_vscode_setup():
     except Exception as e:
         print(f"❌ Setup issue: {e}")
 
+
 def main():
     show_colab_workflow()
     check_vscode_setup()
@@ -59,6 +62,7 @@ def main():
     print("   - colab_helper.py (Upload helper)")
 
     print("\n🎉 Start by opening the notebook and selecting the Colab kernel!")
+
 
 if __name__ == "__main__":
     main()

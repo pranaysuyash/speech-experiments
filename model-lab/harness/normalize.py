@@ -3,9 +3,9 @@ Text normalization utilities for consistent preprocessing.
 Ensures text is consistently formatted across models.
 """
 
-import re
-from typing import List, Dict, Any
 import logging
+import re
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +38,13 @@ class TextNormalizer:
     }
 
     @staticmethod
-    def normalize(text: str,
-                  lowercase: bool = True,
-                  remove_punctuation: bool = False,
-                  expand_contractions: bool = False,
-                  normalize_whitespace: bool = True) -> str:
+    def normalize(
+        text: str,
+        lowercase: bool = True,
+        remove_punctuation: bool = False,
+        expand_contractions: bool = False,
+        normalize_whitespace: bool = True,
+    ) -> str:
         """
         Normalize text with configurable options.
 
@@ -86,12 +88,12 @@ class TextNormalizer:
     @staticmethod
     def _remove_punctuation(text: str) -> str:
         """Remove punctuation but keep alphanumeric and spaces."""
-        return re.sub(r'[^\w\s]', '', text)
+        return re.sub(r"[^\w\s]", "", text)
 
     @staticmethod
     def _normalize_whitespace(text: str) -> str:
         """Collapse multiple spaces and trim."""
-        return ' '.join(text.split())
+        return " ".join(text.split())
 
     @staticmethod
     def normalize_for_asr(text: str) -> str:
@@ -101,7 +103,7 @@ class TextNormalizer:
             lowercase=True,
             remove_punctuation=False,  # Keep punctuation for accuracy
             expand_contractions=True,
-            normalize_whitespace=True
+            normalize_whitespace=True,
         )
 
     @staticmethod
@@ -112,7 +114,7 @@ class TextNormalizer:
             lowercase=True,
             remove_punctuation=True,  # Remove punctuation for word-level comparison
             expand_contractions=True,
-            normalize_whitespace=True
+            normalize_whitespace=True,
         )
 
 
@@ -120,7 +122,7 @@ class AudioDescriptionNormalizer:
     """Normalize audio descriptions and metadata."""
 
     @staticmethod
-    def normalize_metadata(metadata: Dict[str, Any]) -> Dict[str, str]:
+    def normalize_metadata(metadata: dict[str, Any]) -> dict[str, str]:
         """Normalize metadata fields."""
         normalized = {}
 
@@ -149,7 +151,7 @@ class ComparisonNormalizer:
     """Normalize text for fair comparison across models."""
 
     @staticmethod
-    def normalize_for_comparison(texts: Dict[str, str]) -> Dict[str, str]:
+    def normalize_for_comparison(texts: dict[str, str]) -> dict[str, str]:
         """
         Normalize multiple texts for comparison.
 
@@ -160,18 +162,17 @@ class ComparisonNormalizer:
             Dictionary with normalized texts
         """
         return {
-            model_name: TextNormalizer.normalize_for_wer(text)
-            for model_name, text in texts.items()
+            model_name: TextNormalizer.normalize_for_wer(text) for model_name, text in texts.items()
         }
 
     @staticmethod
-    def extract_tokens(text: str) -> List[str]:
+    def extract_tokens(text: str) -> list[str]:
         """Extract tokens from normalized text."""
         normalized = TextNormalizer.normalize_for_wer(text)
         return normalized.split()
 
     @staticmethod
-    def calculate_vocabulary_diversity(texts: List[str]) -> Dict[str, Any]:
+    def calculate_vocabulary_diversity(texts: list[str]) -> dict[str, Any]:
         """Calculate vocabulary statistics across texts."""
         all_tokens = []
 
@@ -182,8 +183,8 @@ class ComparisonNormalizer:
         unique_tokens = set(all_tokens)
 
         return {
-            'total_tokens': len(all_tokens),
-            'unique_tokens': len(unique_tokens),
-            'vocabulary_richness': len(unique_tokens) / max(1, len(all_tokens)),
-            'avg_token_length': sum(len(token) for token in all_tokens) / max(1, len(all_tokens))
+            "total_tokens": len(all_tokens),
+            "unique_tokens": len(unique_tokens),
+            "vocabulary_richness": len(unique_tokens) / max(1, len(all_tokens)),
+            "avg_token_length": sum(len(token) for token in all_tokens) / max(1, len(all_tokens)),
         }

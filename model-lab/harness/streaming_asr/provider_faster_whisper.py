@@ -12,7 +12,7 @@ import asyncio
 import os
 import platform
 import threading
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
 
 from .providers import ASRConfig, ASRProvider, ASRProviderRegistry, ASRSegment, AudioSource
 
@@ -30,7 +30,7 @@ except Exception:  # pragma: no cover
 class FasterWhisperProvider(ASRProvider):
     def __init__(self, config: ASRConfig):
         super().__init__(config)
-        self._model: Optional["WhisperModel"] = None
+        self._model: WhisperModel | None = None
         self._infer_lock = threading.Lock()
 
     @property
@@ -41,7 +41,7 @@ class FasterWhisperProvider(ASRProvider):
     def is_available(self) -> bool:
         return WhisperModel is not None and np is not None
 
-    def _get_model(self) -> Optional["WhisperModel"]:
+    def _get_model(self) -> WhisperModel | None:
         if not self.is_available:
             return None
 
@@ -68,7 +68,7 @@ class FasterWhisperProvider(ASRProvider):
         self,
         pcm_stream: AsyncIterator[bytes],
         sample_rate: int = 16000,
-        source: Optional[AudioSource] = None,
+        source: AudioSource | None = None,
     ) -> AsyncIterator[ASRSegment]:
         bytes_per_sample = 2
         chunk_seconds = self.config.chunk_seconds
@@ -178,4 +178,3 @@ class FasterWhisperProvider(ASRProvider):
 
 
 ASRProviderRegistry.register("faster_whisper", FasterWhisperProvider)
-

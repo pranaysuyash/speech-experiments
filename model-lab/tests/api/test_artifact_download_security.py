@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 
 def test_artifact_download_path_traversal(monkeypatch, tmp_path):
@@ -14,6 +13,7 @@ def test_artifact_download_path_traversal(monkeypatch, tmp_path):
 
     # Reset index singleton between tests
     import server.services.runs_index as runs_index
+
     runs_index.RunsIndex._instance = None
 
     run_id = "run_artifact_traversal_test"
@@ -72,9 +72,12 @@ def test_artifact_download_path_traversal(monkeypatch, tmp_path):
             }
         },
     }
-    (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    (run_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     from fastapi.testclient import TestClient
+
     import server.main
 
     client = TestClient(server.main.app)

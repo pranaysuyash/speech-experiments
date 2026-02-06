@@ -22,7 +22,19 @@ class TestSessionRunnerE2E(unittest.TestCase):
 
         self.input_file = self.output_dir / "meeting.wav"
         subprocess.run(
-            ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-ar", "16000", "-ac", "1", str(self.input_file)],
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:duration=1",
+                "-ar",
+                "16000",
+                "-ac",
+                "1",
+                str(self.input_file),
+            ],
             check=True,
             capture_output=True,
         )
@@ -68,4 +80,3 @@ class TestSessionRunnerE2E(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

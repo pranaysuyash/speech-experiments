@@ -1,11 +1,11 @@
 """Tests for new preprocessing operators."""
-import pytest
+
+from harness.media_ingest import IngestConfig, build_ffmpeg_filter_chain
 from harness.pipeline_config import (
     PREPROCESSING_REGISTRY,
     PipelineConfig,
     parse_preprocessing_op,
 )
-from harness.media_ingest import IngestConfig, build_ffmpeg_filter_chain
 
 
 class TestPreprocessingRegistry:

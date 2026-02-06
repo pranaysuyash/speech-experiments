@@ -1,8 +1,7 @@
-import pytest
 from harness.asr import resolve_asr_config
 
+
 class TestDeviceSelection:
-    
     def test_basic_preference(self):
         """Should pick first available"""
         config = {"model_type": "distil_whisper", "device_preference": ["cuda", "cpu"]}
@@ -16,7 +15,7 @@ class TestDeviceSelection:
         res = resolve_asr_config(config)
         assert res.device == "cpu"
         assert res.reason == "preference_cpu"
-        
+
     def test_faster_whisper_allows_cuda(self):
         config = {"model_type": "faster_whisper", "device_preference": ["cuda", "cpu"]}
         res = resolve_asr_config(config)

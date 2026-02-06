@@ -1,10 +1,12 @@
-from pathlib import Path
-from typing import Optional
-from fastapi import HTTPException
 import os
+from pathlib import Path
+
+from fastapi import HTTPException
+
 
 def _runs_root() -> Path:
     return Path(os.environ.get("MODEL_LAB_RUNS_ROOT", "runs")).resolve()
+
 
 def validate_path(run_id: str, relative_path: str) -> Path:
     """
@@ -17,26 +19,28 @@ def validate_path(run_id: str, relative_path: str) -> Path:
     # For now, we assume the caller might know the full path or we search efficiently.
     # Actually, runs/sessions/<hash>/<run_id>.
     # If run_id is unique enough, we can find it.
-    
+
     # Optimization: If index service provides the absolute path, we use that as base?
     # But safe_files should verify provided "relative_path" is inside the "base_path".
     pass
 
-def get_run_dir(run_id: str) -> Optional[Path]:
+
+def get_run_dir(run_id: str) -> Path | None:
     """
     Finds the directory for a given run_id by searching runs/sessions.
     Returns None if not found.
     """
-    # This is a bit expensive if we traverse everything. 
+    # This is a bit expensive if we traverse everything.
     # relying on glob for V0 is acceptable or using the Index service's cache.
     # To keep this module standalone, we'll do a focused glob.
-    
+
     # Run IDs are typically unique.
     # Attempt to find it.
     found = list(_runs_root().glob(f"sessions/*/{run_id}"))
     if not found:
         return None
     return found[0].resolve()
+
 
 def safe_file_path(run_id: str, relative_path: str) -> Path:
     """
@@ -47,22 +51,22 @@ def safe_file_path(run_id: str, relative_path: str) -> Path:
     run_dir = get_run_dir(run_id)
     if not run_dir:
         raise HTTPException(status_code=404, detail="Run not found")
-        
+
     # secure join
     try:
         # Prevent ".." attacks
         target_path = (run_dir / relative_path).resolve()
     except Exception:
-         raise HTTPException(status_code=403, detail="Invalid path")
-         
+        raise HTTPException(status_code=403, detail="Invalid path")
+
     # Enforce strict containment
     if not target_path.is_relative_to(run_dir):
-         raise HTTPException(status_code=403, detail="Path traversal detected")
-         
+        raise HTTPException(status_code=403, detail="Path traversal detected")
+
     if not target_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
-        
+
     if not target_path.is_file():
-         raise HTTPException(status_code=400, detail="Path is not a file")
+        raise HTTPException(status_code=400, detail="Path is not a file")
 
     return target_path

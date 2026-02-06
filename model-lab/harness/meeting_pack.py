@@ -7,8 +7,7 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 MEETING_PACK_SCHEMA_VERSION = "meeting_pack_bundle_manifest.v0.1"
 
@@ -42,21 +41,21 @@ def _atomic_write_bytes_if_changed(path: Path, data: bytes) -> bool:
     return True
 
 
-def _read_json(path: Path) -> Dict[str, Any]:
+def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _pick_first_existing(paths: List[Path]) -> Optional[Path]:
+def _pick_first_existing(paths: list[Path]) -> Path | None:
     for p in paths:
         if p.exists() and p.is_file():
             return p
     return None
 
 
-def _find_manifest_artifact_paths(manifest: Dict[str, Any], step_name: str) -> List[Path]:
+def _find_manifest_artifact_paths(manifest: dict[str, Any], step_name: str) -> list[Path]:
     step = (manifest.get("steps") or {}).get(step_name) or {}
     artifacts = step.get("artifacts") or []
-    out: List[Path] = []
+    out: list[Path] = []
     for a in artifacts:
         if not isinstance(a, dict):
             continue
@@ -66,7 +65,7 @@ def _find_manifest_artifact_paths(manifest: Dict[str, Any], step_name: str) -> L
     return out
 
 
-def _discover_run_dir_artifact(run_dir: Path, patterns: List[str]) -> Optional[Path]:
+def _discover_run_dir_artifact(run_dir: Path, patterns: list[str]) -> Path | None:
     artifacts_dir = run_dir / "artifacts"
     for pat in patterns:
         hit = _pick_first_existing(sorted(artifacts_dir.glob(pat)))
@@ -75,10 +74,10 @@ def _discover_run_dir_artifact(run_dir: Path, patterns: List[str]) -> Optional[P
     return None
 
 
-def _normalize_segments(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _normalize_segments(raw: dict[str, Any]) -> list[dict[str, Any]]:
     output = raw.get("output", raw)
     segments = output.get("segments") or []
-    normalized: List[Dict[str, Any]] = []
+    normalized: list[dict[str, Any]] = []
     for seg in segments:
         if not isinstance(seg, dict):
             continue
@@ -99,10 +98,10 @@ def _normalize_segments(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
     return normalized
 
 
-def _render_summary_md(summary_artifact: Dict[str, Any]) -> str:
+def _render_summary_md(summary_artifact: dict[str, Any]) -> str:
     output = summary_artifact.get("output", summary_artifact)
     speaker_summaries = output.get("speaker_summaries") or {}
-    lines: List[str] = ["# Summary", ""]
+    lines: list[str] = ["# Summary", ""]
     if not speaker_summaries:
         return "\n".join(lines).rstrip() + "\n"
 
@@ -120,10 +119,10 @@ def _render_summary_md(summary_artifact: Dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _extract_action_items_rows(action_items_artifact: Dict[str, Any]) -> List[Dict[str, str]]:
+def _extract_action_items_rows(action_items_artifact: dict[str, Any]) -> list[dict[str, str]]:
     output = action_items_artifact.get("output", action_items_artifact)
     items = output.get("action_items") or []
-    rows: List[Dict[str, str]] = []
+    rows: list[dict[str, str]] = []
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -144,14 +143,15 @@ class BundleArtifact:
     content_type: str
 
 
-_EXPECTED_ARTIFACTS: List[BundleArtifact] = [
+_EXPECTED_ARTIFACTS: list[BundleArtifact] = [
     BundleArtifact("transcript.json", "bundle/transcript.json", "application/json"),
     BundleArtifact("summary.md", "bundle/summary.md", "text/markdown"),
     BundleArtifact("action_items.csv", "bundle/action_items.csv", "text/csv"),
     BundleArtifact("decisions.md", "bundle/decisions.md", "text/markdown"),
 ]
 
-def _canonicalize_iso_utc(ts: Optional[str]) -> Optional[str]:
+
+def _canonicalize_iso_utc(ts: str | None) -> str | None:
     if not ts or not isinstance(ts, str):
         return None
     t = ts.strip()
@@ -163,7 +163,7 @@ def _canonicalize_iso_utc(ts: Optional[str]) -> Optional[str]:
     return t + "Z"
 
 
-def _deterministic_generated_at(run_manifest: Dict[str, Any]) -> str:
+def _deterministic_generated_at(run_manifest: dict[str, Any]) -> str:
     # Prefer stable lifecycle timestamps to make bundle idempotent for the same run state.
     for k in ("ended_at", "started_at", "updated_at"):
         v = _canonicalize_iso_utc(run_manifest.get(k))
@@ -172,7 +172,7 @@ def _deterministic_generated_at(run_manifest: Dict[str, Any]) -> str:
     return _now_iso_utc()
 
 
-def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
+def build_meeting_pack(run_dir: Path) -> dict[str, Any]:
     """
     Creates/updates a deterministic bundle folder in a run directory:
       - bundle/bundle_manifest.json (always)
@@ -192,22 +192,24 @@ def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
     bundle_dir = run_dir / "bundle"
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
-    written: List[Path] = []
-    absent: List[Dict[str, str]] = []
+    written: list[Path] = []
+    absent: list[dict[str, str]] = []
 
     # --- transcript.json ---
     transcript_out = bundle_dir / "transcript.json"
-    alignment_path = _pick_first_existing(_find_manifest_artifact_paths(manifest, "alignment")) or _discover_run_dir_artifact(
-        run_dir, ["alignment*.json"]
-    )
-    asr_path = _pick_first_existing(_find_manifest_artifact_paths(manifest, "asr")) or _discover_run_dir_artifact(
-        run_dir, ["asr*.json"]
-    )
+    alignment_path = _pick_first_existing(
+        _find_manifest_artifact_paths(manifest, "alignment")
+    ) or _discover_run_dir_artifact(run_dir, ["alignment*.json"])
+    asr_path = _pick_first_existing(
+        _find_manifest_artifact_paths(manifest, "asr")
+    ) or _discover_run_dir_artifact(run_dir, ["asr*.json"])
 
     transcript_src = alignment_path or asr_path
     if transcript_src:
         segments = _normalize_segments(_read_json(transcript_src))
-        payload = (json.dumps({"segments": segments}, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        payload = (json.dumps({"segments": segments}, indent=2, sort_keys=True) + "\n").encode(
+            "utf-8"
+        )
         if _atomic_write_bytes_if_changed(transcript_out, payload):
             written.append(transcript_out)
     else:
@@ -215,9 +217,9 @@ def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
 
     # --- summary.md ---
     summary_out = bundle_dir / "summary.md"
-    summary_path = _pick_first_existing(_find_manifest_artifact_paths(manifest, "summarize_by_speaker")) or _discover_run_dir_artifact(
-        run_dir, ["summary_by_speaker_*.json", "summary*.json"]
-    )
+    summary_path = _pick_first_existing(
+        _find_manifest_artifact_paths(manifest, "summarize_by_speaker")
+    ) or _discover_run_dir_artifact(run_dir, ["summary_by_speaker_*.json", "summary*.json"])
     if summary_path:
         md = _render_summary_md(_read_json(summary_path))
         if _atomic_write_bytes_if_changed(summary_out, md.encode("utf-8")):
@@ -227,9 +229,9 @@ def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
 
     # --- action_items.csv ---
     action_items_out = bundle_dir / "action_items.csv"
-    action_items_path = _pick_first_existing(_find_manifest_artifact_paths(manifest, "action_items_assignee")) or _discover_run_dir_artifact(
-        run_dir, ["action_items_*.json"]
-    )
+    action_items_path = _pick_first_existing(
+        _find_manifest_artifact_paths(manifest, "action_items_assignee")
+    ) or _discover_run_dir_artifact(run_dir, ["action_items_*.json"])
     if action_items_path:
         rows = _extract_action_items_rows(_read_json(action_items_path))
         s = io.StringIO()
@@ -252,7 +254,7 @@ def build_meeting_pack(run_dir: Path) -> Dict[str, Any]:
         absent.append({"name": "decisions.md", "reason": "No decisions artifact found"})
 
     # Build manifest of what exists
-    artifacts: List[Dict[str, Any]] = []
+    artifacts: list[dict[str, Any]] = []
     for a in _EXPECTED_ARTIFACTS:
         p = run_dir / a.rel_path
         if not p.exists():
