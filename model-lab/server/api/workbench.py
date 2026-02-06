@@ -362,7 +362,7 @@ async def create_workbench_run(
                     preprocessing=preprocessing_ops or None,
                 )
             except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e))
+                raise HTTPException(status_code=400, detail=str(e)) from e
 
             resolved_steps = pipeline_cfg.resolve_dependencies()
             pipeline_config_payload = pipeline_cfg.to_dict()

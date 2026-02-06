@@ -26,7 +26,7 @@ def get_run_results(run_id: str):
     try:
         return RunsService.get_run_results(run_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         import logging
 
@@ -58,7 +58,7 @@ def compare_runs(run_a: str = Query(...), run_b: str = Query(...)):
     try:
         return RunsService.compare_runs(run_a, run_b)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.post("/{run_id}/rerun")
@@ -67,10 +67,10 @@ def rerun_pipeline(run_id: str, config_overrides: dict[str, Any] | None = None):
     try:
         return RunsService.rerun_pipeline(run_id, config_overrides)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         if "Runner is busy" in str(e):
-            raise HTTPException(status_code=409, detail=str(e))
+            raise HTTPException(status_code=409, detail=str(e)) from e
         raise HTTPException(status_code=500, detail=f"Failed to rerun pipeline: {e}") from e
 
 
@@ -80,7 +80,7 @@ def get_run_status(run_id: str):
     try:
         return RunsService.get_run_status(run_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         import logging
 
@@ -211,9 +211,9 @@ def get_run_details(run_id: str):
     try:
         return RunsService.get_run_manifest(run_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/{run_id}/transcript")
@@ -231,7 +231,7 @@ def get_run_transcript(run_id: str):
         return transcript
     except RuntimeError as e:
         if "E_ARTIFACT_REGISTRY_MISSING" in str(e):
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         raise e
 
 

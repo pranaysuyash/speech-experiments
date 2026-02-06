@@ -184,7 +184,7 @@ def get_cached_model(model_type: str, device: str = "cpu"):
         raise
     except Exception as e:
         logger.error(f"Failed to load model {model_type}: {e}")
-        raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}") from e
 
 
 async def process_asr_audio(audio_data: bytes, model_type: str, config: dict[str, Any]) -> str:
@@ -211,7 +211,7 @@ async def process_asr_audio(audio_data: bytes, model_type: str, config: dict[str
 
     except Exception as e:
         logger.error(f"ASR processing failed: {e}")
-        raise HTTPException(status_code=500, detail=f"ASR processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"ASR processing failed: {str(e)}") from e
 
 
 async def process_tts_text(text: str, model_type: str, config: dict[str, Any]):
@@ -229,7 +229,7 @@ async def process_tts_text(text: str, model_type: str, config: dict[str, Any]):
 
     except Exception as e:
         logger.error(f"TTS processing failed: {e}")
-        raise HTTPException(status_code=500, detail=f"TTS processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"TTS processing failed: {str(e)}") from e
 
 
 def run_asr_inference(model: Any, audio_path: str, config: dict[str, Any]) -> str:
@@ -629,7 +629,7 @@ async def transcribe_audio(
     except Exception as e:
         REQUEST_STATS["errors"] += 1
         logger.error(f"ASR request failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/tts/synthesize")
@@ -650,7 +650,7 @@ async def synthesize_speech(request: TTSRequest, background_tasks: BackgroundTas
     except Exception as e:
         REQUEST_STATS["errors"] += 1
         logger.error(f"TTS request failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/models")

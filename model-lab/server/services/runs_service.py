@@ -533,4 +533,4 @@ class RunsService:
             data = json.loads(manifest_path.read_text())
             return {"summary": run, "manifest": data}
         except Exception as e:
-            raise RuntimeError(f"Failed to read manifest: {str(e)}")
+            raise RuntimeError(f"Failed to read manifest: {str(e)}") from e

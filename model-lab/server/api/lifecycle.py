@@ -36,9 +36,9 @@ def retry_run_endpoint(run_id: str, req: RetryRequest = Body(default=RetryReques
     except RunnerBusyError:
         raise HTTPException(status_code=409, detail="System busy")
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         import logging
 
         logging.getLogger("server.api").exception(f"Retry failed for {run_id}")
-        raise HTTPException(status_code=500, detail=f"Retry failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Retry failed: {str(e)}") from e
