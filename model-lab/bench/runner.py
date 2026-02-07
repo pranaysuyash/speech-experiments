@@ -348,3 +348,95 @@ def generate_bench_report(surface: str = "asr", results_dir: str = "bench/result
     
     return header + table
 
+
+def run_enhance_bench(
+    model_id: str,
+    noisy_path: str,
+    clean_path: str | None = None,
+    device: str = "cpu",
+) -> dict[str, Any]:
+    """
+    Run enhancement benchmark.
+    
+    Args:
+        model_id: Model ID (rnnoise, deepfilternet, etc.)
+        noisy_path: Path to noisy audio
+        clean_path: Optional path to clean reference for SI-SNR delta
+        device: Device to use
+    
+    Returns:
+        Benchmark result with enhancement metrics
+    """
+    import soundfile as sf
+    
+    from harness.registry import ModelRegistry
+    from harness.metrics_enhance import si_snr, stoi, is_stoi_available
+    
+    # Load noisy audio
+    noisy, sr = sf.read(noisy_path)
+    noisy = np.asarray(noisy, dtype=np.float32)
+    duration_s = len(noisy) / sr
+    
+    # Load clean reference if provided
+    clean = None
+    if clean_path:
+        clean, clean_sr = sf.read(clean_path)
+        clean = np.asarray(clean, dtype=np.float32)
+        # Ensure same length
+        min_len = min(len(clean), len(noisy))
+        clean = clean[:min_len]
+        noisy = noisy[:min_len]
+    
+    # Load model
+    bundle = ModelRegistry.load_model(model_id, {}, device=device)
+    
+    if "enhance" not in bundle.get("capabilities", []):
+        raise ValueError(f"{model_id} does not support enhance")
+    
+    # Run enhancement
+    t_start = time.perf_counter()
+    enhanced = bundle["enhance"]["process"](noisy, sr=sr)
+    t_end = time.perf_counter()
+    wall_s = t_end - t_start
+    wall_ms = wall_s * 1000
+    rtf = wall_s / duration_s if duration_s > 0 else 0
+    
+    # Compute metrics
+    metrics = {
+        "rtf": round(rtf, 4),
+        "wall_ms": round(wall_ms, 1),
+        "audio_duration_s": round(duration_s, 3),
+    }
+    
+    # Sanity checks
+    input_energy = float(np.mean(noisy ** 2))
+    output_energy = float(np.mean(enhanced ** 2))
+    metrics["energy_ratio"] = round(output_energy / (input_energy + 1e-10), 4)
+    metrics["output_silent"] = output_energy < 1e-10
+    metrics["clipping_detected"] = float(np.max(np.abs(enhanced))) > 1.0
+    
+    if clean is not None:
+        # Compute SI-SNR before and after
+        min_len = min(len(clean), len(noisy), len(enhanced))
+        si_snr_input = si_snr(clean[:min_len], noisy[:min_len])
+        si_snr_output = si_snr(clean[:min_len], enhanced[:min_len])
+        metrics["si_snr_input_db"] = round(si_snr_input, 2)
+        metrics["si_snr_output_db"] = round(si_snr_output, 2)
+        metrics["si_snr_delta_db"] = round(si_snr_output - si_snr_input, 2)
+        
+        # Optional STOI
+        if is_stoi_available():
+            stoi_result = stoi(clean[:min_len], enhanced[:min_len], sr=sr)
+            if not stoi_result.get("skipped"):
+                metrics["stoi"] = round(stoi_result["score"], 4)
+    
+    return create_result_schema(
+        model_id=model_id,
+        surface="enhance",
+        input_info={"path": noisy_path, "duration_s": round(duration_s, 3), "sr": sr, "has_clean_ref": clean is not None},
+        metrics=metrics,
+        timing={"wall_s": round(wall_s, 3), "wall_ms": round(wall_ms, 1), "rtf": round(rtf, 4)},
+        env={"device": device, "model_type": bundle.get("model_type", "")},
+    )
+
+

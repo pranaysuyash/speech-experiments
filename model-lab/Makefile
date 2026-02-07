@@ -156,6 +156,27 @@ bench-report-asr-stream:
 from bench.runner import generate_bench_report; \
 print(generate_bench_report(surface='asr_stream'))"
 
+# Usage: make bench-enhance MODEL=rnnoise NOISY=data/audio/noisy_speech_10s_20pct.wav [CLEAN=data/audio/clean_speech_10s.wav]
+bench-enhance:
+ifndef MODEL
+	$(error MODEL is required. Usage: make bench-enhance MODEL=rnnoise NOISY=noisy.wav)
+endif
+ifndef NOISY
+	$(error NOISY is required. Usage: make bench-enhance MODEL=rnnoise NOISY=noisy.wav)
+endif
+	$(PYTHON) -c "\
+import json; \
+from bench.runner import run_enhance_bench, save_result; \
+result = run_enhance_bench('$(MODEL)', '$(NOISY)', clean_path='$(CLEAN)' if '$(CLEAN)' else None, device='$(if $(DEVICE),$(DEVICE),cpu)'); \
+save_result(result); \
+print(json.dumps(result, indent=2))"
+
+# Usage: make bench-report-enhance
+bench-report-enhance:
+	$(PYTHON) -c "\
+from bench.runner import generate_bench_report; \
+print(generate_bench_report(surface='enhance'))"
+
 # Usage: make tts MODEL=lfm2_5_audio TEXT="Hello world"
 tts:
 ifndef MODEL
