@@ -1,0 +1,15 @@
+{
+    "samples": [
+        {
+            "id": "clean_speech_10s",
+            "audio": "data/audio/clean_speech_10s.wav",
+            "reference": "this is a test of clean speech audio for benchmarking purposes"
+        },
+        {
+            "id": "speech_like_4s",
+            "audio": "data/audio/speech_like_4s.wav",
+            "reference": "short speech sample"
+        }
+    ],
+    "notes": "Loose reference - normalize lowercase, strip punctuation before WER"
+}

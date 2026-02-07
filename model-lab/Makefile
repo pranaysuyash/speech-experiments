@@ -100,6 +100,40 @@ bundle = ModelRegistry.load_model('$(MODEL)', {}, device='cpu'); \
 metrics = measure_streaming_latency(bundle['asr_stream'], audio, sr, chunk_ms=$(if $(CHUNK_MS),$(CHUNK_MS),160)); \
 print(json.dumps(metrics, indent=2))"
 
+# =============================================================================
+# Benchmarks (LCS-B)
+# =============================================================================
+
+# Usage: make bench-asr-stream MODEL=kyutai_streaming AUDIO=data/audio/clean_speech_10s.wav [REF="reference text"]
+bench-asr-stream:
+ifndef MODEL
+	$(error MODEL is required. Usage: make bench-asr-stream MODEL=kyutai_streaming AUDIO=audio.wav)
+endif
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make bench-asr-stream MODEL=kyutai_streaming AUDIO=audio.wav)
+endif
+	$(PYTHON) -c "\
+import json; \
+from bench.runner import run_streaming_asr_bench, save_result; \
+result = run_streaming_asr_bench('$(MODEL)', '$(AUDIO)', reference='$(REF)' if '$(REF)' else None); \
+save_result(result); \
+print(json.dumps(result, indent=2))"
+
+# Usage: make bench-asr MODEL=faster_whisper AUDIO=data/audio/clean_speech_10s.wav [REF="reference text"]
+bench-asr:
+ifndef MODEL
+	$(error MODEL is required. Usage: make bench-asr MODEL=faster_whisper AUDIO=audio.wav)
+endif
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make bench-asr MODEL=faster_whisper AUDIO=audio.wav)
+endif
+	$(PYTHON) -c "\
+import json; \
+from bench.runner import run_batch_asr_bench, save_result; \
+result = run_batch_asr_bench('$(MODEL)', '$(AUDIO)', reference='$(REF)' if '$(REF)' else None); \
+save_result(result); \
+print(json.dumps(result, indent=2))"
+
 # Usage: make tts MODEL=lfm2_5_audio TEXT="Hello world"
 tts:
 ifndef MODEL

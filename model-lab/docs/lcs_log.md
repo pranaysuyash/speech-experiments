@@ -1,5 +1,40 @@
 # LCS Log
 
+## LCS-B1: Streaming ASR Benchmark Framework
+
+**Latency + WER/CER benchmarks for asr_stream models**
+
+```bash
+# Run benchmark with optional reference for WER
+make bench-asr-stream MODEL=kyutai_streaming AUDIO=data/audio/clean_speech_10s.wav REF="expected text"
+```
+
+**Output Schema:**
+```json
+{
+  "run_id": "20260207_221500_a1b2c3d4",
+  "model_id": "kyutai_streaming",
+  "surface": "asr_stream",
+  "input": {"path": "...", "duration_s": 10.0, "sr": 16000},
+  "metrics": {
+    "first_token_latency_ms": 45.2,
+    "partial_update_rate_hz": 12.5,
+    "finalize_latency_ms": 0.125,
+    "rtf": 0.12,
+    "wer": 0.15,
+    "cer": 0.08
+  },
+  "timing": {"wall_s": 1.2, "rtf": 0.12},
+  "env": {"device": "cpu", "model_type": "kyutai_streaming"}
+}
+```
+
+**Also added:** `make bench-asr` for batch ASR
+
+**Tests:** 4 pass
+
+---
+
 ## LCS-Z: Model Selector
 
 **Filter models by device/runtime/surface/ci**
