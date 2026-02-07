@@ -1,5 +1,39 @@
 # LCS Log
 
+## LCS-Y: Streaming Latency Measurement
+
+**Dependency-free metrics for asr_stream models**
+
+```bash
+make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample_16k.wav CHUNK_MS=160
+```
+
+**Sample Output:**
+```json
+{
+  "first_token_latency_ms": 45.2,
+  "partial_update_rate_hz": 12.50,
+  "finalize_latency_ms": 0.125,
+  "real_time_factor": 0.1234,
+  "num_events": 62,
+  "num_partials": 61,
+  "num_finals": 1,
+  "audio_duration_s": 5.000
+}
+```
+
+**Metrics:**
+| Metric | Description |
+|--------|-------------|
+| first_token_latency_ms | Time until first non-empty text |
+| partial_update_rate_hz | Partials per second |
+| finalize_latency_ms | Time in finalize() call |
+| real_time_factor | Processing time / audio duration |
+
+**Tests:** 7 unit tests with fake adapters (partials, no partials, empty partials ignored)
+
+---
+
 ## LCS-18–22: Batch 3 Streaming + TTS
 
 **5 models: 3 streaming ASR, 1 batch ASR with diarization, 1 TTS**

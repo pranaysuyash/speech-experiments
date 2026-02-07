@@ -7,8 +7,8 @@ description: "Real-time streaming ASR with configurable transcription delay"
 
 # Model source
 source:
-  repo: "mistralai/Voxtral-Mini-4B-2507-no-eos"
-  hub: "https://huggingface.co/mistralai/Voxtral-Mini-4B-2507-no-eos"
+  repo: "mistralai/Voxtral-Mini-4B-Realtime-2602"
+  hub: "https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602"
   license: "Apache 2.0"
 
 # Variants

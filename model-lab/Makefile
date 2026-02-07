@@ -82,6 +82,24 @@ bundle = ModelRegistry.load_model('$(MODEL)', {}, device='cpu'); \
 result = bundle['asr']['transcribe'](audio, sr=sr); \
 print('Text:', result.get('text', result))"
 
+# Usage: make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample_16k.wav [CHUNK_MS=160]
+asr-stream-audio:
+ifndef MODEL
+	$(error MODEL is required. Usage: make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample.wav)
+endif
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample.wav)
+endif
+	$(PYTHON) -c "\
+import json; \
+import soundfile as sf; \
+from harness.registry import ModelRegistry; \
+from harness.streaming_metrics import measure_streaming_latency; \
+audio, sr = sf.read('$(AUDIO)'); \
+bundle = ModelRegistry.load_model('$(MODEL)', {}, device='cpu'); \
+metrics = measure_streaming_latency(bundle['asr_stream'], audio, sr, chunk_ms=$(if $(CHUNK_MS),$(CHUNK_MS),160)); \
+print(json.dumps(metrics, indent=2))"
+
 # Usage: make tts MODEL=lfm2_5_audio TEXT="Hello world"
 tts:
 ifndef MODEL
