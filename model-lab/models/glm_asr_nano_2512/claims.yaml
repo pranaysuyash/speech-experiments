@@ -1,0 +1,30 @@
+# GLM-ASR-Nano-2512 Claims (LCS-16)
+# Contract: Bundle Contract v2
+
+model_id: glm_asr_nano_2512
+runtime: pytorch
+device_support: [cpu, cuda, mps]
+streaming: false
+precision: fp16
+io:
+  format: float32
+  sample_rate: 16000
+ci: false
+ci_reason: "PyTorch + HuggingFace model weights"
+
+claims:
+  - id: glm_asr_nano_asr_structural
+    task: asr
+    type: structural
+    description: "Speech-to-text transcription"
+    enforcement: required
+    test_ref: claims.asr.smoke_v1
+    thresholds:
+      has_text: true
+
+  - id: glm_asr_nano_non_whisper
+    task: asr
+    type: structural
+    description: "Non-Whisper decoder architecture"
+    enforcement: required
+    notes: "GLM-4 based architecture, different from Whisper family"

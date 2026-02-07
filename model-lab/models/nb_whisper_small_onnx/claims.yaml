@@ -1,0 +1,30 @@
+# NB-Whisper-Small-ONNX Claims (LCS-17)
+# Contract: Bundle Contract v2
+
+model_id: nb_whisper_small_onnx
+runtime: onnxruntime
+device_support: [cpu, cuda]
+streaming: false
+precision: fp32
+io:
+  format: float32
+  sample_rate: 16000
+ci: false
+ci_reason: "ONNX runtime + model weights"
+
+claims:
+  - id: nb_whisper_small_onnx_asr_structural
+    task: asr
+    type: structural
+    description: "Speech-to-text transcription with ONNX runtime"
+    enforcement: required
+    test_ref: claims.asr.smoke_v1
+    thresholds:
+      has_text: true
+
+  - id: nb_whisper_small_onnx_norwegian
+    task: asr
+    type: capacity
+    description: "Optimized for Norwegian language"
+    enforcement: optional
+    source: "https://huggingface.co/NbAiLab"

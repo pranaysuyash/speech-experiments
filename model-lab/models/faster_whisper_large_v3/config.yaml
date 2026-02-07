@@ -1,0 +1,27 @@
+# Systran Faster-Whisper Large V3 (LCS-14)
+# CTranslate2-based Whisper with optimized inference
+
+model_id: faster_whisper_large_v3
+display_name: "Faster-Whisper Large V3"
+description: "Systran's optimized Whisper large-v3 with CTranslate2 runtime"
+
+# Model source
+source:
+  repo: "Systran/faster-whisper-large-v3"
+  hub: "https://huggingface.co/Systran/faster-whisper-large-v3"
+  license: "MIT"
+
+# Variants
+variants:
+  large-v3:
+    description: "Full large-v3 model (~3GB)"
+    default: true
+
+default_variant: large-v3
+
+# Model configuration
+config:
+  sample_rate: 16000
+  compute_type: "float16"  # Can be int8, float16, float32
+  beam_size: 5
+  language: null  # Auto-detect

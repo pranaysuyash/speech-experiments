@@ -66,6 +66,22 @@ ifndef DATASET
 endif
 	$(PYTHON) scripts/run_asr.py --model $(MODEL) --dataset $(DATASET)
 
+# Usage: make asr-audio MODEL=moonshine AUDIO=inputs/sample_16k.wav
+asr-audio:
+ifndef MODEL
+	$(error MODEL is required. Usage: make asr-audio MODEL=moonshine AUDIO=inputs/sample.wav)
+endif
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make asr-audio MODEL=moonshine AUDIO=inputs/sample.wav)
+endif
+	$(PYTHON) -c "\
+import soundfile as sf; \
+from harness.registry import ModelRegistry; \
+audio, sr = sf.read('$(AUDIO)'); \
+bundle = ModelRegistry.load_model('$(MODEL)', {}, device='cpu'); \
+result = bundle['asr']['transcribe'](audio, sr=sr); \
+print('Text:', result.get('text', result))"
+
 # Usage: make tts MODEL=lfm2_5_audio TEXT="Hello world"
 tts:
 ifndef MODEL

@@ -1,0 +1,13 @@
+# NB-Whisper-Small-ONNX Dependencies
+# Install: pip install -r models/nb_whisper_small_onnx/requirements.txt
+
+# ONNX runtime
+onnxruntime>=1.16.0
+
+# Tokenizers
+transformers>=4.35.0
+
+# Audio processing
+numpy>=1.20.0
+soundfile>=0.12.0
+librosa>=0.10.0

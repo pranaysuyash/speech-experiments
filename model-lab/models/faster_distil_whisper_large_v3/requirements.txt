@@ -1,0 +1,9 @@
+# Faster-Distil-Whisper Large V3 Dependencies
+# Install: pip install -r models/faster_distil_whisper_large_v3/requirements.txt
+
+# CTranslate2-based Whisper
+faster-whisper>=1.0.0
+
+# Audio processing
+numpy>=1.20.0
+soundfile>=0.12.0

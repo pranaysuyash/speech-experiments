@@ -1,0 +1,27 @@
+# Faster-Distil-Whisper Large V3 (LCS-15)
+# Distilled Whisper with CTranslate2 runtime - faster inference
+
+model_id: faster_distil_whisper_large_v3
+display_name: "Faster-Distil-Whisper Large V3"
+description: "Distilled Whisper large-v3 with CTranslate2 for faster inference"
+
+# Model source
+source:
+  repo: "Systran/faster-distil-whisper-large-v3"
+  hub: "https://huggingface.co/Systran/faster-distil-whisper-large-v3"
+  license: "MIT"
+
+# Variants
+variants:
+  large-v3:
+    description: "Distilled large-v3 (~1.5GB)"
+    default: true
+
+default_variant: large-v3
+
+# Model configuration
+config:
+  sample_rate: 16000
+  compute_type: "float16"
+  beam_size: 5
+  language: null  # Auto-detect

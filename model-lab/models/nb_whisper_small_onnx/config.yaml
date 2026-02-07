@@ -1,0 +1,25 @@
+# NB-Whisper-Small-ONNX (LCS-17)
+# Norwegian Whisper with ONNX runtime
+
+model_id: nb_whisper_small_onnx
+display_name: "NB-Whisper-Small-ONNX"
+description: "Norwegian Whisper (small) with ONNX runtime for cross-platform inference"
+
+# Model source
+source:
+  repo: "NbAiLab/nb-whisper-small-ONNX"
+  hub: "https://huggingface.co/NbAiLab/nb-whisper-small-ONNX"
+  license: "MIT"
+
+# Variants
+variants:
+  small:
+    description: "Small variant (~240MB)"
+    default: true
+
+default_variant: small
+
+# Model configuration
+config:
+  sample_rate: 16000
+  language: "no"  # Norwegian default

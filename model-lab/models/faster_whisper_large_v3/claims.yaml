@@ -1,0 +1,31 @@
+# Faster-Whisper Large V3 Claims (LCS-14)
+# Contract: Bundle Contract v2
+
+model_id: faster_whisper_large_v3
+runtime: ctranslate2
+device_support: [cpu, cuda]
+streaming: false
+precision: float16
+io:
+  format: float32
+  sample_rate: 16000
+ci: false
+ci_reason: "CTranslate2 + large model weights, isolated venv required"
+
+claims:
+  - id: faster_whisper_large_v3_asr_structural
+    task: asr
+    type: structural
+    description: "Speech-to-text transcription with word-level timestamps"
+    enforcement: required
+    test_ref: claims.asr.smoke_v1
+    thresholds:
+      has_text: true
+      has_segments: true
+
+  - id: faster_whisper_large_v3_multilingual
+    task: asr
+    type: capacity
+    description: "Supports 99+ languages with auto-detection"
+    enforcement: optional
+    source: "https://huggingface.co/Systran/faster-whisper-large-v3"

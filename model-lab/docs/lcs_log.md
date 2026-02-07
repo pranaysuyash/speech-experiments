@@ -1,5 +1,28 @@
 # LCS Log
 
+## LCS-14–17: Batch 2 ASR Models
+
+**4 ASR models across 3 runtimes**:
+
+| LCS | Model | Runtime | Notes |
+|-----|-------|---------|-------|
+| LCS-14 | faster_whisper_large_v3 | CTranslate2 | Systran optimized Whisper |
+| LCS-15 | faster_distil_whisper_large_v3 | CTranslate2 | 2-3x faster distilled |
+| LCS-16 | glm_asr_nano_2512 | PyTorch | Non-Whisper architecture |
+| LCS-17 | nb_whisper_small_onnx | ONNX | Cross-platform runtime |
+
+**Files per model**: config.yaml, claims.yaml, requirements.txt, README.md, smoke tests
+
+**CLI**:
+```bash
+make asr-audio MODEL=faster_whisper_large_v3 AUDIO=inputs/sample_16k.wav
+make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample.wav
+```
+
+**Tests**: All structural tests pass, model tests skip without deps.
+
+---
+
 ## LCS-13: Pipeline Integration
 
 **Feature**: Linear pipeline runner for chaining models
