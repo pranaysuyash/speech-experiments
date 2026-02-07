@@ -1,5 +1,31 @@
 # LCS Log
 
+## LCS-04: Moonshine Tiny ASR
+
+**Surfaces**: asr
+
+**Runtime**: pytorch
+
+**Devices**: cpu, mps (fallback to cpu)
+
+**Files**:
+- `models/moonshine/config.yaml` - model config with variants
+- `models/moonshine/claims.yaml` - claims manifest
+- `models/moonshine/requirements.txt` - isolated dependencies
+- `models/moonshine/README.md` - usage docs
+- `harness/registry.py` - loader + registration
+- `tests/integration/test_model_moonshine_smoke.py` - 7 tests (3 structural, 4 model)
+
+**Commands**:
+```bash
+make model-install MODEL=moonshine
+python -m pytest tests/integration/test_model_moonshine_smoke.py -v
+```
+
+**Notes**: 27M params, 5-15x faster than Whisper on short segments. English-only.
+
+---
+
 ## LCS-03: Enhance + Separate Metrics + Streaming Misuse
 
 **Surfaces**: enhance, separate (metrics support)

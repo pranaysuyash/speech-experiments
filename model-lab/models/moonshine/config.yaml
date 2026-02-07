@@ -1,0 +1,25 @@
+# Moonshine Tiny ASR Model
+# Useful Sensors - 27M params, CPU-first, 5-15x faster than Whisper
+
+model_id: moonshine
+display_name: "Moonshine Tiny"
+description: "Fast CPU-first ASR from Useful Sensors, optimized for real-time on-device transcription"
+
+# Variants available from Useful Sensors
+variants:
+  tiny:
+    repo: "UsefulSensors/moonshine-tiny"
+    params: 27M
+    default: true
+  base:
+    repo: "UsefulSensors/moonshine-base"
+    params: 61M
+
+# Default variant
+default_variant: tiny
+
+# Model configuration
+config:
+  sample_rate: 16000
+  language: en  # English-only initially
+  task: transcribe

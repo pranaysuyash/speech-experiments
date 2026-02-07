@@ -1,0 +1,30 @@
+# Moonshine Claims Manifest (LCS-04)
+# Contract: Bundle Contract v2
+
+model_id: moonshine
+runtime: pytorch
+device_support: [cpu, mps]
+streaming: false
+precision: fp32
+io:
+  format: float32
+  sample_rate: 16000
+ci: true
+
+claims:
+  - id: moonshine_asr_structural
+    task: asr
+    type: structural
+    description: "ASR runs and produces valid transcript with segments"
+    enforcement: required
+    test_ref: claims.asr.smoke_structural_v1
+    thresholds:
+      has_text: true
+      has_segments: true
+
+  - id: moonshine_speed_claim
+    task: asr
+    type: performance
+    description: "5-15x faster than Whisper on short segments"
+    enforcement: optional
+    source: "https://github.com/usefulsensors/moonshine"

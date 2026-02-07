@@ -1128,6 +1128,114 @@ ModelRegistry.register_loader(
 )
 
 
+# =============================================================================
+# Moonshine ASR (LCS-04)
+# =============================================================================
+
+
+def load_moonshine(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load Moonshine ASR model with Bundle Contract v2.
+    
+    Moonshine is a fast CPU-first ASR from Useful Sensors (27M params).
+    5-15x faster than Whisper on short segments.
+    """
+    try:
+        import torch
+        import numpy as np
+        
+        # Import moonshine - may need to be installed from git
+        try:
+            import moonshine
+        except ImportError:
+            raise ImportError(
+                "moonshine package not installed. Install with:\n"
+                "pip install -r models/moonshine/requirements.txt"
+            )
+        
+        variant = config.get("variant", "tiny")
+        model_name = f"moonshine/{variant}"
+        
+        # Device handling: moonshine supports CPU and CUDA
+        # For MPS, we use CPU (moonshine may not have MPS support yet)
+        if device == "mps":
+            actual_device = "cpu"
+            logger.info("Moonshine: MPS requested, using CPU (MPS not yet supported)")
+        elif device == "cuda" and torch.cuda.is_available():
+            actual_device = "cuda"
+        else:
+            actual_device = "cpu"
+        
+        logger.info(f"Loading Moonshine {variant} on {actual_device}")
+        
+        # Load the model
+        model = moonshine.load_model(variant)
+        
+        def transcribe(audio, sr=16000, **kwargs):
+            """Transcribe audio using Moonshine."""
+            # Convert to numpy if tensor
+            if isinstance(audio, torch.Tensor):
+                audio = audio.cpu().numpy()
+            
+            # Ensure float32
+            if isinstance(audio, np.ndarray) and audio.dtype != np.float32:
+                audio = audio.astype(np.float32)
+            
+            # Resample if needed (moonshine expects 16kHz)
+            if sr != 16000:
+                try:
+                    import librosa
+                    audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
+                except ImportError:
+                    logger.warning("librosa not available for resampling")
+            
+            # Run transcription
+            result = moonshine.transcribe(model, audio)
+            
+            # Handle result format (may be string or dict)
+            if isinstance(result, str):
+                text = result
+                segments = []
+            elif isinstance(result, list):
+                # Multiple segments
+                text = " ".join(r if isinstance(r, str) else r.get("text", "") for r in result)
+                segments = result if isinstance(result[0], dict) else []
+            else:
+                text = result.get("text", str(result))
+                segments = result.get("segments", [])
+            
+            return {
+                "text": text.strip(),
+                "segments": segments,
+                "language": "en",  # Moonshine is English-only
+                "meta": {"variant": variant, "device": actual_device},
+            }
+        
+        return {
+            "model_type": "moonshine",
+            "device": actual_device,
+            "capabilities": ["asr"],
+            "modes": ["batch"],
+            "asr": {"transcribe": transcribe},
+            "raw": {"model": model, "variant": variant},
+        }
+    
+    except ImportError as e:
+        raise ImportError(f"Failed to load Moonshine: {e}")
+
+
+ModelRegistry.register_loader(
+    "moonshine",
+    load_moonshine,
+    "Moonshine: Fast CPU-first ASR from Useful Sensors (27M params)",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["asr"],
+    hardware=["cpu", "mps"],
+    modes=["batch"],
+)
+
+
 def load_model_from_config(config_path: Path, device: str = "cpu") -> Bundle:
     """
     Load model from YAML config file.
