@@ -1,0 +1,26 @@
+# DeepFilterNet Audio Enhancement Model
+# Production-grade speech enhancement using deep filtering
+
+model_id: deepfilternet
+display_name: "DeepFilterNet"
+description: "Deep learning noise suppression for speech enhancement using ERB-scale deep filtering"
+
+# Model source
+source:
+  repo: "https://github.com/Rikorose/DeepFilterNet"
+  paper: "https://arxiv.org/abs/2110.05588"
+
+# Variants
+variants:
+  df2:
+    description: "DeepFilterNet2 - balanced quality/speed"
+    default: true
+  df3:
+    description: "DeepFilterNet3 - highest quality"
+
+default_variant: df2
+
+# Model configuration
+config:
+  sample_rate: 48000  # Native rate
+  frame_size_ms: 10   # 10ms frames

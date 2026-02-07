@@ -1,0 +1,31 @@
+# DeepFilterNet Claims Manifest (LCS-07)
+# Contract: Bundle Contract v2
+
+model_id: deepfilternet
+runtime: pytorch
+device_support: [cpu, mps]
+streaming: false
+precision: fp32
+io:
+  format: float32
+  sample_rate: 48000
+ci: false
+ci_reason: "PyTorch heavyweight, isolated venv required"
+
+claims:
+  - id: deepfilternet_enhance_structural
+    task: enhance
+    type: structural
+    description: "Enhancement produces audio output same length as input"
+    enforcement: required
+    test_ref: claims.enhance.smoke_structural_v1
+    thresholds:
+      output_length_matches: true
+      output_sr_matches: true
+
+  - id: deepfilternet_quality_claim
+    task: enhance
+    type: quality
+    description: "State-of-the-art speech enhancement quality"
+    enforcement: optional
+    source: "https://arxiv.org/abs/2110.05588"

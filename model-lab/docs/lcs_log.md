@@ -1,5 +1,31 @@
 # LCS Log
 
+## LCS-07: DeepFilterNet Audio Enhancement
+
+**Surfaces**: enhance (second implementation, production-grade)
+
+**Runtime**: pytorch
+
+**Devices**: cpu, mps (fallback to cpu)
+
+**Files**:
+- `models/deepfilternet/config.yaml` (variants df2/df3)
+- `models/deepfilternet/claims.yaml` (ci=false, PyTorch)
+- `models/deepfilternet/requirements.txt`
+- `models/deepfilternet/README.md`
+- `harness/registry.py` - loader + registration
+- `tests/integration/test_model_deepfilternet_smoke.py` - 10 tests
+
+**Commands**:
+```bash
+make model-install MODEL=deepfilternet
+python -m pytest tests/integration/test_model_deepfilternet_smoke.py -v
+```
+
+**Notes**: 48kHz native, auto-resampling, length preservation enforced. Pre-ASR pipeline candidate.
+
+---
+
 ## LCS-06: RNNoise Audio Enhancement
 
 **Surfaces**: enhance (first implementation!)

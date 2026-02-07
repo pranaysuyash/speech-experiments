@@ -1444,6 +1444,114 @@ ModelRegistry.register_loader(
 )
 
 
+# =============================================================================
+# DeepFilterNet Audio Enhancement (LCS-07)
+# =============================================================================
+
+
+def load_deepfilternet(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load DeepFilterNet audio enhancement model with Bundle Contract v2.
+    
+    DeepFilterNet is a state-of-the-art speech enhancement model using
+    ERB-scale deep filtering. Production-grade quality.
+    """
+    try:
+        import numpy as np
+        
+        # Import deepfilternet
+        try:
+            from df.enhance import enhance as df_enhance, init_df
+        except ImportError:
+            raise ImportError(
+                "deepfilternet not installed. Install with:\n"
+                "pip install -r models/deepfilternet/requirements.txt"
+            )
+        
+        variant = config.get("variant", "DeepFilterNet2")
+        
+        # Device handling
+        if device == "mps":
+            actual_device = "cpu"  # DF may not support MPS directly
+            logger.info("DeepFilterNet: MPS requested, using CPU")
+        elif device == "cuda":
+            import torch
+            actual_device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            actual_device = "cpu"
+        
+        logger.info(f"Loading DeepFilterNet ({variant}) on {actual_device}...")
+        
+        # Initialize model
+        model, df_state, _ = init_df()
+        
+        def enhance_audio(audio, sr=48000, **kwargs):
+            """Enhance audio by removing noise using DeepFilterNet."""
+            # Ensure numpy array
+            if hasattr(audio, "numpy"):
+                audio = audio.numpy()
+            audio = np.asarray(audio, dtype=np.float32).flatten()
+            
+            original_sr = sr
+            original_len = len(audio)
+            
+            # DeepFilterNet expects 48kHz, resample if needed
+            if sr != 48000:
+                try:
+                    import librosa
+                    audio = librosa.resample(audio, orig_sr=sr, target_sr=48000)
+                except ImportError:
+                    logger.warning("librosa not available for resampling")
+            
+            # Run enhancement
+            enhanced = df_enhance(model, df_state, audio)
+            
+            # Resample back to original rate if needed
+            if original_sr != 48000:
+                try:
+                    import librosa
+                    enhanced = librosa.resample(enhanced, orig_sr=48000, target_sr=original_sr)
+                except ImportError:
+                    pass
+            
+            # Ensure output length matches input (preserve alignment)
+            if len(enhanced) != original_len:
+                if len(enhanced) > original_len:
+                    enhanced = enhanced[:original_len]
+                else:
+                    enhanced = np.pad(enhanced, (0, original_len - len(enhanced)))
+            
+            return {
+                "audio": enhanced,
+                "sample_rate": original_sr,
+                "meta": {"variant": variant, "device": actual_device},
+            }
+        
+        return {
+            "model_type": "deepfilternet",
+            "device": actual_device,
+            "capabilities": ["enhance"],
+            "modes": ["batch"],
+            "enhance": {"process": enhance_audio},
+            "raw": {"model": model, "df_state": df_state},
+        }
+    
+    except ImportError as e:
+        raise ImportError(f"Failed to load DeepFilterNet: {e}")
+
+
+ModelRegistry.register_loader(
+    "deepfilternet",
+    load_deepfilternet,
+    "DeepFilterNet: State-of-the-art speech enhancement",
+    status=ModelStatus.EXPERIMENTAL,
+    version="2.0.0",
+    capabilities=["enhance"],
+    hardware=["cpu", "mps"],
+    modes=["batch"],
+)
+
+
 def load_model_from_config(config_path: Path, device: str = "cpu") -> Bundle:
     """
     Load model from YAML config file.
