@@ -1,5 +1,43 @@
 # LCS Log
 
+## LCS-13: Pipeline Integration
+
+**Feature**: Linear pipeline runner for chaining models
+
+**Files**:
+- `harness/pipeline.py` - PipelineRunner, PipelineConfig, surface handlers
+- `config/pipelines/enhance_asr.yaml` - preprocess → transcribe
+- `config/pipelines/separate_vocals_asr.yaml` - extract vocals → transcribe
+- `config/pipelines/separate_vocals_transcribe.yaml` - vocals → MIDI
+- `tests/unit/test_pipeline.py` - 22 unit tests (fake models)
+- `tests/integration/test_pipeline_integration.py` - 5 tests
+- `Makefile` - run-pipeline, model-install targets
+
+**Pipeline Configs**:
+1. `enhance → asr` (DeepFilterNet/RNNoise → Moonshine)
+2. `separate(vocals) → asr` (Demucs → ASR)
+3. `separate(vocals) → music_transcription` (Demucs → Basic Pitch)
+
+**Interface**:
+```python
+from harness.pipeline import run_pipeline
+
+result = run_pipeline("config/pipelines/enhance_asr.yaml", audio, sr)
+print(result.final)        # Last step output
+print(result.artifacts)    # All step outputs
+```
+
+**CLI**:
+```bash
+make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample.wav
+```
+
+**Error Handling**: Errors include step_id, model_id, surface for debugging.
+
+**Testing**: All 27 tests CI-safe (use fake models), RNNoise integration test skipped if not installed.
+
+---
+
 ## LCS-12: Basic Pitch Music Transcription
 
 **Surfaces**: music_transcription (first!)

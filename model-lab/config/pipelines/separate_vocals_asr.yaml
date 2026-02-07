@@ -1,0 +1,17 @@
+# Pipeline: Separate Vocals → ASR
+# Extracts vocals from audio before speech recognition
+
+name: separate_vocals_asr
+description: "Extract vocals with Demucs, then run speech recognition"
+
+steps:
+  - id: separate
+    model: demucs
+    surface: separate
+    stem: vocals  # Extract vocals stem
+    args: {}
+  
+  - id: asr
+    model: moonshine
+    surface: asr
+    args: {}

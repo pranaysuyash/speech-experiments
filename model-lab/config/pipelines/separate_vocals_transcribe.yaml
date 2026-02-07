@@ -1,0 +1,17 @@
+# Pipeline: Separate Vocals → Music Transcription
+# Extracts vocals, then transcribes to MIDI
+
+name: separate_vocals_transcribe
+description: "Extract vocals with Demucs, then transcribe music to MIDI"
+
+steps:
+  - id: separate
+    model: demucs
+    surface: separate
+    stem: vocals
+    args: {}
+  
+  - id: transcribe
+    model: basic_pitch
+    surface: music_transcription
+    args: {}

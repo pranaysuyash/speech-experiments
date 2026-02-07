@@ -94,6 +94,31 @@ ifndef MODEL
 endif
 	$(PYTHON) -c "from harness.registry import ModelRegistry; import json; print(json.dumps(ModelRegistry.get_model_metadata('$(MODEL)'), indent=2))"
 
+# Usage: make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample.wav
+run-pipeline:
+ifndef PIPELINE
+	$(error PIPELINE is required. Usage: make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample.wav)
+endif
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample.wav)
+endif
+	$(PYTHON) -c "\
+import soundfile as sf; \
+import numpy as np; \
+from harness.pipeline import run_pipeline; \
+audio, sr = sf.read('$(AUDIO)'); \
+result = run_pipeline('$(PIPELINE)', audio, sr); \
+print('Steps:', result.steps_executed); \
+print('Final:', result.final)"
+
+# Usage: make model-install MODEL=demucs
+model-install:
+ifndef MODEL
+	$(error MODEL is required. Usage: make model-install MODEL=demucs)
+endif
+	pip install -r models/$(MODEL)/requirements.txt
+	@echo "✓ Model $(MODEL) dependencies installed"
+
 # =============================================================================
 # Cleanup
 # =============================================================================
@@ -130,6 +155,10 @@ help:
 	@echo "    make tts MODEL=lfm2_5_audio TEXT='Hello'"
 	@echo "    make list-models   - List registered models"
 	@echo "    make model-info MODEL=whisper"
+	@echo "    make model-install MODEL=demucs"
+	@echo ""
+	@echo "  Pipeline:"
+	@echo "    make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample.wav"
 	@echo ""
 	@echo "  Analysis:"
 	@echo "    make scorecard     - Generate comparison scorecard"

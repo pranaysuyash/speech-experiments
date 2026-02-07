@@ -1,0 +1,16 @@
+# Pipeline: Enhance → ASR
+# Preprocesses audio with enhancement before speech recognition
+
+name: enhance_asr
+description: "Audio enhancement followed by speech recognition"
+
+steps:
+  - id: enhance
+    model: deepfilternet  # or rnnoise
+    surface: enhance
+    args: {}
+  
+  - id: asr
+    model: moonshine  # or faster_whisper
+    surface: asr
+    args: {}
