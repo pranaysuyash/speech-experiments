@@ -1,0 +1,33 @@
+# Parakeet Multitalker Claims (LCS-20)
+# Contract: Bundle Contract v2
+
+model_id: parakeet_multitalker
+runtime: nemo
+device_support: [cpu, cuda]
+streaming: false
+precision: fp16
+io:
+  format: float32
+  sample_rate: 16000
+ci: false
+ci_reason: "NeMo heavy dependency, requires dedicated venv .venv.nemo_parakeet"
+
+claims:
+  - id: parakeet_multitalker_asr_structural
+    task: asr
+    type: structural
+    description: "Speech-to-text with multitalker handling"
+    enforcement: required
+    test_ref: claims.asr.smoke_v1
+    thresholds:
+      has_text: true
+      has_speakers: true
+
+  - id: parakeet_multitalker_diarization
+    task: asr
+    type: capacity
+    description: "Speaker diarization support (up to 4 speakers)"
+    enforcement: optional
+    thresholds:
+      max_speakers: 4
+    notes: "Requires speaker segments as input if pre-diarization is needed"

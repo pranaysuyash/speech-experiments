@@ -1,0 +1,31 @@
+# GLM-TTS Claims (LCS-21)
+# Contract: Bundle Contract v2
+
+model_id: glm_tts
+runtime: pytorch
+device_support: [cpu, cuda, mps]
+streaming: false
+precision: fp16
+io:
+  format: float32
+  sample_rate: 24000
+ci: false
+ci_reason: "PyTorch + HuggingFace model weights"
+
+claims:
+  - id: glm_tts_structural
+    task: tts
+    type: structural
+    description: "Text-to-speech synthesis"
+    enforcement: required
+    test_ref: claims.tts.smoke_v1
+    thresholds:
+      has_audio: true
+      sample_rate_valid: true
+
+  - id: glm_tts_quality
+    task: tts
+    type: capacity
+    description: "High-quality speech synthesis from GLM-4"
+    enforcement: optional
+    source: "https://huggingface.co/THUDM/glm-4-voice"

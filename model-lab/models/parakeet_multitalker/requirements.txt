@@ -1,0 +1,19 @@
+# Parakeet Multitalker Dependencies
+# Install in dedicated venv: pip install -r models/parakeet_multitalker/requirements.txt
+#
+# IMPORTANT: Use dedicated venv to avoid dependency conflicts
+# python -m venv .venv.nemo_parakeet
+# source .venv.nemo_parakeet/bin/activate
+# pip install -r models/parakeet_multitalker/requirements.txt
+
+# NVIDIA NeMo toolkit
+nemo_toolkit[asr]>=1.20.0
+
+# Audio processing
+numpy>=1.20.0
+soundfile>=0.12.0
+librosa>=0.10.0
+
+# PyTorch (NeMo dependency)
+torch>=2.0.0
+torchaudio>=2.0.0

@@ -1,0 +1,28 @@
+# Parakeet Multitalker (LCS-20)
+# NeMo-based multitalker ASR (heavy, dedicated venv)
+
+model_id: parakeet_multitalker
+display_name: "Parakeet Multitalker ASR"
+description: "NVIDIA Parakeet multitalker speech recognition with diarization"
+
+# Model source
+source:
+  repo: "nvidia/parakeet-rnnt-1.1b"
+  hub: "https://huggingface.co/nvidia"
+  license: "Apache 2.0"
+
+# Variants
+variants:
+  multitalker:
+    description: "Multitalker variant with speaker handling"
+    default: true
+
+default_variant: multitalker
+
+# Model configuration
+config:
+  sample_rate: 16000
+  max_speakers: 4
+  
+# Environment
+venv: ".venv.nemo_parakeet"  # Dedicated venv

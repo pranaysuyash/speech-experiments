@@ -1,0 +1,29 @@
+# Nemotron Streaming ASR (LCS-18)
+# NeMo-based streaming ASR (heavy, dedicated venv)
+
+model_id: nemotron_streaming
+display_name: "Nemotron Streaming ASR"
+description: "NVIDIA Nemotron streaming speech recognition (NeMo runtime)"
+
+# Model source
+source:
+  repo: "nvidia/nemotron-asr"
+  hub: "https://huggingface.co/nvidia"
+  license: "Apache 2.0"
+
+# Variants
+variants:
+  streaming:
+    description: "Streaming variant"
+    default: true
+
+default_variant: streaming
+
+# Model configuration
+config:
+  sample_rate: 16000
+  chunk_ms: 160
+  streaming: true
+  
+# Environment
+venv: ".venv.nemo_nemotron"  # Dedicated venv

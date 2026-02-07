@@ -1,0 +1,28 @@
+# Voxtral Realtime 2602 (LCS-22)
+# Real-time streaming ASR with configurable delay
+
+model_id: voxtral_realtime_2602
+display_name: "Voxtral Realtime 2602"
+description: "Real-time streaming ASR with configurable transcription delay"
+
+# Model source
+source:
+  repo: "mistralai/voxtral"
+  hub: "https://huggingface.co/mistralai"
+  license: "Apache 2.0"
+
+# Variants
+variants:
+  realtime:
+    description: "Realtime streaming variant"
+    default: true
+
+default_variant: realtime
+
+# Model configuration
+config:
+  sample_rate: 16000
+  chunk_ms: 100
+  streaming: true
+  # Configurable delay knob
+  transcription_delay_ms: 200  # Range: 100-500ms

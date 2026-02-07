@@ -1,0 +1,19 @@
+# Nemotron Streaming ASR Dependencies
+# Install in dedicated venv: pip install -r models/nemotron_streaming/requirements.txt
+#
+# IMPORTANT: Use dedicated venv to avoid dependency conflicts
+# python -m venv .venv.nemo_nemotron
+# source .venv.nemo_nemotron/bin/activate
+# pip install -r models/nemotron_streaming/requirements.txt
+
+# NVIDIA NeMo toolkit
+nemo_toolkit[asr]>=1.20.0
+
+# Audio processing
+numpy>=1.20.0
+soundfile>=0.12.0
+librosa>=0.10.0
+
+# PyTorch (NeMo dependency)
+torch>=2.0.0
+torchaudio>=2.0.0

@@ -1,0 +1,33 @@
+# Kyutai Streaming ASR Claims (LCS-19)
+# Contract: Bundle Contract v2 + Streaming Lifecycle
+
+model_id: kyutai_streaming
+runtime: pytorch
+device_support: [cpu, cuda, mps]
+streaming: true
+precision: fp16
+io:
+  format: float32
+  sample_rate: 16000
+ci: false
+ci_reason: "PyTorch + model weights"
+
+claims:
+  - id: kyutai_streaming_asr_stream_structural
+    task: asr_stream
+    type: structural
+    description: "Real-time streaming speech recognition"
+    enforcement: required
+    test_ref: claims.asr_stream.smoke_v1
+    thresholds:
+      seq_monotonic: true
+      segment_id_stable: true
+      finalize_idempotent: true
+
+  - id: kyutai_streaming_latency
+    task: asr_stream
+    type: capacity
+    description: "Low-latency streaming inference"
+    enforcement: optional
+    thresholds:
+      chunk_latency_ms: 100

@@ -1,0 +1,43 @@
+# Voxtral Realtime 2602 Claims (LCS-22)
+# Contract: Bundle Contract v2 + Streaming Lifecycle
+
+model_id: voxtral_realtime_2602
+runtime: mistral_api
+device_support: [cpu]  # API-based
+streaming: true
+precision: n/a
+io:
+  format: float32
+  sample_rate: 16000
+ci: false
+ci_reason: "Requires Mistral API access"
+
+claims:
+  - id: voxtral_realtime_asr_stream_structural
+    task: asr_stream
+    type: structural
+    description: "Real-time streaming speech recognition"
+    enforcement: required
+    test_ref: claims.asr_stream.smoke_v1
+    thresholds:
+      seq_monotonic: true
+      segment_id_stable: true
+      finalize_idempotent: true
+
+  - id: voxtral_realtime_delay_configurable
+    task: asr_stream
+    type: structural
+    description: "Configurable transcription_delay_ms (100-500ms range)"
+    enforcement: required
+    thresholds:
+      transcription_delay_ms_min: 100
+      transcription_delay_ms_max: 500
+      transcription_delay_ms_default: 200
+
+  - id: voxtral_realtime_latency
+    task: asr_stream
+    type: capacity
+    description: "Low-latency real-time streaming"
+    enforcement: optional
+    thresholds:
+      e2e_latency_ms: 300

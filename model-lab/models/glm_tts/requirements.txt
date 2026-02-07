@@ -1,0 +1,10 @@
+# GLM-TTS Dependencies
+# Install: pip install -r models/glm_tts/requirements.txt
+
+# PyTorch + HuggingFace
+torch>=2.0.0
+transformers>=4.35.0
+
+# Audio processing
+numpy>=1.20.0
+soundfile>=0.12.0

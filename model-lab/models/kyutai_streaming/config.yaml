@@ -1,0 +1,26 @@
+# Kyutai Streaming ASR (LCS-19)
+# Lightweight PyTorch streaming ASR
+
+model_id: kyutai_streaming
+display_name: "Kyutai Streaming ASR"
+description: "Lightweight streaming speech recognition from Kyutai"
+
+# Model source
+source:
+  repo: "kyutai/stt"
+  hub: "https://huggingface.co/kyutai"
+  license: "MIT"
+
+# Variants
+variants:
+  base:
+    description: "Base streaming model"
+    default: true
+
+default_variant: base
+
+# Model configuration
+config:
+  sample_rate: 16000
+  chunk_ms: 100
+  streaming: true

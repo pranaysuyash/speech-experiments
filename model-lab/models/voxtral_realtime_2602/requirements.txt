@@ -1,0 +1,9 @@
+# Voxtral Realtime 2602 Dependencies
+# Install: pip install -r models/voxtral_realtime_2602/requirements.txt
+
+# Mistral client (if using API)
+mistralai>=1.0.0
+
+# Audio processing
+numpy>=1.20.0
+soundfile>=0.12.0

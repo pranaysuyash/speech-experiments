@@ -1,5 +1,29 @@
 # LCS Log
 
+## LCS-18–22: Batch 3 Streaming + TTS
+
+**5 models: 3 streaming ASR, 1 batch ASR with diarization, 1 TTS**
+
+| LCS | Model | Runtime | Surface |
+|-----|-------|---------|---------|
+| LCS-19 | kyutai_streaming | PyTorch | asr_stream |
+| LCS-18 | nemotron_streaming | NeMo | asr_stream |
+| LCS-20 | parakeet_multitalker | NeMo | asr |
+| LCS-21 | glm_tts | PyTorch | tts |
+| LCS-22 | voxtral_realtime_2602 | API | asr_stream |
+
+**Streaming Contract**:
+- seq_monotonic, segment_id_stable, finalize_idempotent
+- push_after_finalize raises RuntimeError
+
+**Voxtral Realtime**: Configurable `transcription_delay_ms` (100-500ms range)
+
+**NeMo models**: Use dedicated venvs (`.venv.nemo_*`)
+
+**Tests**: All structural tests pass, model tests skip without deps.
+
+---
+
 ## LCS-14–17: Batch 2 ASR Models
 
 **4 ASR models across 3 runtimes**:

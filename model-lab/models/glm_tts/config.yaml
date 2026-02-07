@@ -1,0 +1,25 @@
+# GLM-TTS (LCS-21)
+# Text-to-speech from THUDM
+
+model_id: glm_tts
+display_name: "GLM-TTS"
+description: "Text-to-speech synthesis from THUDM GLM-4 Voice"
+
+# Model source
+source:
+  repo: "THUDM/glm-4-voice-decoder"
+  hub: "https://huggingface.co/THUDM/glm-4-voice"
+  license: "Apache 2.0"
+
+# Variants
+variants:
+  base:
+    description: "Base TTS model"
+    default: true
+
+default_variant: base
+
+# Model configuration
+config:
+  sample_rate: 24000
+  output_format: float32
