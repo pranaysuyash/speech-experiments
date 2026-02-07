@@ -1,0 +1,32 @@
+# Demucs Claims Manifest (LCS-11)
+# Contract: Bundle Contract v2
+
+model_id: demucs
+runtime: pytorch
+device_support: [cpu, mps, cuda]
+streaming: false
+precision: fp32
+io:
+  format: float32
+  sample_rate: 44100
+ci: false
+ci_reason: "PyTorch/torchaudio heavyweight, isolated venv required"
+
+claims:
+  - id: demucs_separate_structural
+    task: separate
+    type: structural
+    description: "Separates audio into stems (vocals, drums, bass, other)"
+    enforcement: required
+    test_ref: claims.separate.smoke_v1
+    thresholds:
+      stems: [vocals, drums, bass, other]
+      all_stems_present: true
+      length_alignment: true
+
+  - id: demucs_output_format
+    task: separate
+    type: structural
+    description: "Output shape is {stems: {name: audio}, sr: int}"
+    enforcement: required
+    test_ref: claims.separate.output_format_v1

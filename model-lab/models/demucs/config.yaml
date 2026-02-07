@@ -1,0 +1,31 @@
+# Demucs Audio Source Separation Model
+# First separate surface implementation
+
+model_id: demucs
+display_name: "Demucs"
+description: "Hybrid transformer audio source separation from Meta"
+
+# Model source
+source:
+  repo: "https://github.com/facebookresearch/demucs"
+  paper: "https://arxiv.org/abs/2111.03600"
+  license: "MIT"
+
+# Variants
+variants:
+  htdemucs:
+    description: "Hybrid Transformer Demucs (default, best quality)"
+    default: true
+  htdemucs_ft:
+    description: "Fine-tuned version with better vocals"
+  htdemucs_6s:
+    description: "6-stem model (vocals, drums, bass, guitar, piano, other)"
+  mdx_extra:
+    description: "MDX challenge winner model"
+
+default_variant: htdemucs
+
+# Model configuration
+config:
+  sample_rate: 44100
+  stems: [vocals, drums, bass, other]

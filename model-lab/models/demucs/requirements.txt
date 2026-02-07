@@ -1,0 +1,13 @@
+# Demucs Dependencies
+# Install: pip install -r models/demucs/requirements.txt
+# NOTE: PyTorch heavyweight, use isolated venv
+
+# Demucs and dependencies
+demucs>=4.0.0
+
+# Audio processing
+numpy>=1.20.0
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# Note: demucs pulls torch and torchaudio automatically

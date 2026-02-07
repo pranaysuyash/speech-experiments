@@ -1904,6 +1904,150 @@ ModelRegistry.register_loader(
 )
 
 
+# =============================================================================
+# Demucs Audio Source Separation (LCS-11)
+# =============================================================================
+
+
+def load_demucs(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load Demucs source separation model with Bundle Contract v2.
+    
+    Demucs separates audio into stems:
+    - vocals, drums, bass, other (4-stem default)
+    
+    Output: {stems: {name: np.ndarray}, sr: int}
+    Length alignment: All stems same length as input.
+    """
+    try:
+        import numpy as np
+        
+        # Import demucs
+        try:
+            import demucs.api
+        except ImportError:
+            raise ImportError(
+                "demucs not installed. Install with:\n"
+                "pip install -r models/demucs/requirements.txt"
+            ) from None
+        
+        import torch
+        
+        # Device handling
+        if device == "mps":
+            actual_device = "mps" if torch.backends.mps.is_available() else "cpu"
+        elif device == "cuda":
+            actual_device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            actual_device = "cpu"
+        
+        variant = config.get("variant", "htdemucs")
+        logger.info(f"Loading Demucs ({variant}) on {actual_device}...")
+        
+        # Load separator
+        separator = demucs.api.Separator(model=variant, device=actual_device)
+        
+        def separate(audio, sr=44100, **kwargs):
+            """
+            Separate audio into stems.
+            
+            Args:
+                audio: Input audio (mono or stereo)
+                sr: Sample rate
+                
+            Returns:
+                {stems: {name: audio}, sr: int}
+            """
+            # Ensure numpy array
+            if hasattr(audio, "numpy"):
+                audio = audio.numpy()
+            audio = np.asarray(audio, dtype=np.float32)
+            
+            # Store original length for alignment
+            original_length = audio.shape[-1] if audio.ndim > 1 else len(audio)
+            
+            # Ensure 2D (channels, samples)
+            if audio.ndim == 1:
+                audio = audio[np.newaxis, :]  # Mono to (1, samples)
+            
+            # Resample if needed
+            if sr != 44100:
+                try:
+                    import librosa
+                    # Process each channel
+                    resampled = []
+                    for ch in range(audio.shape[0]):
+                        resampled.append(
+                            librosa.resample(audio[ch], orig_sr=sr, target_sr=44100)
+                        )
+                    audio = np.stack(resampled)
+                except ImportError:
+                    pass
+            
+            # Convert to torch tensor
+            audio_tensor = torch.from_numpy(audio).float()
+            if audio_tensor.ndim == 1:
+                audio_tensor = audio_tensor.unsqueeze(0)
+            
+            # Separate
+            origin, separated = separator.separate_tensor(audio_tensor.unsqueeze(0))
+            
+            # Extract stems
+            stems = {}
+            stem_names = separator.model.sources  # e.g., ['drums', 'bass', 'other', 'vocals']
+            
+            for i, name in enumerate(stem_names):
+                stem_audio = separated[0, i].cpu().numpy()  # (channels, samples)
+                
+                # Convert to mono if input was mono
+                if stem_audio.shape[0] == 2 and original_length == stem_audio.shape[-1]:
+                    stem_audio = stem_audio.mean(axis=0)
+                elif stem_audio.shape[0] == 2:
+                    stem_audio = stem_audio.mean(axis=0)
+                elif stem_audio.ndim > 1:
+                    stem_audio = stem_audio.squeeze()
+                
+                # Ensure length alignment (trim or pad)
+                if len(stem_audio) > original_length:
+                    stem_audio = stem_audio[:original_length]
+                elif len(stem_audio) < original_length:
+                    stem_audio = np.pad(
+                        stem_audio,
+                        (0, original_length - len(stem_audio)),
+                    )
+                
+                stems[name] = stem_audio.astype(np.float32)
+            
+            return {
+                "stems": stems,
+                "sr": 44100,
+            }
+        
+        return {
+            "model_type": "demucs",
+            "device": actual_device,
+            "capabilities": ["separate"],
+            "modes": ["batch"],
+            "separate": {"separate": separate},
+            "raw": {"separator": separator},
+        }
+    
+    except ImportError as e:
+        raise ImportError(f"Failed to load Demucs: {e}") from e
+
+
+ModelRegistry.register_loader(
+    "demucs",
+    load_demucs,
+    "Demucs: Audio source separation",
+    status=ModelStatus.EXPERIMENTAL,
+    version="4.0.0",
+    capabilities=["separate"],
+    hardware=["cpu", "mps", "cuda"],
+    modes=["batch"],
+)
+
+
 def load_model_from_config(config_path: Path, device: str = "cpu") -> Bundle:
     """
     Load model from YAML config file.

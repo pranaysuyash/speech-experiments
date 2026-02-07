@@ -1,5 +1,46 @@
 # LCS Log
 
+## LCS-11: Demucs Source Separation
+
+**Surfaces**: separate (first!)
+
+**Runtime**: pytorch
+
+**Devices**: cpu, mps, cuda
+
+**Files**:
+- `models/demucs/config.yaml` (variants: htdemucs, htdemucs_ft, htdemucs_6s, mdx_extra)
+- `models/demucs/claims.yaml` (separate surface, stem structure)
+- `models/demucs/requirements.txt`
+- `models/demucs/README.md`
+- `harness/registry.py` - loader + registration
+- `tests/integration/test_model_demucs_smoke.py` - 13 tests
+
+**Output Contract**:
+```python
+{
+    "stems": {
+        "vocals": np.array([...]),
+        "drums": np.array([...]),
+        "bass": np.array([...]),
+        "other": np.array([...]),
+    },
+    "sr": 44100
+}
+```
+
+**Length Alignment**: All stems same length as input (enforced via trim/pad).
+
+**Commands**:
+```bash
+make model-install MODEL=demucs
+python -m pytest tests/integration/test_model_demucs_smoke.py -v
+```
+
+**Notes**: 44.1kHz native, auto-resampling. Non-speech audio category. Unlocks separate surface.
+
+---
+
 ## LCS-10: Voxtral Streaming ASR
 
 **Surfaces**: asr_stream (first!), asr (batch via streaming)
