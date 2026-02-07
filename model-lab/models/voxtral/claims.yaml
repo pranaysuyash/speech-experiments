@@ -1,0 +1,33 @@
+# Voxtral Claims Manifest (LCS-10)
+# Contract: Bundle Contract v2
+
+model_id: voxtral
+runtime: api
+device_support: [cpu]  # API-based, runs on Mistral cloud
+streaming: true
+precision: fp32
+io:
+  format: float32
+  sample_rate: 16000
+ci: false
+ci_reason: "Requires Mistral API key"
+
+claims:
+  - id: voxtral_asr_streaming
+    task: asr_stream
+    type: structural
+    description: "Streaming ASR with partial updates and final transcript"
+    enforcement: required
+    test_ref: claims.asr_stream.smoke_v1
+    thresholds:
+      has_partials: true
+      has_final: true
+      seq_monotonic: true
+      segment_id_stable: true
+
+  - id: voxtral_multilingual
+    task: asr
+    type: capacity
+    description: "Supports 20+ languages with auto-detection"
+    enforcement: optional
+    source: "https://docs.mistral.ai"

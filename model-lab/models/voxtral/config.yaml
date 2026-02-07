@@ -1,0 +1,30 @@
+# Voxtral Streaming ASR Model
+# Mistral AI's streaming speech recognition
+
+model_id: voxtral
+display_name: "Voxtral Realtime"
+description: "Streaming ASR from Mistral AI with low-latency real-time transcription"
+
+# Model source
+source:
+  provider: "Mistral AI"
+  docs: "https://docs.mistral.ai/api/"
+  license: "Apache 2.0"
+
+# Variants
+variants:
+  mini:
+    description: "Voxtral Mini (3B) - Edge deployment"
+  small:
+    description: "Voxtral Small (24B) - Production quality"
+    default: true
+  realtime:
+    description: "Voxtral Realtime - Low latency streaming"
+
+default_variant: realtime
+
+# Model configuration
+config:
+  sample_rate: 16000
+  chunk_ms: 160  # 160ms chunks for streaming
+  frame_ms: 20   # 20ms frames

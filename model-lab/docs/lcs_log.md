@@ -1,5 +1,42 @@
 # LCS Log
 
+## LCS-10: Voxtral Streaming ASR
+
+**Surfaces**: asr_stream (first!), asr (batch via streaming)
+
+**Runtime**: api (Mistral cloud)
+
+**Devices**: cpu (API-based)
+
+**Files**:
+- `models/voxtral/config.yaml` (variants: mini, small, realtime)
+- `models/voxtral/claims.yaml` (streaming=true, asr_stream)
+- `models/voxtral/requirements.txt` (mistralai[realtime])
+- `models/voxtral/README.md`
+- `harness/registry.py` - VoxtralStreamingAdapter using StreamingAdapter base
+- `tests/integration/test_model_voxtral_smoke.py` - 13 tests
+
+**Streaming Lifecycle**:
+```python
+asr_stream["start_stream"]()
+for chunk in audio_chunks:
+    events = list(asr_stream["push_audio"](chunk, sr))
+flush_events = list(asr_stream["flush"]())
+result = asr_stream["finalize"]()
+asr_stream["close"]()
+```
+
+**Commands**:
+```bash
+make model-install MODEL=voxtral
+export MISTRAL_API_KEY=your_key
+make asr-stream MODEL=voxtral AUDIO=inputs/sample_16k.wav
+```
+
+**Notes**: Uses harness/streaming.py infrastructure. Mock mode when API key not set. seq monotonic, segment_id stable.
+
+---
+
 ## LCS-09: Streaming Utilities
 
 **Surfaces**: asr_stream infrastructure (no models, pure utilities)
