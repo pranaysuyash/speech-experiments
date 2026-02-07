@@ -1,5 +1,33 @@
 # LCS Log
 
+## LCS-Z: Model Selector
+
+**Filter models by device/runtime/surface/ci**
+
+```python
+from harness.selector import list_models_by_filter, get_streaming_models
+
+# Show all streaming models I can run on MPS
+mps_streaming = list_models_by_filter(device="mps", surface="asr_stream")
+
+# Shortcuts
+streaming = get_streaming_models(device="mps")
+ci_safe = get_ci_safe_models(surface="asr")
+pytorch = get_models_by_runtime("pytorch")
+```
+
+**Filters:**
+| Filter | Values |
+|--------|--------|
+| device | cpu, cuda, mps |
+| surface | asr, asr_stream, tts, classify, enhance, embed, separate, music_transcription |
+| runtime | pytorch, nemo, onnx, ctranslate2 |
+| ci | true/false |
+
+**Tests:** 11 unit tests
+
+---
+
 ## LCS-Y: Streaming Latency Measurement
 
 **Dependency-free metrics for asr_stream models**
