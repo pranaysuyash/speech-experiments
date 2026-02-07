@@ -1,5 +1,43 @@
 # LCS Log
 
+## LCS-09: Streaming Utilities
+
+**Surfaces**: asr_stream infrastructure (no models, pure utilities)
+
+**Files**:
+- `harness/streaming.py` - Core streaming infrastructure
+- `tests/unit/test_streaming_utils.py` - 33 tests
+
+**Components**:
+
+1. **Chunking Helpers** (`ChunkConfig`, `AudioChunker`)
+   - `frame_ms`: 20ms default
+   - `chunk_ms`: 160ms default
+   - Sample-rate normalization (resample once, not per chunk)
+   - Accepts `bytes` (pcm_s16le) or `np.ndarray` (float32/int16)
+
+2. **StreamingAdapter Base Class**
+   - Enforces `seq` monotonicity (always increasing)
+   - Enforces `segment_id` stability (same ID across updates)
+   - Lifecycle: `start_stream()` → `push_audio()` → `flush()` → `finalize()` → `close()`
+   - `push_audio` before `start_stream` raises `StreamingAdapterError`
+   - `finalize` is idempotent (return same result)
+
+3. **SilenceEndpointer** (optional utility)
+   - Energy-based silence detection
+   - Default OFF, only when model doesn't provide endpoints
+
+4. **FakeStreamingAdapter** for testing
+
+**Commands**:
+```bash
+python -m pytest tests/unit/test_streaming_utils.py -v  # 33 passed
+```
+
+**Notes**: No model runtime imports. Lightweight. Ready for Voxtral adapter.
+
+---
+
 ## LCS-08: CLAP Embed + Classify
 
 **Surfaces**: embed (first!), classify (multi-surface model!)
