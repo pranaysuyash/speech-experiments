@@ -1236,6 +1236,105 @@ ModelRegistry.register_loader(
 )
 
 
+# =============================================================================
+# YAMNet Audio Classification (LCS-05)
+# =============================================================================
+
+
+def load_yamnet(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load YAMNet audio classification model with Bundle Contract v2.
+    
+    YAMNet classifies 521 AudioSet event classes using TensorFlow Hub.
+    """
+    try:
+        import numpy as np
+        
+        # Import TensorFlow and Hub
+        try:
+            import tensorflow as tf
+            import tensorflow_hub as hub
+        except ImportError:
+            raise ImportError(
+                "TensorFlow not installed. Install with:\n"
+                "pip install -r models/yamnet/requirements.txt"
+            )
+        
+        # Suppress TF warnings
+        tf.get_logger().setLevel("ERROR")
+        
+        logger.info("Loading YAMNet from TensorFlow Hub...")
+        
+        # Load YAMNet model from TF Hub
+        yamnet_model = hub.load("https://tfhub.dev/google/yamnet/1")
+        
+        # Load class names
+        class_map_path = yamnet_model.class_map_path().numpy().decode("utf-8")
+        with open(class_map_path) as f:
+            # Skip header
+            lines = f.readlines()[1:]
+            class_names = [line.strip().split(",")[2] for line in lines]
+        
+        def classify(audio, sr=16000, top_k=5, **kwargs):
+            """Classify audio using YAMNet."""
+            # Ensure numpy array
+            if hasattr(audio, "numpy"):
+                audio = audio.numpy()
+            audio = np.asarray(audio, dtype=np.float32).flatten()
+            
+            # Resample if needed (YAMNet expects 16kHz)
+            if sr != 16000:
+                try:
+                    import librosa
+                    audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
+                except ImportError:
+                    logger.warning("librosa not available for resampling")
+            
+            # Run inference
+            scores, embeddings, spectrogram = yamnet_model(audio)
+            
+            # Average scores across frames
+            mean_scores = np.mean(scores.numpy(), axis=0)
+            
+            # Get top-k predictions
+            top_indices = np.argsort(mean_scores)[::-1][:top_k]
+            top_labels = [class_names[i] for i in top_indices]
+            top_scores = [float(mean_scores[i]) for i in top_indices]
+            
+            return {
+                "labels": top_labels,
+                "scores": top_scores,
+                "top_k": top_k,
+                "all_scores": mean_scores.tolist(),
+                "embeddings": embeddings.numpy().mean(axis=0).tolist(),  # Average embeddings
+                "meta": {"n_frames": scores.shape[0], "n_classes": len(class_names)},
+            }
+        
+        return {
+            "model_type": "yamnet",
+            "device": "cpu",  # TF Hub runs on CPU by default
+            "capabilities": ["classify"],
+            "modes": ["batch"],
+            "classify": {"predict": classify},
+            "raw": {"model": yamnet_model, "class_names": class_names},
+        }
+    
+    except ImportError as e:
+        raise ImportError(f"Failed to load YAMNet: {e}")
+
+
+ModelRegistry.register_loader(
+    "yamnet",
+    load_yamnet,
+    "YAMNet: Audio event classification (521 classes) from TF Hub",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["classify"],
+    hardware=["cpu"],
+    modes=["batch"],
+)
+
+
 def load_model_from_config(config_path: Path, device: str = "cpu") -> Bundle:
     """
     Load model from YAML config file.

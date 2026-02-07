@@ -1,0 +1,18 @@
+# YAMNet Audio Classification Model
+# TensorFlow Hub - 521 audio event classes
+
+model_id: yamnet
+display_name: "YAMNet"
+description: "Audio event classification (521 classes) using MobileNetV1 architecture from TensorFlow Hub"
+
+# Model source
+source:
+  hub_url: "https://tfhub.dev/google/yamnet/1"
+  paper: "https://arxiv.org/abs/1609.04243"
+
+# Model configuration
+config:
+  sample_rate: 16000
+  frame_length_ms: 960  # 0.96 seconds per frame
+  frame_hop_ms: 480     # 50% overlap
+  top_k: 5              # Return top-k predictions

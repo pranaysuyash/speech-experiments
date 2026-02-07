@@ -1,0 +1,32 @@
+# YAMNet Claims Manifest (LCS-05)
+# Contract: Bundle Contract v2
+
+model_id: yamnet
+runtime: tensorflow
+device_support: [cpu]
+streaming: false
+precision: fp32
+io:
+  format: float32
+  sample_rate: 16000
+ci: false
+ci_reason: "TensorFlow heavyweight, isolated venv required"
+
+claims:
+  - id: yamnet_classify_structural
+    task: classify
+    type: structural
+    description: "Classification produces valid labels with scores"
+    enforcement: required
+    test_ref: claims.classify.smoke_structural_v1
+    thresholds:
+      has_labels: true
+      has_scores: true
+      top_k: 5
+
+  - id: yamnet_521_classes
+    task: classify
+    type: capacity
+    description: "Supports 521 AudioSet event classes"
+    enforcement: optional
+    source: "https://tfhub.dev/google/yamnet/1"

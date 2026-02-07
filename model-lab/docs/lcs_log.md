@@ -1,5 +1,31 @@
 # LCS Log
 
+## LCS-05: YAMNet Audio Classification
+
+**Surfaces**: classify (first implementation!)
+
+**Runtime**: tensorflow
+
+**Devices**: cpu
+
+**Files**:
+- `models/yamnet/config.yaml`
+- `models/yamnet/claims.yaml` (ci=false, TF heavyweight)
+- `models/yamnet/requirements.txt`
+- `models/yamnet/README.md`
+- `harness/registry.py` - loader + registration
+- `tests/integration/test_model_yamnet_smoke.py` - 8 tests (4 structural, 4 model)
+
+**Commands**:
+```bash
+make model-install MODEL=yamnet
+python -m pytest tests/integration/test_model_yamnet_smoke.py -v
+```
+
+**Notes**: 521 AudioSet classes. TF Hub model. Isolated venv recommended.
+
+---
+
 ## LCS-04: Moonshine Tiny ASR
 
 **Surfaces**: asr
