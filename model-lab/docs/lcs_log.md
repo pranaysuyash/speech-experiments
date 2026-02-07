@@ -1,5 +1,48 @@
 # LCS Log
 
+## LCS-12: Basic Pitch Music Transcription
+
+**Surfaces**: music_transcription (first!)
+
+**Runtime**: tensorflow
+
+**Devices**: cpu
+
+**Files**:
+- `models/basic_pitch/config.yaml`
+- `models/basic_pitch/claims.yaml` (music_transcription surface)
+- `models/basic_pitch/requirements.txt`
+- `models/basic_pitch/README.md`
+- `harness/registry.py` - loader + registration
+- `tests/integration/test_model_basic_pitch_smoke.py` - 10 tests
+
+**Output Contract**:
+```python
+{
+    "notes": [
+        {"onset": 0.5, "offset": 1.2, "pitch": 60, "velocity": 0.8},
+        ...
+    ],
+    "midi": <PrettyMIDI>,
+}
+```
+
+**Note Fields**:
+- `onset`: Note start time (seconds)
+- `offset`: Note end time (seconds)
+- `pitch`: MIDI pitch (0-127)
+- `velocity`: Note intensity (0.0-1.0)
+
+**Commands**:
+```bash
+make model-install MODEL=basic_pitch
+python -m pytest tests/integration/test_model_basic_pitch_smoke.py -v
+```
+
+**Notes**: 22.05kHz native, auto-resampling. Instrument-agnostic polyphonic detection.
+
+---
+
 ## LCS-11: Demucs Source Separation
 
 **Surfaces**: separate (first!)

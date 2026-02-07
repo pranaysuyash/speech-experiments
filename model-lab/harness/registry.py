@@ -2048,6 +2048,114 @@ ModelRegistry.register_loader(
 )
 
 
+# =============================================================================
+# Basic Pitch Automatic Music Transcription (LCS-12)
+# =============================================================================
+
+
+def load_basic_pitch(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load Basic Pitch music transcription model with Bundle Contract v2.
+    
+    Basic Pitch transcribes audio to MIDI notes:
+    - Each note has onset, offset, pitch (MIDI), velocity
+    
+    Output: {notes: [{onset, offset, pitch, velocity}], ...}
+    """
+    try:
+        import numpy as np
+        
+        # Import basic-pitch
+        try:
+            from basic_pitch.inference import predict
+            from basic_pitch import ICASSP_2022_MODEL_PATH
+        except ImportError:
+            raise ImportError(
+                "basic-pitch not installed. Install with:\n"
+                "pip install -r models/basic_pitch/requirements.txt"
+            ) from None
+        
+        logger.info("Loading Basic Pitch...")
+        
+        def transcribe(audio, sr=22050, **kwargs):
+            """
+            Transcribe audio to MIDI notes.
+            
+            Args:
+                audio: Input audio
+                sr: Sample rate
+                
+            Returns:
+                {notes: [{onset, offset, pitch, velocity}, ...], ...}
+            """
+            # Ensure numpy array
+            if hasattr(audio, "numpy"):
+                audio = audio.numpy()
+            audio = np.asarray(audio, dtype=np.float32)
+            
+            # Ensure mono
+            if audio.ndim > 1:
+                audio = audio.mean(axis=0)
+            
+            # Resample if needed
+            if sr != 22050:
+                try:
+                    import librosa
+                    audio = librosa.resample(audio, orig_sr=sr, target_sr=22050)
+                except ImportError:
+                    pass
+            
+            # Run prediction
+            model_output, midi_data, note_events = predict(
+                audio,
+                ICASSP_2022_MODEL_PATH,
+            )
+            
+            # Convert note events to consistent format
+            notes = []
+            for start_time, end_time, pitch, velocity, pitch_bend in note_events:
+                notes.append({
+                    "onset": float(start_time),
+                    "offset": float(end_time),
+                    "pitch": int(pitch),  # MIDI pitch (0-127)
+                    "velocity": float(velocity),
+                })
+            
+            return {
+                "notes": notes,
+                "midi": midi_data,  # Pretty MIDI object
+                "model_output": {
+                    "contours": model_output["contour"],
+                    "notes": model_output["note"],
+                    "onsets": model_output["onset"],
+                },
+            }
+        
+        return {
+            "model_type": "basic_pitch",
+            "device": "cpu",
+            "capabilities": ["music_transcription"],
+            "modes": ["batch"],
+            "music_transcription": {"transcribe": transcribe},
+            "raw": {},
+        }
+    
+    except ImportError as e:
+        raise ImportError(f"Failed to load Basic Pitch: {e}") from e
+
+
+ModelRegistry.register_loader(
+    "basic_pitch",
+    load_basic_pitch,
+    "Basic Pitch: Automatic music transcription",
+    status=ModelStatus.EXPERIMENTAL,
+    version="0.2.0",
+    capabilities=["music_transcription"],
+    hardware=["cpu"],
+    modes=["batch"],
+)
+
+
 def load_model_from_config(config_path: Path, device: str = "cpu") -> Bundle:
     """
     Load model from YAML config file.

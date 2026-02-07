@@ -1,0 +1,25 @@
+# Basic Pitch Automatic Music Transcription Model
+# First music_transcription surface implementation
+
+model_id: basic_pitch
+display_name: "Basic Pitch"
+description: "Lightweight automatic music transcription from Spotify's Audio Intelligence Lab"
+
+# Model source
+source:
+  repo: "https://github.com/spotify/basic-pitch"
+  paper: "https://arxiv.org/abs/2202.09048"
+  license: "Apache 2.0"
+
+# Variants
+variants:
+  default:
+    description: "Default model (ICASSP 2022)"
+    default: true
+
+default_variant: default
+
+# Model configuration
+config:
+  sample_rate: 22050
+  frame_hop_ms: 11.6  # ~256 samples at 22050 Hz

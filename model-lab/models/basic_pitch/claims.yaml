@@ -1,0 +1,33 @@
+# Basic Pitch Claims Manifest (LCS-12)
+# Contract: Bundle Contract v2
+
+model_id: basic_pitch
+runtime: tensorflow
+device_support: [cpu]
+streaming: false
+precision: fp32
+io:
+  format: float32
+  sample_rate: 22050
+ci: false
+ci_reason: "TensorFlow heavyweight, isolated venv required"
+
+claims:
+  - id: basic_pitch_music_transcription_structural
+    task: music_transcription
+    type: structural
+    description: "Returns list of notes with onset, offset, and pitch"
+    enforcement: required
+    test_ref: claims.music_transcription.smoke_v1
+    thresholds:
+      has_notes_list: true
+      notes_have_onset: true
+      notes_have_offset: true
+      notes_have_pitch: true
+
+  - id: basic_pitch_deterministic_structure
+    task: music_transcription
+    type: structural
+    description: "Output structure is consistent regardless of input"
+    enforcement: required
+    test_ref: claims.music_transcription.structure_v1
