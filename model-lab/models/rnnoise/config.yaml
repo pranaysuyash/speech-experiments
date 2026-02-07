@@ -1,0 +1,17 @@
+# RNNoise Audio Enhancement Model
+# Native C library with Python bindings via pyrnnoise
+
+model_id: rnnoise
+display_name: "RNNoise"
+description: "Real-time noise suppression using RNN from Mozilla/Xiph.org"
+
+# Model source
+source:
+  repo: "https://github.com/xiph/rnnoise"
+  paper: "https://arxiv.org/abs/1709.08243"
+  python: "pyrnnoise"
+
+# Model configuration
+config:
+  sample_rate: 48000  # RNNoise native rate
+  frame_size: 480     # 10ms at 48kHz

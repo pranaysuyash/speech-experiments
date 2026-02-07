@@ -1,0 +1,29 @@
+# RNNoise Claims Manifest (LCS-06)
+# Contract: Bundle Contract v2
+
+model_id: rnnoise
+runtime: native
+device_support: [cpu]
+streaming: true
+precision: fp32
+io:
+  format: float32
+  sample_rate: 48000
+ci: true
+
+claims:
+  - id: rnnoise_enhance_structural
+    task: enhance
+    type: structural
+    description: "Enhancement produces audio output same length as input"
+    enforcement: required
+    test_ref: claims.enhance.smoke_structural_v1
+    thresholds:
+      output_length_matches: true
+
+  - id: rnnoise_realtime_claim
+    task: enhance
+    type: performance
+    description: "Supports real-time processing (<10ms latency per frame)"
+    enforcement: optional
+    source: "https://github.com/xiph/rnnoise"

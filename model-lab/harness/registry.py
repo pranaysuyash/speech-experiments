@@ -1335,6 +1335,115 @@ ModelRegistry.register_loader(
 )
 
 
+# =============================================================================
+# RNNoise Audio Enhancement (LCS-06)
+# =============================================================================
+
+
+def load_rnnoise(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load RNNoise audio enhancement model with Bundle Contract v2.
+    
+    RNNoise is a real-time noise suppression library using GRU-based RNN.
+    Native runtime (C library with Python bindings via pyrnnoise).
+    """
+    try:
+        import numpy as np
+        
+        # Import pyrnnoise Python bindings
+        try:
+            from pyrnnoise import RNNoise
+        except ImportError:
+            raise ImportError(
+                "pyrnnoise not installed. Install with:\n"
+                "pip install -r models/rnnoise/requirements.txt"
+            )
+        
+        logger.info("Loading RNNoise...")
+        
+        # Create RNNoise instance
+        denoiser = RNNoise()
+        
+        def enhance(audio, sr=48000, **kwargs):
+            """Enhance audio by removing noise using RNNoise."""
+            # Ensure numpy array
+            if hasattr(audio, "numpy"):
+                audio = audio.numpy()
+            audio = np.asarray(audio, dtype=np.float32).flatten()
+            
+            # RNNoise expects 48kHz, resample if needed
+            original_sr = sr
+            if sr != 48000:
+                try:
+                    import librosa
+                    audio = librosa.resample(audio, orig_sr=sr, target_sr=48000)
+                    sr = 48000
+                except ImportError:
+                    logger.warning("librosa not available for resampling, may produce artifacts")
+            
+            # Process audio through RNNoise
+            # RNNoise processes in 10ms frames (480 samples at 48kHz)
+            frame_size = 480
+            output = np.zeros_like(audio)
+            vad_probs = []
+            
+            for i in range(0, len(audio) - frame_size + 1, frame_size):
+                frame = audio[i:i + frame_size]
+                # pyrnnoise returns (denoised_frame, vad_probability)
+                denoised, vad_prob = denoiser.process_frame(frame)
+                output[i:i + frame_size] = denoised
+                vad_probs.append(float(vad_prob))
+            
+            # Handle remaining samples (if any)
+            remaining = len(audio) % frame_size
+            if remaining > 0:
+                # Pad the last frame
+                last_frame = np.zeros(frame_size, dtype=np.float32)
+                last_frame[:remaining] = audio[-remaining:]
+                denoised, vad_prob = denoiser.process_frame(last_frame)
+                output[-remaining:] = denoised[:remaining]
+                vad_probs.append(float(vad_prob))
+            
+            # Resample back to original rate if needed
+            if original_sr != 48000:
+                try:
+                    import librosa
+                    output = librosa.resample(output, orig_sr=48000, target_sr=original_sr)
+                except ImportError:
+                    pass
+            
+            return {
+                "audio": output,
+                "sample_rate": original_sr,
+                "vad_probs": vad_probs,
+                "meta": {"frame_size": frame_size, "n_frames": len(vad_probs)},
+            }
+        
+        return {
+            "model_type": "rnnoise",
+            "device": "cpu",  # Native C, CPU only
+            "capabilities": ["enhance"],
+            "modes": ["batch", "streaming"],
+            "enhance": {"process": enhance},
+            "raw": {"denoiser": denoiser},
+        }
+    
+    except ImportError as e:
+        raise ImportError(f"Failed to load RNNoise: {e}")
+
+
+ModelRegistry.register_loader(
+    "rnnoise",
+    load_rnnoise,
+    "RNNoise: Real-time noise suppression (native C runtime)",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["enhance"],
+    hardware=["cpu"],
+    modes=["batch", "streaming"],
+)
+
+
 def load_model_from_config(config_path: Path, device: str = "cpu") -> Bundle:
     """
     Load model from YAML config file.

@@ -1,0 +1,10 @@
+# RNNoise Dependencies
+# Install: pip install -r models/rnnoise/requirements.txt
+
+# Python bindings for RNNoise
+pyrnnoise>=0.0.5
+
+# Audio processing
+numpy>=1.20.0
+librosa>=0.10.0
+soundfile>=0.12.0

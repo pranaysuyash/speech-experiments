@@ -1,5 +1,31 @@
 # LCS Log
 
+## LCS-06: RNNoise Audio Enhancement
+
+**Surfaces**: enhance (first implementation!)
+
+**Runtime**: native (C library)
+
+**Devices**: cpu
+
+**Files**:
+- `models/rnnoise/config.yaml`
+- `models/rnnoise/claims.yaml` (streaming=true)
+- `models/rnnoise/requirements.txt` (pyrnnoise)
+- `models/rnnoise/README.md`
+- `harness/registry.py` - loader + registration
+- `tests/integration/test_model_rnnoise_smoke.py` - 8 tests
+
+**Commands**:
+```bash
+make model-install MODEL=rnnoise
+python -m pytest tests/integration/test_model_rnnoise_smoke.py -v
+```
+
+**Notes**: Real-time <10ms latency. 48kHz native, auto-resampling. VAD probs returned.
+
+---
+
 ## LCS-05: YAMNet Audio Classification
 
 **Surfaces**: classify (first implementation!)
