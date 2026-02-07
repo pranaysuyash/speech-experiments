@@ -1552,6 +1552,156 @@ ModelRegistry.register_loader(
 )
 
 
+# =============================================================================
+# CLAP Contrastive Language-Audio Pretraining (LCS-08)
+# =============================================================================
+
+
+def load_clap(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load CLAP audio embedding and classification model with Bundle Contract v2.
+    
+    CLAP provides:
+    - embed: Fixed-dimension audio embeddings (512-d)
+    - classify: Zero-shot classification via text prompts
+    
+    First multi-surface model in the registry!
+    """
+    try:
+        import numpy as np
+        
+        # Import laion-clap
+        try:
+            import laion_clap
+        except ImportError:
+            raise ImportError(
+                "laion-clap not installed. Install with:\n"
+                "pip install -r models/clap/requirements.txt"
+            )
+        
+        import torch
+        
+        # Device handling
+        if device == "mps":
+            actual_device = "mps" if torch.backends.mps.is_available() else "cpu"
+        elif device == "cuda":
+            actual_device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            actual_device = "cpu"
+        
+        logger.info(f"Loading CLAP on {actual_device}...")
+        
+        # Load model - use HTSAT-tiny for speed
+        model = laion_clap.CLAP_Module(enable_fusion=False)
+        model.load_ckpt()  # Downloads checkpoint if needed
+        
+        if actual_device != "cpu":
+            model = model.to(actual_device)
+        
+        model.eval()
+        
+        def encode_audio(audio, sr=48000, **kwargs):
+            """Generate audio embedding using CLAP."""
+            # Ensure numpy array
+            if hasattr(audio, "numpy"):
+                audio = audio.numpy()
+            audio = np.asarray(audio, dtype=np.float32).flatten()
+            
+            # CLAP expects 48kHz
+            if sr != 48000:
+                try:
+                    import librosa
+                    audio = librosa.resample(audio, orig_sr=sr, target_sr=48000)
+                except ImportError:
+                    pass
+            
+            # Get embedding
+            with torch.no_grad():
+                embedding = model.get_audio_embedding_from_data(
+                    [audio], use_tensor=False
+                )
+            
+            return {
+                "embedding": embedding[0],
+                "dim": len(embedding[0]),
+                "meta": {"sample_rate": 48000, "device": actual_device},
+            }
+        
+        def classify_audio(audio, sr=48000, labels=None, top_k=5, **kwargs):
+            """Zero-shot classification using text prompts."""
+            if labels is None:
+                labels = ["speech", "music", "silence", "noise", "animal"]
+            
+            # Ensure numpy array
+            if hasattr(audio, "numpy"):
+                audio = audio.numpy()
+            audio = np.asarray(audio, dtype=np.float32).flatten()
+            
+            # CLAP expects 48kHz
+            if sr != 48000:
+                try:
+                    import librosa
+                    audio = librosa.resample(audio, orig_sr=sr, target_sr=48000)
+                except ImportError:
+                    pass
+            
+            # Get embeddings
+            with torch.no_grad():
+                audio_embed = model.get_audio_embedding_from_data(
+                    [audio], use_tensor=True
+                )
+                text_embed = model.get_text_embedding(
+                    labels, use_tensor=True
+                )
+                
+                # Compute similarity
+                audio_embed = audio_embed / audio_embed.norm(dim=-1, keepdim=True)
+                text_embed = text_embed / text_embed.norm(dim=-1, keepdim=True)
+                similarity = (audio_embed @ text_embed.T).squeeze(0)
+                
+                # Softmax for probabilities
+                probs = torch.softmax(similarity * 100, dim=-1)  # Temperature scaling
+            
+            probs = probs.cpu().numpy()
+            
+            # Sort by score
+            sorted_indices = np.argsort(probs)[::-1][:top_k]
+            top_labels = [labels[i] for i in sorted_indices]
+            top_scores = [float(probs[i]) for i in sorted_indices]
+            
+            return {
+                "labels": top_labels,
+                "scores": top_scores,
+                "top_k": top_k,
+                "all_scores": {labels[i]: float(probs[i]) for i in range(len(labels))},
+            }
+        
+        return {
+            "model_type": "clap",
+            "device": actual_device,
+            "capabilities": ["embed", "classify"],  # Multi-surface!
+            "modes": ["batch"],
+            "embed": {"encode": encode_audio},
+            "classify": {"predict": classify_audio},
+            "raw": {"model": model},
+        }
+    
+    except ImportError as e:
+        raise ImportError(f"Failed to load CLAP: {e}")
+
+
+ModelRegistry.register_loader(
+    "clap",
+    load_clap,
+    "CLAP: Audio embeddings + zero-shot classification",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["embed", "classify"],
+    hardware=["cpu", "mps", "cuda"],
+    modes=["batch"],
+)
+
+
 def load_model_from_config(config_path: Path, device: str = "cpu") -> Bundle:
     """
     Load model from YAML config file.

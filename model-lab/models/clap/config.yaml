@@ -1,0 +1,26 @@
+# CLAP Contrastive Language-Audio Pretraining Model
+# Multi-surface: embed + classify via text prompts
+
+model_id: clap
+display_name: "CLAP"
+description: "Contrastive Language-Audio Pretraining for audio embeddings and zero-shot classification"
+
+# Model source
+source:
+  repo: "https://github.com/LAION-AI/CLAP"
+  paper: "https://arxiv.org/abs/2211.06687"
+
+# Variants
+variants:
+  music_audioset:
+    description: "Trained on music and AudioSet"
+    default: true
+  audioset:
+    description: "AudioSet only"
+
+default_variant: music_audioset
+
+# Model configuration
+config:
+  sample_rate: 48000
+  embedding_dim: 512

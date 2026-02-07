@@ -1,0 +1,34 @@
+# CLAP Claims Manifest (LCS-08)
+# Contract: Bundle Contract v2
+
+model_id: clap
+runtime: pytorch
+device_support: [cpu, mps, cuda]
+streaming: false
+precision: fp32
+io:
+  format: float32
+  sample_rate: 48000
+ci: false
+ci_reason: "PyTorch heavyweight, isolated venv required"
+
+claims:
+  - id: clap_embed_structural
+    task: embed
+    type: structural
+    description: "Produces fixed-dimension audio embeddings"
+    enforcement: required
+    test_ref: claims.embed.smoke_structural_v1
+    thresholds:
+      embedding_dim: 512
+      has_embedding: true
+
+  - id: clap_classify_structural
+    task: classify
+    type: structural
+    description: "Zero-shot classification via text prompts"
+    enforcement: required
+    test_ref: claims.classify.zero_shot_v1
+    thresholds:
+      has_labels: true
+      has_scores: true

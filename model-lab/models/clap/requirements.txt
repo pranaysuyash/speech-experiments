@@ -1,0 +1,11 @@
+# CLAP Dependencies
+# Install: pip install -r models/clap/requirements.txt
+# NOTE: PyTorch heavyweight, use isolated venv
+
+# LAION CLAP package
+laion-clap>=1.1.0
+
+# Audio processing
+numpy>=1.20.0
+librosa>=0.10.0
+soundfile>=0.12.0

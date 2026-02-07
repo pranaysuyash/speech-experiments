@@ -1,5 +1,31 @@
 # LCS Log
 
+## LCS-08: CLAP Embed + Classify
+
+**Surfaces**: embed (first!), classify (multi-surface model!)
+
+**Runtime**: pytorch
+
+**Devices**: cpu, mps, cuda
+
+**Files**:
+- `models/clap/config.yaml`
+- `models/clap/claims.yaml` (embed + classify claims)
+- `models/clap/requirements.txt` (laion-clap)
+- `models/clap/README.md`
+- `harness/registry.py` - loader + registration
+- `tests/integration/test_model_clap_smoke.py` - 10 tests
+
+**Commands**:
+```bash
+make model-install MODEL=clap
+python -m pytest tests/integration/test_model_clap_smoke.py -v
+```
+
+**Notes**: 512-d embeddings. Zero-shot classification via text prompts. First multi-surface model.
+
+---
+
 ## LCS-07: DeepFilterNet Audio Enhancement
 
 **Surfaces**: enhance (second implementation, production-grade)
