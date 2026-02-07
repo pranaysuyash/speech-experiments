@@ -4,18 +4,18 @@ LCS-22: Real-time streaming ASR with configurable transcription delay.
 
 ## Overview
 
-- **Architecture**: Voxtral real-time streaming
-- **Runtime**: Mistral API (or local if weights available)
+- **Architecture**: Voxtral Mini 4B (open-weights)
+- **Runtime**: PyTorch
 - **Sample Rate**: 16kHz
 - **Streaming**: Yes
 - **License**: Apache 2.0
 
 ## Configuration
 
-| Parameter | Default | Range | Description |
-|-----------|---------|-------|-------------|
-| `transcription_delay_ms` | 200 | 100-500 | Delay before emitting transcriptions |
-| `chunk_ms` | 100 | 50-500 | Audio chunk size |
+| Parameter | Default | Model Range | Recommended |
+|-----------|---------|-------------|-------------|
+| `transcription_delay_ms` | 200 | 80-2400 | 100-500 |
+| `chunk_ms` | 100 | 50-500 | 100 |
 
 ## Installation
 

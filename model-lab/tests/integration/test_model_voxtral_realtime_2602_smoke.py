@@ -67,18 +67,18 @@ class TestVoxtralRealtimeSmokeTest:
         assert bundle["config"]["transcription_delay_ms"] == 150
     
     def test_delay_clamped_to_range(self):
-        """Verify delay is clamped to 100-500ms range."""
+        """Verify delay is clamped to 80-2400ms range."""
         # Too low
         bundle = ModelRegistry.load_model("voxtral_realtime_2602", {
             "transcription_delay_ms": 50
         }, device="cpu")
-        assert bundle["config"]["transcription_delay_ms"] == 100
+        assert bundle["config"]["transcription_delay_ms"] == 80
         
         # Too high
         bundle = ModelRegistry.load_model("voxtral_realtime_2602", {
-            "transcription_delay_ms": 1000
+            "transcription_delay_ms": 5000
         }, device="cpu")
-        assert bundle["config"]["transcription_delay_ms"] == 500
+        assert bundle["config"]["transcription_delay_ms"] == 2400
     
     def test_streaming_lifecycle(self):
         """Verify streaming lifecycle works."""
@@ -128,7 +128,7 @@ class TestVoxtralRealtimeStructural:
         assert "voxtral_realtime_delay_configurable" in claim_ids
     
     def test_claims_delay_range(self):
-        """Verify claims document 100-500ms delay range."""
+        """Verify claims document 80-2400ms delay range."""
         import yaml
         claims_path = Path(__file__).parent.parent.parent / "models" / "voxtral_realtime_2602" / "claims.yaml"
         with open(claims_path) as f:
@@ -137,6 +137,6 @@ class TestVoxtralRealtimeStructural:
         for claim in claims.get("claims", []):
             if claim.get("id") == "voxtral_realtime_delay_configurable":
                 thresholds = claim.get("thresholds", {})
-                assert thresholds.get("transcription_delay_ms_min") == 100
-                assert thresholds.get("transcription_delay_ms_max") == 500
+                assert thresholds.get("transcription_delay_ms_min") == 80
+                assert thresholds.get("transcription_delay_ms_max") == 2400
                 break

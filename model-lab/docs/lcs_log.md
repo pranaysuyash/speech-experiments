@@ -8,9 +8,9 @@
 |-----|-------|---------|---------|
 | LCS-19 | kyutai_streaming | PyTorch | asr_stream |
 | LCS-18 | nemotron_streaming | NeMo | asr_stream |
-| LCS-20 | parakeet_multitalker | NeMo | asr |
+| LCS-20 | parakeet_multitalker | NeMo | asr (batch) |
 | LCS-21 | glm_tts | PyTorch | tts |
-| LCS-22 | voxtral_realtime_2602 | API | asr_stream |
+| LCS-22 | voxtral_realtime_2602 | PyTorch | asr_stream |
 
 **Streaming Contract**:
 - seq_monotonic, segment_id_stable, finalize_idempotent

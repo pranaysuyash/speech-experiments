@@ -2818,18 +2818,34 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
     """
     Load Voxtral Realtime 2602 with Bundle Contract v2.
     
-    Real-time streaming ASR with configurable transcription_delay_ms.
+    Open-weights Voxtral Mini 4B with configurable transcription_delay_ms.
     Reuses StreamingAdapter for lifecycle.
     """
     try:
         import numpy as np
         
+        try:
+            import torch
+        except ImportError:
+            raise ImportError(
+                "PyTorch not installed. Install with:\n"
+                "pip install -r models/voxtral_realtime_2602/requirements.txt"
+            ) from None
+        
         from harness.streaming import StreamingAdapter
         
-        # Configurable delay knob
+        # Device mapping
+        if device == "mps":
+            torch_device = "mps"
+        elif device == "cuda":
+            torch_device = "cuda"
+        else:
+            torch_device = "cpu"
+        
+        # Configurable delay knob (model supports 80ms-2.4s)
         transcription_delay_ms = config.get("transcription_delay_ms", 200)
-        # Clamp to valid range
-        transcription_delay_ms = max(100, min(500, transcription_delay_ms))
+        # Clamp to model's supported range
+        transcription_delay_ms = max(80, min(2400, transcription_delay_ms))
         
         chunk_ms = config.get("chunk_ms", 100)
         
@@ -2889,7 +2905,7 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
         
         return {
             "model_type": "voxtral_realtime_2602",
-            "device": "cpu",  # API-based
+            "device": torch_device,
             "capabilities": ["asr_stream"],
             "modes": ["streaming"],
             "config": {
@@ -2912,11 +2928,11 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
 ModelRegistry.register_loader(
     "voxtral_realtime_2602",
     load_voxtral_realtime_2602,
-    "Voxtral Realtime 2602: Real-time streaming ASR with configurable delay",
+    "Voxtral Realtime 2602: Open-weights streaming ASR (PyTorch)",
     status=ModelStatus.EXPERIMENTAL,
     version="1.0.0",
     capabilities=["asr_stream"],
-    hardware=["cpu"],
+    hardware=["cpu", "cuda", "mps"],
     modes=["streaming"],
 )
 

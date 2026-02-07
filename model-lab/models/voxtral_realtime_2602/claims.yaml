@@ -2,10 +2,13 @@
 # Contract: Bundle Contract v2 + Streaming Lifecycle
 
 model_id: voxtral_realtime_2602
-runtime: mistral_api
-device_support: [cpu]  # API-based
+runtime: pytorch
+device_support: [cpu, cuda, mps]
 streaming: true
-precision: n/a
+precision: fp16
+io:
+  format: float32
+  sample_rate: 16000
 io:
   format: float32
   sample_rate: 16000
@@ -27,11 +30,11 @@ claims:
   - id: voxtral_realtime_delay_configurable
     task: asr_stream
     type: structural
-    description: "Configurable transcription_delay_ms (100-500ms range)"
+    description: "Configurable transcription_delay_ms (model: 80ms-2.4s, recommended: 100-500ms)"
     enforcement: required
     thresholds:
-      transcription_delay_ms_min: 100
-      transcription_delay_ms_max: 500
+      transcription_delay_ms_min: 80
+      transcription_delay_ms_max: 2400
       transcription_delay_ms_default: 200
 
   - id: voxtral_realtime_latency
