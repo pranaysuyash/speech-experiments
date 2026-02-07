@@ -1,15 +1,35 @@
 {
+    "version": "1.0",
+    "description": "Minimal ASR benchmark samples (loose reference, normalize before WER)",
     "samples": [
         {
             "id": "clean_speech_10s",
             "audio": "data/audio/clean_speech_10s.wav",
-            "reference": "this is a test of clean speech audio for benchmarking purposes"
+            "reference": "this is a test of clean speech audio for benchmarking purposes",
+            "duration_s": 10.0,
+            "type": "clean"
         },
         {
             "id": "speech_like_4s",
             "audio": "data/audio/speech_like_4s.wav",
-            "reference": "short speech sample"
+            "reference": "short speech sample",
+            "duration_s": 4.0,
+            "type": "clean"
+        },
+        {
+            "id": "conversation_2ppl_10s",
+            "audio": "data/audio/conversation_2ppl_10s.wav",
+            "reference": "conversation between two people testing the system",
+            "duration_s": 10.0,
+            "type": "multi_speaker"
+        },
+        {
+            "id": "noisy_speech_10s",
+            "audio": "data/audio/noisy_speech_10s_20pct.wav",
+            "reference": "noisy speech sample with background noise",
+            "duration_s": 10.0,
+            "type": "noisy"
         }
     ],
-    "notes": "Loose reference - normalize lowercase, strip punctuation before WER"
+    "notes": "Normalize: lowercase, strip punctuation. Reference text is approximate."
 }

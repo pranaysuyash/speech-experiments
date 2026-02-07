@@ -1,5 +1,28 @@
 # LCS Log
 
+## LCS-B2: Batch ASR Benchmark
+
+**Multi-model sweep with comparison table**
+
+```bash
+# Sweep all CI-safe ASR models on one audio file
+make bench-asr-all AUDIO=data/audio/clean_speech_10s.wav REF="expected text" DEVICE=cpu
+
+# View sorted report
+make bench-report-asr
+```
+
+**Enhanced metrics (wall_ms, text_len, num_segments)**
+
+**New Makefile targets:**
+- `bench-asr-all` - Run all ASR models via selector
+- `bench-report-asr` - Generate sorted table from results/
+- `bench-report-asr-stream` - Same for streaming
+
+**Tests:** 7 pass (including new sorting and report tests)
+
+---
+
 ## LCS-B1: Streaming ASR Benchmark Framework
 
 **Latency + WER/CER benchmarks for asr_stream models**

@@ -1,5 +1,5 @@
 """
-Bench runner tests (LCS-B1).
+Bench runner tests (LCS-B1/B2).
 
 Tests for benchmark runner functions.
 """
@@ -12,6 +12,8 @@ from bench.runner import (
     get_run_id,
     create_result_schema,
     format_result_table,
+    load_results,
+    generate_bench_report,
 )
 
 
@@ -68,13 +70,13 @@ class TestFormatResultTable:
                 "model_id": "model_a",
                 "surface": "asr",
                 "metrics": {"wer": 0.1, "cer": 0.05, "rtf": 0.5},
-                "timing": {"rtf": 0.5},
+                "timing": {"rtf": 0.5, "wall_ms": 500},
             },
             {
                 "model_id": "model_b",
                 "surface": "asr_stream",
                 "metrics": {"wer": 0.15, "cer": 0.08, "rtf": 0.3, "first_token_latency_ms": 45.2},
-                "timing": {"rtf": 0.3},
+                "timing": {"rtf": 0.3, "wall_ms": 300},
             },
         ]
         
@@ -84,3 +86,35 @@ class TestFormatResultTable:
         assert "model_b" in table
         assert "asr" in table
         assert "asr_stream" in table
+    
+    def test_sorts_by_wer(self):
+        """Results sorted by WER."""
+        results = [
+            {"model_id": "worse", "surface": "asr", "metrics": {"wer": 0.5, "rtf": 0.5}, "timing": {}},
+            {"model_id": "better", "surface": "asr", "metrics": {"wer": 0.1, "rtf": 0.5}, "timing": {}},
+        ]
+        
+        table = format_result_table(results, sort_by="wer")
+        
+        # Better should come before worse
+        better_pos = table.find("better")
+        worse_pos = table.find("worse")
+        assert better_pos < worse_pos
+
+
+class TestLoadResults:
+    """Test loading results from directory."""
+    
+    def test_empty_dir_returns_empty(self, tmp_path):
+        """Non-existent directory returns empty list."""
+        results = load_results(str(tmp_path / "nonexistent"))
+        assert results == []
+
+
+class TestGenerateBenchReport:
+    """Test report generation."""
+    
+    def test_empty_report(self, tmp_path):
+        """Empty directory returns message."""
+        report = generate_bench_report(surface="asr", results_dir=str(tmp_path))
+        assert "No asr results" in report

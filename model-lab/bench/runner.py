@@ -140,7 +140,7 @@ def run_batch_asr_bench(
     """
     Run batch ASR benchmark.
     
-    Returns result with WER/CER and RTF.
+    Returns result with WER/CER, RTF, and additional metrics.
     """
     import soundfile as sf
     
@@ -161,14 +161,24 @@ def run_batch_asr_bench(
     # Run transcription
     t_start = time.perf_counter()
     result = bundle["asr"]["transcribe"](audio, sr=sr)
-    wall_s = time.perf_counter() - t_start
+    t_end = time.perf_counter()
+    wall_s = t_end - t_start
+    wall_ms = wall_s * 1000
     
     hypothesis = result.get("text", "")
     rtf = wall_s / duration_s if duration_s > 0 else 0
     
-    # Compute WER/CER if reference provided
+    # Extract segments if available
+    segments = result.get("segments", [])
+    num_segments = len(segments) if segments else 1
+    
+    # Compute metrics
     metrics = {
         "rtf": round(rtf, 4),
+        "wall_ms": round(wall_ms, 1),
+        "audio_duration_s": round(duration_s, 3),
+        "text_len": len(hypothesis),
+        "num_segments": num_segments,
         "transcript": hypothesis,
     }
     
@@ -184,7 +194,7 @@ def run_batch_asr_bench(
         surface="asr",
         input_info={"path": audio_path, "duration_s": round(duration_s, 3), "sr": sr},
         metrics=metrics,
-        timing={"wall_s": round(wall_s, 3), "rtf": round(rtf, 4)},
+        timing={"wall_s": round(wall_s, 3), "wall_ms": round(wall_ms, 1), "rtf": round(rtf, 4)},
         env={"device": device, "model_type": bundle.get("model_type", "")},
     )
 
@@ -203,23 +213,103 @@ def save_result(result: dict[str, Any], output_dir: str = "bench/results") -> Pa
     return filepath
 
 
-def format_result_table(results: list[dict[str, Any]]) -> str:
-    """Format multiple results as a comparison table."""
+def load_results(results_dir: str = "bench/results", surface: str | None = None) -> list[dict[str, Any]]:
+    """Load all results from directory, optionally filtered by surface."""
+    results_path = Path(results_dir)
+    if not results_path.exists():
+        return []
+    
+    results = []
+    for filepath in results_path.glob("*.json"):
+        with open(filepath) as f:
+            result = json.load(f)
+            if surface is None or result.get("surface") == surface:
+                results.append(result)
+    
+    return results
+
+
+def run_batch_asr_sweep(
+    audio_path: str,
+    reference: str | None = None,
+    device: str = "cpu",
+    models: list[str] | None = None,
+    ci_only: bool = True,
+) -> list[dict[str, Any]]:
+    """
+    Run batch ASR benchmark across multiple models.
+    
+    Args:
+        audio_path: Path to audio file
+        reference: Optional reference text for WER
+        device: Device to use (cpu, cuda, mps)
+        models: List of model IDs, or None to use selector
+        ci_only: If True and models is None, only include CI-safe models
+    
+    Returns:
+        List of benchmark results
+    """
+    from harness.selector import list_models_by_filter
+    
+    if models is None:
+        # Use selector to find ASR models
+        model_list = list_models_by_filter(surface="asr", device=device, ci=ci_only if ci_only else None)
+        models = [m["model_id"] for m in model_list]
+    
+    results = []
+    for model_id in models:
+        try:
+            result = run_batch_asr_bench(model_id, audio_path, reference=reference, device=device)
+            save_result(result)
+            results.append(result)
+        except Exception as e:
+            # Record failure
+            results.append({
+                "model_id": model_id,
+                "surface": "asr",
+                "error": str(e),
+            })
+    
+    return results
+
+
+def format_result_table(results: list[dict[str, Any]], sort_by: str = "wer") -> str:
+    """Format multiple results as a comparison table, sorted."""
     if not results:
         return "No results."
     
+    # Filter out errors
+    valid_results = [r for r in results if "error" not in r]
+    
+    # Sort by metric
+    def get_sort_key(r):
+        metrics = r.get("metrics", {})
+        if sort_by == "wer":
+            wer = metrics.get("wer", 999)
+            rtf = metrics.get("rtf", 999)
+            return (wer if isinstance(wer, (int, float)) else 999, rtf)
+        elif sort_by == "rtf":
+            return metrics.get("rtf", 999)
+        return 0
+    
+    valid_results = sorted(valid_results, key=get_sort_key)
+    
     lines = [
-        "| Model | Surface | RTF | WER | CER | First Token |",
-        "|-------|---------|-----|-----|-----|-------------|",
+        "| Model | Surface | RTF | WER | CER | Wall (ms) | First Token |",
+        "|-------|---------|-----|-----|-----|-----------|-------------|",
     ]
     
-    for r in results:
+    for r in valid_results:
         model = r.get("model_id", "?")
         surface = r.get("surface", "?")
-        rtf = r.get("metrics", {}).get("rtf", r.get("timing", {}).get("rtf", "?"))
-        wer = r.get("metrics", {}).get("wer", "-")
-        cer = r.get("metrics", {}).get("cer", "-")
-        first_token = r.get("metrics", {}).get("first_token_latency_ms", "-")
+        metrics = r.get("metrics", {})
+        timing = r.get("timing", {})
+        
+        rtf = metrics.get("rtf", timing.get("rtf", "-"))
+        wer = metrics.get("wer", "-")
+        cer = metrics.get("cer", "-")
+        wall_ms = timing.get("wall_ms", "-")
+        first_token = metrics.get("first_token_latency_ms", "-")
         
         if isinstance(rtf, float):
             rtf = f"{rtf:.3f}"
@@ -227,9 +317,34 @@ def format_result_table(results: list[dict[str, Any]]) -> str:
             wer = f"{wer:.3f}"
         if isinstance(cer, float):
             cer = f"{cer:.3f}"
+        if isinstance(wall_ms, float):
+            wall_ms = f"{wall_ms:.0f}"
         if isinstance(first_token, float):
             first_token = f"{first_token:.1f}ms"
         
-        lines.append(f"| {model} | {surface} | {rtf} | {wer} | {cer} | {first_token} |")
+        lines.append(f"| {model} | {surface} | {rtf} | {wer} | {cer} | {wall_ms} | {first_token} |")
+    
+    # Add error entries at the end
+    error_results = [r for r in results if "error" in r]
+    for r in error_results:
+        model = r.get("model_id", "?")
+        error = r.get("error", "unknown")[:30]
+        lines.append(f"| {model} | ERROR | - | - | - | - | {error}... |")
     
     return "\n".join(lines)
+
+
+def generate_bench_report(surface: str = "asr", results_dir: str = "bench/results") -> str:
+    """Generate a benchmark report for a surface."""
+    results = load_results(results_dir, surface=surface)
+    
+    if not results:
+        return f"No {surface} results found in {results_dir}/"
+    
+    header = f"# {surface.upper()} Benchmark Report\n\n"
+    header += f"**{len(results)} runs**\n\n"
+    
+    table = format_result_table(results, sort_by="wer")
+    
+    return header + table
+

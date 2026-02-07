@@ -119,20 +119,42 @@ result = run_streaming_asr_bench('$(MODEL)', '$(AUDIO)', reference='$(REF)' if '
 save_result(result); \
 print(json.dumps(result, indent=2))"
 
-# Usage: make bench-asr MODEL=faster_whisper AUDIO=data/audio/clean_speech_10s.wav [REF="reference text"]
+# Usage: make bench-asr MODEL=faster_whisper_large_v3 AUDIO=data/audio/clean_speech_10s.wav [REF="reference text"]
 bench-asr:
 ifndef MODEL
-	$(error MODEL is required. Usage: make bench-asr MODEL=faster_whisper AUDIO=audio.wav)
+	$(error MODEL is required. Usage: make bench-asr MODEL=faster_whisper_large_v3 AUDIO=audio.wav)
 endif
 ifndef AUDIO
-	$(error AUDIO is required. Usage: make bench-asr MODEL=faster_whisper AUDIO=audio.wav)
+	$(error AUDIO is required. Usage: make bench-asr MODEL=faster_whisper_large_v3 AUDIO=audio.wav)
 endif
 	$(PYTHON) -c "\
 import json; \
 from bench.runner import run_batch_asr_bench, save_result; \
-result = run_batch_asr_bench('$(MODEL)', '$(AUDIO)', reference='$(REF)' if '$(REF)' else None); \
+result = run_batch_asr_bench('$(MODEL)', '$(AUDIO)', reference='$(REF)' if '$(REF)' else None, device='$(if $(DEVICE),$(DEVICE),cpu)'); \
 save_result(result); \
 print(json.dumps(result, indent=2))"
+
+# Usage: make bench-asr-all AUDIO=data/audio/clean_speech_10s.wav [REF="text"] [DEVICE=cpu]
+bench-asr-all:
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make bench-asr-all AUDIO=audio.wav)
+endif
+	$(PYTHON) -c "\
+from bench.runner import run_batch_asr_sweep, format_result_table; \
+results = run_batch_asr_sweep('$(AUDIO)', reference='$(REF)' if '$(REF)' else None, device='$(if $(DEVICE),$(DEVICE),cpu)'); \
+print(format_result_table(results))"
+
+# Usage: make bench-report-asr
+bench-report-asr:
+	$(PYTHON) -c "\
+from bench.runner import generate_bench_report; \
+print(generate_bench_report(surface='asr'))"
+
+# Usage: make bench-report-asr-stream
+bench-report-asr-stream:
+	$(PYTHON) -c "\
+from bench.runner import generate_bench_report; \
+print(generate_bench_report(surface='asr_stream'))"
 
 # Usage: make tts MODEL=lfm2_5_audio TEXT="Hello world"
 tts:
