@@ -1,5 +1,29 @@
 # LCS Log
 
+## LCS-03: Enhance + Separate Metrics + Streaming Misuse
+
+**Surfaces**: enhance, separate (metrics support)
+
+**Files**:
+- `harness/metrics_enhance.py` - si_snr, stoi, pesq (optional deps)
+- `harness/metrics_separate.py` - bss_eval, sdr, multi_source_sdr (mir_eval optional)
+- `tests/unit/test_metrics_enhance.py` - 12 tests
+- `tests/unit/test_metrics_separate.py` - 8 tests
+- `tests/unit/test_asr_stream_contract_misuse.py` - 8 tests
+
+**Commands**:
+```bash
+python -m pytest tests/unit/test_metrics_enhance.py tests/unit/test_metrics_separate.py -v  # 14 pass, 6 skip
+python -m pytest tests/unit/test_asr_stream_contract_misuse.py -v  # 8 pass
+```
+
+**Notes**: 
+- SI-SNR always available, STOI/PESQ optional (never fail CI)
+- SDR/SIR/SAR via mir_eval (optional)
+- Streaming lifecycle: finalize is idempotent, close always safe
+
+---
+
 ## LCS-02: Classification Metrics
 
 **Surfaces**: classify (metrics support)
