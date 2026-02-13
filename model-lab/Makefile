@@ -5,6 +5,7 @@
 
 # Default Python for uv
 PYTHON := uv run python
+RUNNER := $(PYTHON) scripts/run_bench.py
 
 # =============================================================================
 # Setup
@@ -134,6 +135,17 @@ result = run_batch_asr_bench('$(MODEL)', '$(AUDIO)', reference='$(REF)' if '$(RE
 save_result(result); \
 print(json.dumps(result, indent=2))"
 
+# Usage: make bench-asr-long MODEL=faster_whisper_large_v3 [AUDIO=data/audio/long_audio.wav] [CHUNK=30] [STRIDE=5] [BATCH=16] [DEVICE=cpu]
+bench-asr-long:  ## Run long-form ASR benchmark with chunking/stride
+	$(RUNNER) asr \
+		--model $(MODEL) \
+		--audio $(if $(AUDIO),$(AUDIO),$(LONG_AUDIO)) \
+		--device $(DEVICE) \
+		$(if $(CHUNK),--chunk-len $(CHUNK),) \
+		$(if $(STRIDE),--stride-len $(STRIDE),) \
+		$(if $(BATCH),--batch-size $(BATCH),) \
+		--output
+
 # Usage: make bench-asr-all AUDIO=data/audio/clean_speech_10s.wav [REF="text"] [DEVICE=cpu]
 bench-asr-all:
 ifndef AUDIO
@@ -177,12 +189,67 @@ bench-report-enhance:
 from bench.runner import generate_bench_report; \
 print(generate_bench_report(surface='enhance'))"
 
+# Usage: make bench-separate MODEL=demucs AUDIO=data/audio/mix.wav [DEVICE=cpu]
+bench-separate:
+ifndef MODEL
+	$(error MODEL is required. Usage: make bench-separate MODEL=demucs AUDIO=mix.wav)
+endif
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make bench-separate MODEL=demucs AUDIO=mix.wav)
+endif
+	$(RUNNER) separate --model $(MODEL) --audio $(AUDIO) --device $(DEVICE) --output
+
+bench-report-separate:  ## Generate separation benchmark report
+	$(PYTHON) -c "\
+from bench.runner import generate_bench_report; \
+print(generate_bench_report(surface='separate'))"
+
+# Usage: make bench-classify MODEL=clap AUDIO=data/audio/dog.wav [DEVICE=cpu]
+bench-classify:
+ifndef MODEL
+	$(error MODEL is required. Usage: make bench-classify MODEL=clap AUDIO=dog.wav)
+endif
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make bench-classify MODEL=clap AUDIO=dog.wav)
+endif
+	$(RUNNER) classify --model $(MODEL) --audio $(AUDIO) --device $(DEVICE) --output
+
+bench-report-classify:
+	$(PYTHON) -c "\
+from bench.runner import generate_bench_report; \
+print(generate_bench_report(surface='classify'))"
+
+# Usage: make bench-embed MODEL=clap AUDIO=data/audio/dog.wav [DEVICE=cpu]
+bench-embed:
+ifndef MODEL
+	$(error MODEL is required. Usage: make bench-embed MODEL=clap AUDIO=dog.wav)
+endif
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make bench-embed MODEL=clap AUDIO=dog.wav)
+endif
+	$(RUNNER) embed --model $(MODEL) --audio $(AUDIO) --device $(DEVICE) --output
+
+bench-report-embed:
+	$(PYTHON) -c "\
+from bench.runner import generate_bench_report; \
+print(generate_bench_report(surface='embed'))"
+
 # Usage: make tts MODEL=lfm2_5_audio TEXT="Hello world"
-tts:
+# Usage: make tts MODEL=lfm2_5_audio TEXT="Hello world" [DEVICE=cpu]
+tts: bench-tts
+
+bench-tts:
 ifndef MODEL
 	$(error MODEL is required. Usage: make tts MODEL=lfm2_5_audio TEXT="Hello")
 endif
-	$(PYTHON) scripts/run_tts.py --model $(MODEL) --text "$(TEXT)"
+ifndef TEXT
+	$(error TEXT is required. Usage: make tts MODEL=lfm2_5_audio TEXT="Hello")
+endif
+	$(RUNNER) tts --model $(MODEL) --text "$(TEXT)" --device $(DEVICE) --output
+
+# Usage: make test-tts MODEL=lfm2_5_audio [DATASET=tts_smoke_v1]
+test-tts:
+	$(PYTHON) scripts/run_tts.py --model $(MODEL) --dataset $(if $(DATASET),$(DATASET),tts_smoke_v1)
 
 # =============================================================================
 # Analysis
@@ -222,13 +289,7 @@ result = run_pipeline('$(PIPELINE)', audio, sr); \
 print('Steps:', result.steps_executed); \
 print('Final:', result.final)"
 
-# Usage: make model-install MODEL=demucs
-model-install:
-ifndef MODEL
-	$(error MODEL is required. Usage: make model-install MODEL=demucs)
-endif
-	pip install -r models/$(MODEL)/requirements.txt
-	@echo "✓ Model $(MODEL) dependencies installed"
+
 
 # =============================================================================
 # Cleanup
@@ -276,3 +337,50 @@ help:
 	@echo ""
 	@echo "  Cleanup:"
 	@echo "    make clean         - Remove cache files"
+
+# =============================================================================
+# Isolation (LCS-I)
+# =============================================================================
+
+# Usage: make model-venv MODEL=clap [PYTHON_VERSION=3.12]
+model-venv:
+ifndef MODEL
+	$(error MODEL is required)
+endif
+	@echo "Creating venv for $(MODEL)..."
+	uv venv models/$(MODEL)/venv --python $(if $(PYTHON_VERSION),$(PYTHON_VERSION),3.12)
+	@echo "✓ Created models/$(MODEL)/venv"
+
+# Usage: make model-install MODEL=clap
+model-install:
+ifndef MODEL
+	$(error MODEL is required)
+endif
+	@echo "Installing requirements for $(MODEL)..."
+	uv pip install -p models/$(MODEL)/venv -r models/$(MODEL)/requirements.txt
+	@echo "✓ Installed requirements for $(MODEL)"
+
+# Usage: make model-run MODEL=clap CMD="python scripts/run_bench.py ..."
+model-run:
+ifndef MODEL
+	$(error MODEL is required)
+endif
+ifndef CMD
+	$(error CMD is required. Example: make model-run MODEL=clap CMD="python scripts/run_bench.py ...")
+endif
+	. models/$(MODEL)/venv/bin/activate && $(CMD)
+
+# Usage: make model-shell MODEL=clap
+model-shell:
+ifndef MODEL
+	$(error MODEL is required)
+endif
+	. models/$(MODEL)/venv/bin/activate && $${SHELL:-/bin/bash}
+
+# Usage: make model-diagnose MODEL=clap
+model-diagnose:
+ifndef MODEL
+	$(error MODEL is required)
+endif
+	@echo "Diagnosing $(MODEL) environment..."
+	@. models/$(MODEL)/venv/bin/activate && python scripts/diagnose_env.py

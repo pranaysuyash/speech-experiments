@@ -32,6 +32,7 @@ claims:
     type: structural
     description: "Configurable transcription_delay_ms (model: 80ms-2.4s, recommended: 100-500ms)"
     enforcement: required
+    test_ref: claims.asr_stream.delay_configurable_v1
     thresholds:
       transcription_delay_ms_min: 80
       transcription_delay_ms_max: 2400
@@ -42,5 +43,6 @@ claims:
     type: capacity
     description: "Low-latency real-time streaming"
     enforcement: optional
+    test_ref: claims.asr_stream.latency_v1
     thresholds:
       e2e_latency_ms: 300

@@ -1,25 +1,30 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
-from datetime import UTC, datetime
+import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from harness.session import SessionRunner
 from server.api.pipelines import build_pipeline_config
+from server.middleware import get_request_id, log_request
 from server.services.lifecycle import (
-    RunnerBusyError,
-    launch_run_worker,
-    release_worker,
     try_acquire_worker,
+    release_worker,
+    launch_run_worker,
+    RunnerBusyError,
 )
+from server.services.runs_index import get_disk_usage
 
 router = APIRouter(prefix="/api/workbench", tags=["workbench"])
+logger = logging.getLogger("server.workbench")
 
 
 def _runs_root() -> Path:
@@ -39,14 +44,14 @@ def _safe_filename(name: str) -> str:
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in name)[:120] or "upload"
 
 
-def _parse_csv(value: str | None) -> list[str]:
+def _parse_csv(value: Optional[str]) -> list[str]:
     """Parse a comma-separated string into a list of non-empty, stripped items."""
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """
     Deep merge two dictionaries.
 
@@ -148,13 +153,13 @@ def start_run_from_path(
     use_case_id: str,
     steps_preset: str,
     *,
-    experiment_id: str | None = None,
-    candidate_id: str | None = None,
-    source_ref: dict[str, Any] | None = None,
-    candidate_snapshot: dict[str, Any] | None = None,
-    config_overrides: dict[str, Any] | None = None,
-    pipeline_config: dict[str, Any] | None = None,  # Custom pipeline configuration
-) -> dict[str, Any]:
+    experiment_id: Optional[str] = None,
+    candidate_id: Optional[str] = None,
+    source_ref: Optional[Dict[str, Any]] = None,
+    candidate_snapshot: Optional[Dict[str, Any]] = None,
+    config_overrides: Optional[Dict[str, Any]] = None,
+    pipeline_config: Optional[Dict[str, Any]] = None,  # Custom pipeline configuration
+) -> Dict[str, Any]:
     """
     Start a run from a file path (not multipart upload).
 
@@ -215,7 +220,7 @@ def start_run_from_path(
             input_path, _runs_root(), steps=steps, config=run_config, preprocessing=ingest_config
         )
 
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
 
         # Compute file info for run_request.json
         file_bytes = input_path.stat().st_size
@@ -294,10 +299,10 @@ async def create_workbench_run(
     file: UploadFile = File(...),
     use_case_id: str = Form(...),
     steps_preset: str = Form("full"),
-    config: str | None = Form(None),
-    steps: str | None = Form(None),
-    preprocessing: str | None = Form(None),
-    pipeline_template: str | None = Form(None),
+    config: Optional[str] = Form(None),
+    steps: Optional[str] = Form(None),
+    preprocessing: Optional[str] = Form(None),
+    pipeline_template: Optional[str] = Form(None),
 ) -> JSONResponse:
     """
     Create a run from the UI (multipart upload) and start processing asynchronously.
@@ -315,6 +320,29 @@ async def create_workbench_run(
 
     Priority: steps > pipeline_template > steps_preset
     """
+    request_id = get_request_id()
+    logger.info(
+        f"Workbench run started",
+        extra={
+            "request_id": request_id,
+            "use_case_id": use_case_id,
+            "steps_preset": steps_preset,
+        },
+    )
+
+    # Check disk space before accepting new run
+    min_free_bytes = int(os.environ.get("MODEL_LAB_MIN_FREE_BYTES", str(5 * 1024 * 1024 * 1024)))
+    usage = get_disk_usage()
+    if usage["free_bytes"] < min_free_bytes:
+        return JSONResponse(
+            status_code=507,
+            content={
+                "error_code": "INSUFFICIENT_DISK_SPACE",
+                "free_bytes": usage["free_bytes"],
+                "min_required": min_free_bytes,
+            },
+        )
+
     if not try_acquire_worker():
         return JSONResponse(status_code=409, content={"error_code": "RUNNER_BUSY"})
 
@@ -322,7 +350,7 @@ async def create_workbench_run(
         max_upload = int(
             os.environ.get("MODEL_LAB_WORKBENCH_MAX_UPLOAD_BYTES", str(200 * 1024 * 1024))
         )
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         yyyy_mm = now.strftime("%Y-%m")
         inputs_dir = _inputs_root() / "workbench" / yyyy_mm
         filename = _safe_filename(file.filename or "upload")
@@ -362,15 +390,17 @@ async def create_workbench_run(
                     preprocessing=preprocessing_ops or None,
                 )
             except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from e
+                raise HTTPException(status_code=400, detail=str(e))
 
             resolved_steps = pipeline_cfg.resolve_dependencies()
             pipeline_config_payload = pipeline_cfg.to_dict()
+        else:
+            pipeline_cfg = None
 
         steps_for_runner = resolved_steps
 
         # Convert preprocessing ops to IngestConfig
-        ingest_config = pipeline_cfg.to_ingest_config() if pipeline_config_payload else None
+        ingest_config = pipeline_cfg.to_ingest_config() if pipeline_cfg else None
 
         runner = SessionRunner(
             dest,
@@ -406,7 +436,7 @@ async def create_workbench_run(
 
         # Write UI metadata without mutating the run manifest (multi-agent safe).
         try:
-            meta: dict[str, Any] = {
+            meta: Dict[str, Any] = {
                 "use_case_id": use_case_id,
                 "steps_preset": steps_preset,
                 "input_rel_path": str(dest.relative_to(_inputs_root()))

@@ -280,7 +280,7 @@ async def create_experiment(
 
     # Write experiment_request.json
     request_data = {
-        "schema_version": "3",  # upgraded to include pipeline configuration
+        "schema_version": "2",  # pipeline configuration supported in schema v2
         "experiment_id": experiment_id,
         "created_at": now.isoformat(),
         "use_case_id": use_case_id,
@@ -321,7 +321,7 @@ async def create_experiment(
 
     # Write experiment_state.json
     state_data = {
-        "schema_version": "2",  # upgraded to include pipeline configuration
+        "schema_version": "1",
         "experiment_id": experiment_id,
         "provenance": {
             "hash": req_hash,

@@ -30,3 +30,6 @@ claims:
     description: "Output shape is {stems: {name: audio}, sr: int}"
     enforcement: required
     test_ref: claims.separate.output_format_v1
+    thresholds:
+      has_stems: true
+      has_sr: true

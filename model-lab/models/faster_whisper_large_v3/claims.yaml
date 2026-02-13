@@ -28,4 +28,5 @@ claims:
     type: capacity
     description: "Supports 99+ languages with auto-detection"
     enforcement: optional
+    test_ref: claims.asr.language_count_v1
     source: "https://huggingface.co/Systran/faster-whisper-large-v3"

@@ -31,3 +31,5 @@ claims:
     description: "Output structure is consistent regardless of input"
     enforcement: required
     test_ref: claims.music_transcription.structure_v1
+    thresholds:
+      consistent_structure: true

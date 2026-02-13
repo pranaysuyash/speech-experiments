@@ -1,4 +1,75 @@
-# LCS Log
+# LCS Log (Procedures & Rules)
+
+## Procedure-only enforcement
+
+This document contains procedures and illustrative schemas only. Do not paste outputs, results, timings, or pass/fail claims here. Paste receipts into `docs/run_receipts.md`.
+
+To scan this file for disallowed icons/keywords used by your policy, run a repo-wide search based on your current banlist.
+If the command prints any lines, edit this file to remove those tokens.
+
+## ⚠️ Critical Findings & Workarounds
+
+### MPS Threading Fix (2026-02-07)
+
+**Problem**: MPS benchmarks crash with mutex lock error (`Invalid argument`)
+
+**Root Cause**: macOS default `fork` multiprocessing copies mutexes in invalid state
+
+**Fix**: Set spawn start method before importing torch:
+```python
+import multiprocessing
+multiprocessing.set_start_method("spawn", force=True)
+```
+
+**Implementation note**: Ensure this is set at module import time (e.g., in `bench/runner.py`) before importing torch
+
+---
+
+### Demucs API Mismatch
+
+**Problem**: Registry uses `demucs.api` but it doesn't exist in demucs 4.0.1
+
+**Root Cause**: `.api` module added in later versions not yet on PyPI
+
+**Known limitation**: Some `demucs` releases may not expose `demucs.api`. If imports fail, adjust the loader or pin to a compatible commit/version.
+
+---
+
+### pyrnnoise API Change
+
+**Problem**: `RNNoise()` fails with `missing required positional argument: 'sample_rate'`
+
+**Root Cause**: pyrnnoise 0.4.3 requires sample_rate in constructor
+
+**Potential incompatibility**: `pyrnnoise` 0.4.3 may require `sample_rate` in the constructor. If you see a missing-argument error, update the loader to pass `sample_rate=48000`.
+
+---
+
+### Model Dependency Isolation
+
+**Best Practice**: Heavy models should use isolated venvs to avoid conflicts:
+- NeMo models: `.venv.nemo_*`
+- TensorFlow models: may conflict with torch
+- Demucs/CLAP: need torchvision which conflicts
+
+---
+
+## LCS-21: GLM-TTS (procedure-only)
+
+### Local procedure
+
+Run the following sequence and paste the terminal output into `docs/run_receipts.md`.
+
+```bash
+rm -rf models/glm_tts/venv models/glm_tts/repo
+cd models/glm_tts && ./install.sh
+huggingface-cli download zai-org/GLM-TTS --local-dir ckpt
+cd ../..
+./scripts/verify_glm_tts.sh
+```
+
+Gate:
+- Run the repo's claim-leak gate against the GLM-TTS bundle files and paste the terminal output into docs/run_receipts.md.
 
 ## LCS-B2: Batch ASR Benchmark
 
@@ -19,7 +90,7 @@ make bench-report-asr
 - `bench-report-asr` - Generate sorted table from results/
 - `bench-report-asr-stream` - Same for streaming
 
-**Tests:** 7 pass (including new sorting and report tests)
+**Test surface**: Unit and integration tests exist for this area. Run the test suite locally/CI to obtain receipts (paste into `docs/run_receipts.md`).
 
 ---
 
@@ -32,29 +103,29 @@ make bench-report-asr
 make bench-asr-stream MODEL=kyutai_streaming AUDIO=data/audio/clean_speech_10s.wav REF="expected text"
 ```
 
-**Output Schema:**
+**Example output schema (illustrative, not measured):**
 ```json
 {
-  "run_id": "20260207_221500_a1b2c3d4",
+  "run_id": "<run_id>",
   "model_id": "kyutai_streaming",
   "surface": "asr_stream",
-  "input": {"path": "...", "duration_s": 10.0, "sr": 16000},
+  "input": {"path": "...", "duration_s": "<number>", "sr": 16000},
   "metrics": {
-    "first_token_latency_ms": 45.2,
-    "partial_update_rate_hz": 12.5,
-    "finalize_latency_ms": 0.125,
-    "rtf": 0.12,
-    "wer": 0.15,
-    "cer": 0.08
+    "first_token_latency_ms": "<number>",
+    "partial_update_rate_hz": "<number>",
+    "finalize_latency_ms": "<number>",
+    "rtf": "<number>",
+    "wer": "<number>",
+    "cer": "<number>"
   },
-  "timing": {"wall_s": 1.2, "rtf": 0.12},
+  "timing": {"wall_s": "<number>", "rtf": "<number>"},
   "env": {"device": "cpu", "model_type": "kyutai_streaming"}
 }
 ```
 
 **Also added:** `make bench-asr` for batch ASR
 
-**Tests:** 4 pass
+**Test surface**: Unit and integration tests exist for this area. Run the test suite locally/CI to obtain receipts (paste into `docs/run_receipts.md`).
 
 ---
 
@@ -82,7 +153,7 @@ pytorch = get_models_by_runtime("pytorch")
 | runtime | pytorch, nemo, onnx, ctranslate2 |
 | ci | true/false |
 
-**Tests:** 11 unit tests
+**Test surface**: Unit and integration tests exist for this area. Run the test suite locally/CI to obtain receipts (paste into `docs/run_receipts.md`).
 
 ---
 
@@ -94,17 +165,17 @@ pytorch = get_models_by_runtime("pytorch")
 make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample_16k.wav CHUNK_MS=160
 ```
 
-**Sample Output:**
+**Example output schema (illustrative, not measured):**
 ```json
 {
-  "first_token_latency_ms": 45.2,
-  "partial_update_rate_hz": 12.50,
-  "finalize_latency_ms": 0.125,
-  "real_time_factor": 0.1234,
-  "num_events": 62,
-  "num_partials": 61,
-  "num_finals": 1,
-  "audio_duration_s": 5.000
+  "first_token_latency_ms": "<number>",
+  "partial_update_rate_hz": "<number>",
+  "finalize_latency_ms": "<number>",
+  "real_time_factor": "<number>",
+  "num_events": "<number>",
+  "num_partials": "<number>",
+  "num_finals": "<number>",
+  "audio_duration_s": "<number>"
 }
 ```
 
@@ -116,7 +187,7 @@ make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample_16k.wav CHUNK_M
 | finalize_latency_ms | Time in finalize() call |
 | real_time_factor | Processing time / audio duration |
 
-**Tests:** 7 unit tests with fake adapters (partials, no partials, empty partials ignored)
+**Test surface**: Unit and integration tests exist for this area. Run the test suite locally/CI to obtain receipts (paste into `docs/run_receipts.md`).
 
 ---
 
@@ -140,7 +211,7 @@ make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample_16k.wav CHUNK_M
 
 **NeMo models**: Use dedicated venvs (`.venv.nemo_*`)
 
-**Tests**: All structural tests pass, model tests skip without deps.
+**Test surface**: Unit and integration tests exist for this area. Run the test suite locally/CI to obtain receipts (paste into `docs/run_receipts.md`).
 
 ---
 
@@ -150,10 +221,10 @@ make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample_16k.wav CHUNK_M
 
 | LCS | Model | Runtime | Notes |
 |-----|-------|---------|-------|
-| LCS-14 | faster_whisper_large_v3 | CTranslate2 | Systran optimized Whisper |
-| LCS-15 | faster_distil_whisper_large_v3 | CTranslate2 | 2-3x faster distilled |
+| LCS-14 | faster_whisper_large_v3 | CTranslate2 | |
+| LCS-15 | faster_distil_whisper_large_v3 | CTranslate2 | |
 | LCS-16 | glm_asr_nano_2512 | PyTorch | Non-Whisper architecture |
-| LCS-17 | nb_whisper_small_onnx | ONNX | Cross-platform runtime |
+| LCS-17 | nb-whisper-small-ONNX | ONNX | |
 
 **Files per model**: config.yaml, claims.yaml, requirements.txt, README.md, smoke tests
 
@@ -163,7 +234,7 @@ make asr-audio MODEL=faster_whisper_large_v3 AUDIO=inputs/sample_16k.wav
 make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample.wav
 ```
 
-**Tests**: All structural tests pass, model tests skip without deps.
+**Test surface**: Unit and integration tests exist for this area. Run the test suite locally/CI to obtain receipts (paste into `docs/run_receipts.md`).
 
 ---
 
@@ -176,8 +247,8 @@ make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample
 - `config/pipelines/enhance_asr.yaml` - preprocess → transcribe
 - `config/pipelines/separate_vocals_asr.yaml` - extract vocals → transcribe
 - `config/pipelines/separate_vocals_transcribe.yaml` - vocals → MIDI
-- `tests/unit/test_pipeline.py` - 22 unit tests (fake models)
-- `tests/integration/test_pipeline_integration.py` - 5 tests
+- `tests/unit/test_pipeline.py` (fake models)
+- `tests/integration/test_pipeline_integration.py`
 - `Makefile` - run-pipeline, model-install targets
 
 **Pipeline Configs**:
@@ -201,13 +272,13 @@ make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample
 
 **Error Handling**: Errors include step_id, model_id, surface for debugging.
 
-**Testing**: All 27 tests CI-safe (use fake models), RNNoise integration test skipped if not installed.
+**Test surface**: Unit and integration tests exist for this area. Run the test suite locally/CI to obtain receipts (paste into `docs/run_receipts.md`).
 
 ---
 
 ## LCS-12: Basic Pitch Music Transcription
 
-**Surfaces**: music_transcription (first!)
+**Surfaces**: music_transcription
 
 **Runtime**: tensorflow
 
@@ -219,23 +290,9 @@ make run-pipeline PIPELINE=config/pipelines/enhance_asr.yaml AUDIO=inputs/sample
 - `models/basic_pitch/requirements.txt`
 - `models/basic_pitch/README.md`
 - `harness/registry.py` - loader + registration
-- `tests/integration/test_model_basic_pitch_smoke.py` - 10 tests
+- `tests/integration/test_model_basic_pitch_smoke.py`
 
 **Output Contract**:
-```python
-{
-    "notes": [
-        {"onset": 0.5, "offset": 1.2, "pitch": 60, "velocity": 0.8},
-        ...
-    ],
-    "midi": <PrettyMIDI>,
-}
-```
-
-**Note Fields**:
-- `onset`: Note start time (seconds)
-- `offset`: Note end time (seconds)
-- `pitch`: MIDI pitch (0-127)
 - `velocity`: Note intensity (0.0-1.0)
 
 **Commands**:
@@ -250,7 +307,7 @@ python -m pytest tests/integration/test_model_basic_pitch_smoke.py -v
 
 ## LCS-11: Demucs Source Separation
 
-**Surfaces**: separate (first!)
+**Surfaces**: separate
 
 **Runtime**: pytorch
 
@@ -262,7 +319,7 @@ python -m pytest tests/integration/test_model_basic_pitch_smoke.py -v
 - `models/demucs/requirements.txt`
 - `models/demucs/README.md`
 - `harness/registry.py` - loader + registration
-- `tests/integration/test_model_demucs_smoke.py` - 13 tests
+- `tests/integration/test_model_demucs_smoke.py`
 
 **Output Contract**:
 ```python
@@ -285,13 +342,13 @@ make model-install MODEL=demucs
 python -m pytest tests/integration/test_model_demucs_smoke.py -v
 ```
 
-**Notes**: 44.1kHz native, auto-resampling. Non-speech audio category. Unlocks separate surface.
+**Notes**: 44.1kHz native, auto-resampling. Non-speech audio category.
 
 ---
 
 ## LCS-10: Voxtral Streaming ASR
 
-**Surfaces**: asr_stream (first!), asr (batch via streaming)
+**Surfaces**: asr_stream, asr (batch via streaming)
 
 **Runtime**: api (Mistral cloud)
 
@@ -303,7 +360,7 @@ python -m pytest tests/integration/test_model_demucs_smoke.py -v
 - `models/voxtral/requirements.txt` (mistralai[realtime])
 - `models/voxtral/README.md`
 - `harness/registry.py` - VoxtralStreamingAdapter using StreamingAdapter base
-- `tests/integration/test_model_voxtral_smoke.py` - 13 tests
+- `tests/integration/test_model_voxtral_smoke.py`
 
 **Streaming Lifecycle**:
 ```python
@@ -332,7 +389,7 @@ make asr-stream MODEL=voxtral AUDIO=inputs/sample_16k.wav
 
 **Files**:
 - `harness/streaming.py` - Core streaming infrastructure
-- `tests/unit/test_streaming_utils.py` - 33 tests
+- `tests/unit/test_streaming_utils.py`
 
 **Components**:
 
@@ -357,7 +414,7 @@ make asr-stream MODEL=voxtral AUDIO=inputs/sample_16k.wav
 
 **Commands**:
 ```bash
-python -m pytest tests/unit/test_streaming_utils.py -v  # 33 passed
+python -m pytest tests/unit/test_streaming_utils.py -v
 ```
 
 **Notes**: No model runtime imports. Lightweight. Ready for Voxtral adapter.
@@ -366,7 +423,7 @@ python -m pytest tests/unit/test_streaming_utils.py -v  # 33 passed
 
 ## LCS-08: CLAP Embed + Classify
 
-**Surfaces**: embed (first!), classify (multi-surface model!)
+**Surfaces**: embed, classify
 
 **Runtime**: pytorch
 
@@ -378,7 +435,7 @@ python -m pytest tests/unit/test_streaming_utils.py -v  # 33 passed
 - `models/clap/requirements.txt` (laion-clap)
 - `models/clap/README.md`
 - `harness/registry.py` - loader + registration
-- `tests/integration/test_model_clap_smoke.py` - 10 tests
+- `tests/integration/test_model_clap_smoke.py`
 
 **Commands**:
 ```bash
@@ -392,7 +449,7 @@ python -m pytest tests/integration/test_model_clap_smoke.py -v
 
 ## LCS-07: DeepFilterNet Audio Enhancement
 
-**Surfaces**: enhance (second implementation, production-grade)
+**Surfaces**: enhance
 
 **Runtime**: pytorch
 
@@ -404,7 +461,7 @@ python -m pytest tests/integration/test_model_clap_smoke.py -v
 - `models/deepfilternet/requirements.txt`
 - `models/deepfilternet/README.md`
 - `harness/registry.py` - loader + registration
-- `tests/integration/test_model_deepfilternet_smoke.py` - 10 tests
+- `tests/integration/test_model_deepfilternet_smoke.py`
 
 **Commands**:
 ```bash
@@ -418,7 +475,7 @@ python -m pytest tests/integration/test_model_deepfilternet_smoke.py -v
 
 ## LCS-06: RNNoise Audio Enhancement
 
-**Surfaces**: enhance (first implementation!)
+**Surfaces**: enhance
 
 **Runtime**: native (C library)
 
@@ -430,7 +487,7 @@ python -m pytest tests/integration/test_model_deepfilternet_smoke.py -v
 - `models/rnnoise/requirements.txt` (pyrnnoise)
 - `models/rnnoise/README.md`
 - `harness/registry.py` - loader + registration
-- `tests/integration/test_model_rnnoise_smoke.py` - 8 tests
+- `tests/integration/test_model_rnnoise_smoke.py`
 
 **Commands**:
 ```bash
@@ -438,13 +495,13 @@ make model-install MODEL=rnnoise
 python -m pytest tests/integration/test_model_rnnoise_smoke.py -v
 ```
 
-**Notes**: Real-time <10ms latency. 48kHz native, auto-resampling. VAD probs returned.
+**Notes**: 48kHz native, auto-resampling, length preservation enforced. VAD probs returned.
 
 ---
 
 ## LCS-05: YAMNet Audio Classification
 
-**Surfaces**: classify (first implementation!)
+**Surfaces**: classify
 
 **Runtime**: tensorflow
 
@@ -456,7 +513,7 @@ python -m pytest tests/integration/test_model_rnnoise_smoke.py -v
 - `models/yamnet/requirements.txt`
 - `models/yamnet/README.md`
 - `harness/registry.py` - loader + registration
-- `tests/integration/test_model_yamnet_smoke.py` - 8 tests (4 structural, 4 model)
+- `tests/integration/test_model_yamnet_smoke.py`
 
 **Commands**:
 ```bash
@@ -482,7 +539,7 @@ python -m pytest tests/integration/test_model_yamnet_smoke.py -v
 - `models/moonshine/requirements.txt` - isolated dependencies
 - `models/moonshine/README.md` - usage docs
 - `harness/registry.py` - loader + registration
-- `tests/integration/test_model_moonshine_smoke.py` - 7 tests (3 structural, 4 model)
+- `tests/integration/test_model_moonshine_smoke.py`
 
 **Commands**:
 ```bash
@@ -490,7 +547,7 @@ make model-install MODEL=moonshine
 python -m pytest tests/integration/test_model_moonshine_smoke.py -v
 ```
 
-**Notes**: 27M params, 5-15x faster than Whisper on short segments. English-only.
+**Notes**: 27M params. English-only.
 
 ---
 
@@ -501,18 +558,18 @@ python -m pytest tests/integration/test_model_moonshine_smoke.py -v
 **Files**:
 - `harness/metrics_enhance.py` - si_snr, stoi, pesq (optional deps)
 - `harness/metrics_separate.py` - bss_eval, sdr, multi_source_sdr (mir_eval optional)
-- `tests/unit/test_metrics_enhance.py` - 12 tests
-- `tests/unit/test_metrics_separate.py` - 8 tests
-- `tests/unit/test_asr_stream_contract_misuse.py` - 8 tests
+- `tests/unit/test_metrics_enhance.py`
+- `tests/unit/test_metrics_separate.py`
+- `tests/unit/test_asr_stream_contract_misuse.py`
 
 **Commands**:
 ```bash
-python -m pytest tests/unit/test_metrics_enhance.py tests/unit/test_metrics_separate.py -v  # 14 pass, 6 skip
-python -m pytest tests/unit/test_asr_stream_contract_misuse.py -v  # 8 pass
+python -m pytest tests/unit/test_metrics_enhance.py tests/unit/test_metrics_separate.py -v
+python -m pytest tests/unit/test_asr_stream_contract_misuse.py -v
 ```
 
-**Notes**: 
-- SI-SNR always available, STOI/PESQ optional (never fail CI)
+**Notes**:
+- SI-SNR always available, STOI/PESQ optional
 - SDR/SIR/SAR via mir_eval (optional)
 - Streaming lifecycle: finalize is idempotent, close always safe
 
@@ -524,11 +581,11 @@ python -m pytest tests/unit/test_asr_stream_contract_misuse.py -v  # 8 pass
 
 **Files**:
 - `harness/metrics_classify.py` - accuracy_top1, precision_recall_f1, confusion_matrix, per_class_metrics
-- `tests/unit/test_metrics_classify.py` - 14 tests
+- `tests/unit/test_metrics_classify.py`
 
 **Commands**:
 ```bash
-python -m pytest tests/unit/test_metrics_classify.py -v  # 14 passed
+python -m pytest tests/unit/test_metrics_classify.py -v
 ```
 
 **Notes**: CI-safe, dataset-free. Macro vs micro vs weighted averaging supported.
@@ -545,8 +602,8 @@ python -m pytest tests/unit/test_metrics_classify.py -v  # 14 passed
 
 **Commands**:
 ```bash
-python -c "from harness.contracts import CONTRACT_VERSION; print(CONTRACT_VERSION)"  # 2.0.0
-python -m pytest tests/unit/test_contract_enforcement.py::TestNewSurfaces -v  # 6 passed
+python -c "from harness.contracts import CONTRACT_VERSION; print(CONTRACT_VERSION)"
+python -m pytest tests/unit/test_contract_enforcement.py::TestNewSurfaces -v
 ```
 
-**Notes**: CONTRACT_VERSION=2.0.0. Streaming lifecycle: start_stream → push_audio → flush → finalize → close. validate_bundle now data-driven.
+**Notes**: Streaming lifecycle: start_stream → push_audio → flush → finalize → close. validate_bundle now data-driven.

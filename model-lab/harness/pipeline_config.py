@@ -30,6 +30,8 @@ from typing import Any
 
 import yaml
 
+from harness.media_ingest import IngestConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -312,8 +314,6 @@ class PipelineConfig:
 
         Note: Some ops (denoise, speed) require ffmpeg filters not yet in IngestConfig.
         """
-        from harness.media_ingest import IngestConfig
-
         # Start with defaults
         kwargs: dict[str, Any] = {}
 

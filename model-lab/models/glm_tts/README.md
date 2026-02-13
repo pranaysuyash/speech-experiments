@@ -17,7 +17,17 @@ make model-install MODEL=glm_tts
 
 ## Usage
 
+
 ```bash
+# Requires HuggingFace token for gated model THUDM/glm-4-voice
+export HF_TOKEN=your_token_here
+make tts MODEL=glm_tts TEXT="Hello world"
+```
+
+OR
+
+```bash
+huggingface-cli login
 make tts MODEL=glm_tts TEXT="Hello world"
 ```
 

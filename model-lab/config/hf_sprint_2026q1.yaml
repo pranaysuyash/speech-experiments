@@ -1,0 +1,69 @@
+sprint:
+  id: hf_pro_2026q1
+  title: HF Pro Sprint (2026-02-12 to 2026-03-01)
+  start_date: 2026-02-12
+  end_date: 2026-03-01
+  objective: >
+    Maximize Hugging Face Pro window by running parallel model evaluation across
+    edge, realtime, specialist, and baseline tracks with reproducible artifacts.
+
+defaults:
+  device: cpu
+  chunk_ms: 160
+  unassigned_agent: general_baselines
+
+datasets:
+  asr_smoke: asr_smoke_v1
+  asr_primary: primary
+  asr_secondary: ux_primary
+  diarization_smoke: diar_smoke_v1
+  vad_smoke: vad_smoke_v1
+  tts_smoke: tts_smoke_v1
+  v2v_smoke: v2v_smoke_v1
+
+audio_inputs:
+  bench_audio: data/audio/clean_speech_10s.wav
+  separate_audio: data/audio/conversation_2ppl_30s.wav
+  enhance_clean_audio: data/audio/clean_speech_10s.wav
+
+agents:
+  edge_small:
+    description: Edge and compact ASR candidates optimized for small footprint.
+    include_models:
+      - moonshine
+      - nb_whisper_small_onnx
+      - whisper_cpp
+      - distil_whisper
+      - faster_distil_whisper_large_v3
+
+  domain_specialist:
+    description: Non-ASR specialist models and modality-specific tools.
+    include_models:
+      - pyannote_diarization
+      - heuristic_diarization
+      - silero_vad
+      - demucs
+      - deepfilternet
+      - clap
+      - yamnet
+      - basic_pitch
+
+  realtime_streaming:
+    description: Realtime and streaming-first transcription candidates.
+    include_models:
+      - kyutai_streaming
+      - voxtral_realtime_2602
+      - nemotron_streaming
+      - voxtral
+      - parakeet_multitalker
+
+  general_baselines:
+    description: High-accuracy baselines and broad-coverage mainline models.
+    include_models:
+      - whisper
+      - faster_whisper
+      - faster_whisper_large_v3
+      - glm_asr_nano_2512
+      - lfm2_5_audio
+      - seamlessm4t
+      - glm_tts

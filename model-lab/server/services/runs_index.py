@@ -375,3 +375,99 @@ class RunsIndex:
 # Singleton accessor
 def get_index() -> RunsIndex:
     return RunsIndex.get_instance()
+
+
+def cleanup_old_runs(retention_days: int = 30, dry_run: bool = False) -> dict[str, Any]:
+    """
+    Clean up runs older than retention_days.
+
+    Args:
+        retention_days: Delete runs not modified in this many days
+        dry_run: If True, only report what would be deleted
+
+    Returns:
+        {"deleted": [run_ids], "freed_bytes": int, "errors": [messages]}
+    """
+    import shutil
+    from datetime import datetime, timedelta
+
+    runs_root = _runs_root()
+    sessions_dir = runs_root / "sessions"
+
+    if not sessions_dir.exists():
+        return {"deleted": [], "freed_bytes": 0, "errors": ["No sessions directory found"]}
+
+    cutoff_time = datetime.now() - timedelta(days=retention_days)
+    deleted = []
+    freed_bytes = 0
+    errors = []
+
+    # Find all run directories
+    run_dirs = list(sessions_dir.glob("*/**/"))
+
+    for run_dir in run_dirs:
+        # Check if it's a run directory (has manifest.json)
+        manifest_path = run_dir / "manifest.json"
+        if not manifest_path.exists():
+            continue
+
+        try:
+            # Check modification time
+            mtime = datetime.fromtimestamp(manifest_path.stat().st_mtime)
+            if mtime > cutoff_time:
+                continue  # Skip runs newer than cutoff
+
+            # Calculate size
+            total_size = sum(f.stat().st_size for f in run_dir.rglob("*") if f.is_file())
+
+            if dry_run:
+                deleted.append(run_dir.name)
+            else:
+                # Delete the run directory
+                shutil.rmtree(run_dir)
+                deleted.append(run_dir.name)
+                freed_bytes += total_size
+                logger.info(f"Deleted run {run_dir.name}, freed {total_size} bytes")
+
+        except Exception as e:
+            errors.append(f"Failed to delete {run_dir.name}: {e}")
+
+    return {
+        "deleted": deleted,
+        "freed_bytes": freed_bytes,
+        "errors": errors,
+        "retention_days": retention_days,
+        "dry_run": dry_run,
+    }
+
+
+def get_disk_usage() -> dict[str, Any]:
+    """
+    Get disk usage for runs directory.
+
+    Returns:
+        {"total_bytes": int, "used_bytes": int, "free_bytes": int, "run_count": int}
+    """
+    import shutil
+
+    runs_root = _runs_root()
+
+    if not runs_root.exists():
+        return {"total_bytes": 0, "used_bytes": 0, "free_bytes": 0, "run_count": 0}
+
+    # Get disk usage
+    usage = shutil.disk_usage(runs_root)
+
+    # Count runs
+    sessions_dir = runs_root / "sessions"
+    run_count = 0
+    if sessions_dir.exists():
+        run_count = sum(1 for _ in sessions_dir.glob("*/**/manifest.json"))
+
+    return {
+        "total_bytes": usage.total,
+        "used_bytes": usage.used,
+        "free_bytes": usage.free,
+        "run_count": run_count,
+        "runs_root": str(runs_root),
+    }

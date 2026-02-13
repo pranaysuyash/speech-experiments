@@ -1,0 +1,35 @@
+diff --git a/cosyvoice/cli/frontend.py b/cosyvoice/cli/frontend.py
+index 3d752ef..ddd1c7d 100644
+--- a/cosyvoice/cli/frontend.py
++++ b/cosyvoice/cli/frontend.py
+@@ -70,7 +70,8 @@ class SpeechTokenizer:
+                 else:
+                     audio, sample_rate = torchaudio.load(utt)
+ 
+-                audio = audio.cuda()
++                device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
++                audio = audio.to(device)
+ 
+                 # Resample to 16k if needed
+                 if sample_rate != 16000:
+@@ -78,7 +79,7 @@ class SpeechTokenizer:
+                         _resample_buffer[sample_rate] = torchaudio.transforms.Resample(
+                             orig_freq=sample_rate,
+                             new_freq=16000
+-                        ).to('cuda')
++                        ).to(device)
+                     audio = _resample_buffer[sample_rate](audio)
+ 
+                 audio = audio[0]  # Take first channel
+@@ -99,9 +100,9 @@ class SpeechTokenizer:
+ 
+             for start in range(0, len(audios), batch_size):
+                 features = feature_extractor(audios[start: start + batch_size], sampling_rate=16000,
+-                                             return_attention_mask=True, return_tensors="pt", device='cuda',
++                                             return_attention_mask=True, return_tensors="pt", device=device,
+                                              padding="longest", pad_to_multiple_of=stride)
+-                features = features.to(device="cuda")
++                features = features.to(device=device)
+                 outputs = model(**features)
+                 speech_tokens = outputs.quantized_token_ids
+ 

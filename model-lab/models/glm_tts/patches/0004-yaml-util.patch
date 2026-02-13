@@ -1,0 +1,14 @@
+diff --git a/utils/yaml_util.py b/utils/yaml_util.py
+index 4cbb2d2..f0447cf 100644
+--- a/utils/yaml_util.py
++++ b/utils/yaml_util.py
+@@ -56,7 +56,8 @@ def load_quantize_encoder(model_path):
+                     state_dict[new_key] = f.get_tensor(key)
+     model.load_state_dict(state_dict)
+     model.eval()
+-    model.cuda()
++    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
++    model.to(device)
+     return model
+ 
+ def load_speech_tokenizer(model_path):

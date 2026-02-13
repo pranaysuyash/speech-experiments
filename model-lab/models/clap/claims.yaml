@@ -3,7 +3,7 @@
 
 model_id: clap
 runtime: pytorch
-device_support: [cpu, mps, cuda]
+device_support: [cpu, cuda]
 streaming: false
 precision: fp32
 io:

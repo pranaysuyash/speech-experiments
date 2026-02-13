@@ -29,4 +29,7 @@ claims:
     type: structural
     description: "NeMo runtime with streaming support"
     enforcement: required
+    test_ref: claims.asr_stream.nemo_runtime_v1
+    thresholds:
+      runtime: nemo
     notes: "Requires NVIDIA NeMo toolkit"

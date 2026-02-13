@@ -1,33 +1,340 @@
 {
   "arsenal_schema_version": 1,
-  "generated_from_commit": "861fa73",
-  "generated_from_tree": "c965ec75304f",
+  "generated_from_commit": "12aadb1",
+  "generated_from_tree": "9336a89819b9",
   "generator_version": "1.0",
-  "models_count": 9,
+  "models_count": 26,
   "models": [
+    {
+      "model_id": "basic_pitch",
+      "evidence": [],
+      "model_name": "basic_pitch",
+      "provider": "",
+      "version": "0.2.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "music_transcription"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "a21966d6",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "clap",
+      "evidence": [],
+      "model_name": "clap",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "embed",
+        "classify"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "307c9413",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "deepfilternet",
+      "evidence": [],
+      "model_name": "deepfilternet",
+      "provider": "",
+      "version": "2.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "enhance"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "7f0ac1a1",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "demucs",
+      "evidence": [],
+      "model_name": "demucs",
+      "provider": "",
+      "version": "4.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "separate"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "eb44f15d",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
     {
       "model_id": "distil_whisper",
       "evidence": [
         {
           "task": "asr",
-          "dataset_id": "llm_primary",
+          "dataset_id": "ux_primary",
           "evidence_grade": "golden_batch",
           "metrics": {
-            "wer": 0.8328173374613003,
-            "rtf": 0.019881024597640573,
-            "latency_ms": 3244.1594999982044
+            "wer": 1.3620689655172413,
+            "rtf": 0.3188850541662153,
+            "latency_ms": 9566.55162498646
           },
-          "valid": false,
-          "invalid_reasons": [
-            "output_quality_failure",
-            "wer_invalid"
-          ],
-          "device": "mps",
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "cpu",
           "run_date": null,
-          "verified_at": "2026-01-09",
+          "verified_at": "2026-02-13",
           "gates": {
-            "wer_valid": false,
-            "is_truncated": true
+            "wer_valid": true,
+            "is_truncated": false
           }
         }
       ],
@@ -42,7 +349,15 @@
         "claimed_limitations": [],
         "recommended_usage": []
       },
-      "declared_capabilities": [],
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
       "evaluation": {
         "primary_tasks": [],
         "secondary_tasks": [],
@@ -108,22 +423,127 @@
       }
     },
     {
+      "model_id": "faster_distil_whisper_large_v3",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "ux_primary",
+          "evidence_grade": "golden_batch",
+          "metrics": {
+            "wer": 1.3620689655172413,
+            "rtf": 0.4994019499999316,
+            "latency_ms": 14982.058499997947
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "2026-02-13",
+          "gates": {
+            "wer_valid": true,
+            "is_truncated": false
+          }
+        }
+      ],
+      "model_name": "faster_distil_whisper_large_v3",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "fa35f7fc",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
       "model_id": "faster_whisper",
       "evidence": [
         {
           "task": "asr",
-          "dataset_id": "llm_primary",
+          "dataset_id": "ux_primary",
           "evidence_grade": "golden_batch",
           "metrics": {
-            "wer": 0.24148606811145512,
-            "rtf": 0.12134864706516542,
-            "latency_ms": 19801.51295799442
+            "wer": 1.3448275862068966,
+            "rtf": 0.09609250416639649,
+            "latency_ms": 2882.7751249918947
           },
           "valid": true,
           "invalid_reasons": [],
-          "device": "mps",
+          "device": "cpu",
           "run_date": null,
-          "verified_at": "2026-01-09",
+          "verified_at": "2026-02-13",
           "gates": {
             "wer_valid": true,
             "is_truncated": false
@@ -214,6 +634,306 @@
       }
     },
     {
+      "model_id": "faster_whisper_large_v3",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "ux_primary",
+          "evidence_grade": "golden_batch",
+          "metrics": {
+            "wer": 1.3620689655172413,
+            "rtf": 1.2844550861331905,
+            "latency_ms": 38533.65258399572
+          },
+          "valid": true,
+          "invalid_reasons": [],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "2026-02-13",
+          "gates": {
+            "wer_valid": true,
+            "is_truncated": false
+          }
+        }
+      ],
+      "model_name": "faster_whisper_large_v3",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "ff91570d",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "glm_asr_nano_2512",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "ux_primary",
+          "evidence_grade": "golden_batch",
+          "metrics": {
+            "wer": 1.0,
+            "rtf": 1.6962500133862098e-05,
+            "latency_ms": 0.5088750040158629
+          },
+          "valid": false,
+          "invalid_reasons": [
+            "output_quality_failure",
+            "wer_invalid"
+          ],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "2026-02-13",
+          "gates": {
+            "wer_valid": false,
+            "is_truncated": true
+          }
+        }
+      ],
+      "model_name": "glm_asr_nano_2512",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "df0fd654",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda",
+          "mps"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "glm_tts",
+      "evidence": [],
+      "model_name": "glm_tts",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
+        {
+          "task": "tts",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "tts"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "f2c8d910",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda",
+          "mps"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
       "model_id": "heuristic_diarization",
       "evidence": [
         {
@@ -222,7 +942,7 @@
           "evidence_grade": "smoke",
           "metrics": {
             "num_speakers": 0.5,
-            "rtf": 0.008575427532196044
+            "rtf": 0.006193244457244873
           },
           "valid": true,
           "invalid_reasons": [],
@@ -339,39 +1059,100 @@
       }
     },
     {
+      "model_id": "kyutai_streaming",
+      "evidence": [],
+      "model_name": "kyutai_streaming",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr_stream"
+      ],
+      "modes": [
+        "streaming"
+      ],
+      "hash": "c2d56cdf",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda",
+          "mps"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
       "model_id": "lfm2_5_audio",
       "evidence": [
         {
-          "task": "v2v",
-          "dataset_id": "v2v_smoke_v1",
-          "evidence_grade": "smoke",
+          "task": "asr",
+          "dataset_id": "ux_primary",
+          "evidence_grade": "golden_batch",
           "metrics": {
-            "latency_ms": 5286.984920501709,
-            "turn_latency_ms": null
+            "wer": 1.3448275862068966,
+            "rtf": 0.4582822138996562,
+            "latency_ms": 13748.466416989686
           },
           "valid": true,
           "invalid_reasons": [],
           "device": "cpu",
           "run_date": null,
-          "verified_at": "",
-          "gates": {
-            "has_failure": false
-          }
-        },
-        {
-          "task": "asr",
-          "dataset_id": "unknown",
-          "evidence_grade": "adhoc",
-          "metrics": {
-            "wer": 1.3777089783281733,
-            "rtf": 0.17930816393172888,
-            "latency_ms": 29259.274584001105
-          },
-          "valid": true,
-          "invalid_reasons": [],
-          "device": "mps",
-          "run_date": null,
-          "verified_at": "2026-01-09",
+          "verified_at": "2026-02-13",
           "gates": {
             "wer_valid": true,
             "is_truncated": false
@@ -382,14 +1163,14 @@
           "dataset_id": "tts_smoke_v1",
           "evidence_grade": "smoke",
           "metrics": {
-            "latency_ms": 7052.5662916673655,
-            "rtf": 2.132832547883276
+            "latency_ms": 4446.828305672777,
+            "rtf": 1.488893405917224
           },
           "valid": true,
           "invalid_reasons": [],
-          "device": "mps",
+          "device": "cpu",
           "run_date": null,
-          "verified_at": "2026-01-09",
+          "verified_at": "2026-02-13",
           "gates": {}
         }
       ],
@@ -532,6 +1313,361 @@
       }
     },
     {
+      "model_id": "moonshine",
+      "evidence": [],
+      "model_name": "moonshine",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "202c6d23",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "mps"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "nb_whisper_small_onnx",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "ux_primary",
+          "evidence_grade": "golden_batch",
+          "metrics": {
+            "wer": 1.0,
+            "rtf": 1.707219974681114e-05,
+            "latency_ms": 0.5121659924043342
+          },
+          "valid": false,
+          "invalid_reasons": [
+            "output_quality_failure",
+            "wer_invalid"
+          ],
+          "device": "cpu",
+          "run_date": null,
+          "verified_at": "2026-02-13",
+          "gates": {
+            "wer_valid": false,
+            "is_truncated": true
+          }
+        }
+      ],
+      "model_name": "nb_whisper_small_onnx",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "726caf7e",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "nemotron_streaming",
+      "evidence": [],
+      "model_name": "nemotron_streaming",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr_stream"
+      ],
+      "modes": [
+        "streaming"
+      ],
+      "hash": "0d709d47",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "parakeet_multitalker",
+      "evidence": [],
+      "model_name": "parakeet_multitalker",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "b56128bf",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
       "model_id": "pyannote_diarization",
       "evidence": [],
       "model_name": "pyannote_diarization",
@@ -638,28 +1774,85 @@
       }
     },
     {
-      "model_id": "seamlessm4t",
-      "evidence": [
-        {
-          "task": "asr",
-          "dataset_id": "unknown",
-          "evidence_grade": "adhoc",
-          "metrics": {
-            "wer": 0.9628482972136223,
-            "rtf": 0.10763252732988927,
-            "latency_ms": 17563.33454199921
-          },
-          "valid": true,
-          "invalid_reasons": [],
-          "device": "mps",
-          "run_date": null,
-          "verified_at": "2026-01-09",
-          "gates": {
-            "wer_valid": true,
-            "is_truncated": true
-          }
-        }
+      "model_id": "rnnoise",
+      "evidence": [],
+      "model_name": "rnnoise",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "enhance"
       ],
+      "modes": [
+        "batch",
+        "streaming"
+      ],
+      "hash": "697c6bb6",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "seamlessm4t",
+      "evidence": [],
       "model_name": "facebook/seamless-m4t-v2-large",
       "provider": "",
       "version": "2.0.0",
@@ -671,7 +1864,22 @@
         "claimed_limitations": [],
         "recommended_usage": []
       },
-      "declared_capabilities": [],
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        },
+        {
+          "task": "mt",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
       "evaluation": {
         "primary_tasks": [],
         "secondary_tasks": [],
@@ -742,17 +1950,17 @@
         {
           "task": "vad",
           "dataset_id": "vad_smoke_v1",
-          "evidence_grade": "adhoc",
+          "evidence_grade": "smoke",
           "metrics": {
             "speech_ratio": 0.4373,
             "num_segments": 1.0,
-            "rtf": 0.008903694152832032
+            "rtf": 0.008111917972564697
           },
           "valid": true,
           "invalid_reasons": [],
           "device": "cpu",
           "run_date": null,
-          "verified_at": "2026-01-09",
+          "verified_at": "2026-02-13",
           "gates": {
             "has_failure": false,
             "failed_cases": 0,
@@ -864,41 +2072,210 @@
       }
     },
     {
-      "model_id": "whisper",
+      "model_id": "voxtral",
       "evidence": [
         {
           "task": "asr",
           "dataset_id": "primary",
           "evidence_grade": "golden_batch",
           "metrics": {
-            "wer": 0.29102167182662536,
-            "rtf": 1.8894422604483583,
-            "latency_ms": 308316.70816699625
+            "wer": 2.198142414860681,
+            "rtf": 9.517097631556253e-05,
+            "latency_ms": 15.52987500326708
           },
           "valid": true,
           "invalid_reasons": [],
           "device": "cpu",
           "run_date": null,
-          "verified_at": "2026-01-09",
+          "verified_at": "2026-02-13",
           "gates": {
             "wer_valid": true,
             "is_truncated": false
           }
-        },
+        }
+      ],
+      "model_name": "voxtral",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [
         {
-          "task": "alignment",
-          "dataset_id": "v2v_smoke_v1",
-          "evidence_grade": "smoke",
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr",
+        "asr_stream"
+      ],
+      "modes": [
+        "batch",
+        "streaming"
+      ],
+      "hash": "ea9f458f",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "voxtral_realtime_2602",
+      "evidence": [],
+      "model_name": "voxtral_realtime_2602",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "asr_stream"
+      ],
+      "modes": [
+        "streaming"
+      ],
+      "hash": "5e8e6a53",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu",
+          "cuda",
+          "mps"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "whisper",
+      "evidence": [
+        {
+          "task": "asr",
+          "dataset_id": "ux_primary",
+          "evidence_grade": "golden_batch",
           "metrics": {
-            "violations_mean": 0.0,
-            "coverage_mean": 1.0
+            "wer": 1.3620689655172413,
+            "rtf": 0.4982603611337254,
+            "latency_ms": 14947.810834011761
           },
           "valid": true,
           "invalid_reasons": [],
           "device": "cpu",
           "run_date": null,
-          "verified_at": "",
-          "gates": {}
+          "verified_at": "2026-02-13",
+          "gates": {
+            "wer_valid": true,
+            "is_truncated": false
+          }
         }
       ],
       "model_name": "large-v3",
@@ -1055,7 +2432,15 @@
         "claimed_limitations": [],
         "recommended_usage": []
       },
-      "declared_capabilities": [],
+      "declared_capabilities": [
+        {
+          "task": "asr",
+          "role": "primary",
+          "confidence": "inferred",
+          "notes": "Inferred from registry capabilities",
+          "source": "registry"
+        }
+      ],
       "evaluation": {
         "primary_tasks": [],
         "secondary_tasks": [],
@@ -1094,6 +2479,82 @@
           "Uses AVX/NEON SIMD for fast CPU inference",
           "No GPU required"
         ]
+      },
+      "artifacts": [],
+      "install": {
+        "method": "pip",
+        "deps_pain": "low",
+        "known_issues": []
+      },
+      "observed": {
+        "wer_mean": null,
+        "cer_mean": null,
+        "rtf_median": null,
+        "latency_ms_p50": null,
+        "failure_rate": null,
+        "failure_modes": [],
+        "accelerators_verified": [],
+        "golden_set_version": null,
+        "last_verified_commit": null,
+        "last_verified_at": null
+      },
+      "recommendation": {
+        "best_app_types": [],
+        "poor_app_types": [],
+        "interaction_style": "batch"
+      },
+      "links": {
+        "paper_url": null,
+        "repo_url": null
+      }
+    },
+    {
+      "model_id": "yamnet",
+      "evidence": [],
+      "model_name": "yamnet",
+      "provider": "",
+      "version": "1.0.0",
+      "license": "",
+      "description": "",
+      "official_sources": [],
+      "claims": {
+        "claimed_strengths": [],
+        "claimed_limitations": [],
+        "recommended_usage": []
+      },
+      "declared_capabilities": [],
+      "evaluation": {
+        "primary_tasks": [],
+        "secondary_tasks": [],
+        "skip_tasks": [],
+        "default_datasets": {}
+      },
+      "status": "experimental",
+      "capabilities": [
+        "classify"
+      ],
+      "modes": [
+        "batch"
+      ],
+      "hash": "d10eb68e",
+      "deployment": {
+        "runtimes": [
+          "local"
+        ],
+        "offline_capable": true,
+        "targets": [
+          "desktop"
+        ],
+        "notes": ""
+      },
+      "hardware": {
+        "accelerators_supported": [
+          "cpu"
+        ],
+        "min_vram_gb": null,
+        "ram_gb_recommended": null,
+        "disk_gb_model": null,
+        "notes": []
       },
       "artifacts": [],
       "install": {

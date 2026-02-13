@@ -1,5 +1,41 @@
 # Agent Instructions
 
+<!-- PROJECTS_MEMORY_AGENT_ALIGNMENT_BEGIN -->
+
+## Projects-Level Agent Alignment (Workspace Memory)
+
+**Purpose:** ensure any agent/LLM (Codex, Copilot, Claude Code, Qwen, GLM, etc.) starts aligned with the same workspace memory + project context.
+
+### Step 0 (first time in this folder)
+Generate the per-project context pack:
+```bash
+/Users/pranay/Projects/agent-start
+```
+
+### Step 1 (per shell)
+Load the shared defaults for this project session:
+```bash
+source .agent/STEP1_ENV.sh
+# Or (no file read) print exports and eval:
+/Users/pranay/Projects/agent-start --print-step1 --skip-index
+```
+
+### Step 2 (generate aligned context pack)
+```bash
+/Users/pranay/Projects/agent-start
+```
+
+Outputs:
+- `.agent/SESSION_CONTEXT.md`
+- `.agent/AGENT_KICKOFF_PROMPT.txt`
+- `.agent/STEP1_ENV.sh`
+
+### How agents should use this
+- Provide `.agent/AGENT_KICKOFF_PROMPT.txt` and `.agent/SESSION_CONTEXT.md` as the first context for the agent.
+- If sources conflict, the agent must cite concrete file paths and ask before proceeding.
+
+<!-- PROJECTS_MEMORY_AGENT_ALIGNMENT_END -->
+
 ## Worktrees
 
 - All work happens in the primary worktree on master branch.

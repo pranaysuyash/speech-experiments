@@ -27,4 +27,7 @@ claims:
     type: structural
     description: "Non-Whisper decoder architecture"
     enforcement: required
+    test_ref: claims.asr.non_whisper_v1
+    thresholds:
+      non_whisper: true
     notes: "GLM-4 based architecture, different from Whisper family"

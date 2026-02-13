@@ -149,7 +149,13 @@ def get_cached_model(model_type: str, device: str = "cpu"):
 
     # Load model
     try:
-        config = {"model_name": f"models/{model_type}/config.yaml"}
+        import yaml
+        config_path = Path(f"models/{model_type}/config.yaml")
+        if config_path.exists():
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+        else:
+            config = {}
         model = ModelRegistry.load_model(model_type, config, device=device)
 
         # Validate model status for production use

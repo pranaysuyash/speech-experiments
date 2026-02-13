@@ -29,5 +29,6 @@ claims:
     type: capacity
     description: "Low-latency streaming inference"
     enforcement: optional
+    test_ref: claims.asr_stream.latency_v1
     thresholds:
       chunk_latency_ms: 100

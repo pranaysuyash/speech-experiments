@@ -1,0 +1,30 @@
+diff --git a/utils/file_utils.py b/utils/file_utils.py
+index a586dcb..feaba11 100644
+--- a/utils/file_utils.py
++++ b/utils/file_utils.py
+@@ -11,20 +11,22 @@
+ # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
++import torch
+ import torchaudio
+ import json
+ import os
+ 
+ def load_wav(wav, target_sr):
+     speech, sample_rate = torchaudio.load(wav)
+-    speech = speech.to("cuda")
++    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
++    speech = speech.to(device)
+     speech = speech.mean(dim=0, keepdim=True)
+     if sample_rate != target_sr:
+         resampler = torchaudio.transforms.Resample(
+                     orig_freq=sample_rate,
+                     new_freq=target_sr
+-                ).to('cuda')
+-        speech = resampler(speech).to("cuda")
++                ).to(device)
++        speech = resampler(speech).to(device)
+     return speech
+ 
+ def get_jsonl(jsonl_file_path=None):

@@ -1,11 +1,16 @@
 import logging
 import logging.config
 
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env (HF_TOKEN, API keys, device config)
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.api import (
+    admin,
     candidates,
     experiments,
     lifecycle,
@@ -15,6 +20,7 @@ from server.api import (
     workbench,
     ws_runs,
 )
+from server.middleware import RequestIDMiddleware
 
 # Logging configuration - balance visibility with noise reduction
 LOGGING_CONFIG = {
@@ -68,6 +74,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request ID middleware for correlation
+app.add_middleware(RequestIDMiddleware)
+
 # Register Routers
 app.include_router(runs.router)
 app.include_router(results.router)
@@ -77,6 +86,7 @@ app.include_router(candidates.router)
 app.include_router(lifecycle.router)
 app.include_router(pipelines.router)
 app.include_router(ws_runs.router)
+app.include_router(admin.router)
 
 
 @app.get("/health")

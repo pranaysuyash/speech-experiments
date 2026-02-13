@@ -1,0 +1,31 @@
+diff --git a/cosyvoice/utils/file_utils.py b/cosyvoice/utils/file_utils.py
+index 0fe5943..39a8772 100644
+--- a/cosyvoice/utils/file_utils.py
++++ b/cosyvoice/utils/file_utils.py
+@@ -15,6 +15,7 @@
+ # limitations under the License.
+ 
+ import json
++import torch
+ import torchaudio
+ 
+ 
+@@ -35,14 +36,15 @@ def read_json_lists(list_file):
+ 
+ def load_wav(wav, target_sr):
+     speech, sample_rate = torchaudio.load(wav)
+-    speech = speech.to("cuda")
++    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
++    speech = speech.to(device)
+     speech = speech.mean(dim=0, keepdim=True)
+     if sample_rate != target_sr:
+         resampler = torchaudio.transforms.Resample(
+                     orig_freq=sample_rate,
+                     new_freq=target_sr
+-                ).to('cuda')
+-        speech = resampler(speech).to("cuda")
++                ).to(device)
++        speech = resampler(speech).to(device)
+     return speech
+ 
+ def speed_change(waveform, sample_rate, speed_factor: str):

@@ -14,6 +14,14 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+class FFmpegNotFoundError(RuntimeError):
+    """Raised when ffmpeg is not found on the system."""
+
+
+class IngestError(RuntimeError):
+    """Raised when media ingestion fails."""
+
+
 @dataclass(frozen=True)
 class IngestConfig:
     normalize: bool = False
@@ -223,6 +231,8 @@ def extract_audio_ffmpeg(
         subprocess.run(argv, check=True, capture_output=True)
         atomic_replace(tmp_path, output_wav)
         return argv, ffmpeg_version
+    except FileNotFoundError:
+        raise FFmpegNotFoundError("ffmpeg is not installed or not found in PATH") from None
     except subprocess.CalledProcessError as e:
         # Keep stderr for debugging
         stderr = (
@@ -230,7 +240,7 @@ def extract_audio_ffmpeg(
             if isinstance(e.stderr, (bytes, bytearray))
             else str(e.stderr)
         )
-        raise RuntimeError(f"ffmpeg failed: {stderr}") from e
+        raise IngestError(f"ffmpeg failed: {stderr}") from e
     finally:
         if tmp_path.exists():
             try:

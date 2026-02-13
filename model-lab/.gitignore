@@ -111,6 +111,7 @@ Thumbs.db
 
 # IDE
 .vscode/
+.githooks/
 .idea/
 *.sublime-project
 *.sublime-workspace

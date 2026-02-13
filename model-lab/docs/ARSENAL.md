@@ -1,7 +1,7 @@
 # Model Arsenal
 
 > Auto-generated from registry + configs + runs. Do not edit manually.
-> Generated from commit: 861fa73 (tree: c965ec75304f)
+> Generated from commit: 12aadb1 (tree: 9336a89819b9)
 > ⚠️ Working directory has uncommitted changes
 
 ## Summary
@@ -12,15 +12,108 @@
 | **pyannote_diarization** | ✅ production | diarization | local, api | server | - | - |
 | **silero_vad** | ✅ production | vad | local, mobile, browser | server, edge | - | - |
 | **whisper** | ✅ production | asr | local, api | desktop, server | - | - |
+| **basic_pitch** | 🔬 experimental | music_transcription | local | desktop | - | - |
+| **clap** | 🔬 experimental | embed, classify | local | desktop | - | - |
+| **deepfilternet** | 🔬 experimental | enhance | local | desktop | - | - |
+| **demucs** | 🔬 experimental | separate | local | desktop | - | - |
 | **distil_whisper** | 🔬 experimental | asr | local | desktop, server | - | - |
+| **faster_distil_whisper_large_v3** | 🔬 experimental | asr | local | desktop | - | - |
+| **faster_whisper_large_v3** | 🔬 experimental | asr | local | desktop | - | - |
+| **glm_asr_nano_2512** | 🔬 experimental | asr | local | desktop | - | - |
+| **glm_tts** | 🔬 experimental | tts | local | desktop | - | - |
 | **heuristic_diarization** | 🔬 experimental | diarization | local | server, edge | - | - |
+| **kyutai_streaming** | 🔬 experimental | asr_stream | local | desktop | - | - |
 | **lfm2_5_audio** | 🟡 candidate | asr, tts, chat | local, api | desktop, server | - | - |
+| **moonshine** | 🔬 experimental | asr | local | desktop | - | - |
+| **nb_whisper_small_onnx** | 🔬 experimental | asr | local | desktop | - | - |
+| **nemotron_streaming** | 🔬 experimental | asr_stream | local | desktop | - | - |
+| **parakeet_multitalker** | 🔬 experimental | asr | local | desktop | - | - |
+| **rnnoise** | 🔬 experimental | enhance | local | desktop | - | - |
 | **seamlessm4t** | 🔬 experimental | asr, mt | local | desktop | - | - |
+| **voxtral** | 🔬 experimental | asr, asr_stream | local | desktop | - | - |
+| **voxtral_realtime_2602** | 🔬 experimental | asr_stream | local | desktop | - | - |
 | **whisper_cpp** | 🔬 experimental | asr | local, cli | desktop, edge, mobile | - | - |
+| **yamnet** | 🔬 experimental | classify | local | desktop | - | - |
 
 ---
 
 ## Model Details
+
+### basic_pitch
+
+**basic_pitch** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | music_transcription |
+| Accelerators | cpu |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=basic_pitch DATASET=primary
+```
+
+---
+
+### clap
+
+**clap** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | embed, classify |
+| Accelerators | cpu, mps, cuda |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=clap DATASET=primary
+```
+
+---
+
+### deepfilternet
+
+**deepfilternet** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | enhance |
+| Accelerators | cpu, mps |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=deepfilternet DATASET=primary
+```
+
+---
+
+### demucs
+
+**demucs** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | separate |
+| Accelerators | cpu, mps, cuda |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=demucs DATASET=primary
+```
+
+---
 
 ### distil_whisper
 
@@ -39,10 +132,44 @@
 make asr MODEL=distil_whisper DATASET=primary
 ```
 
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+
 #### Observed Evidence
 | Task | Grade | Device | Metrics | Gates | Ver. |
 |------|-------|--------|---------|-------|------|
-| asr | EvidenceGrade.GOLDEN_BATCH | mps | wer:83.3%<br>rtf:0.02x<br>latency_ms:3244ms | ❌ wer_valid | 2026-01-09 |
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:136.2%<br>rtf:0.32x<br>latency_ms:9567ms | ❌ is_truncated | 2026-02-13 |
+
+---
+
+### faster_distil_whisper_large_v3
+
+**faster_distil_whisper_large_v3** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr |
+| Accelerators | cpu, cuda |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=faster_distil_whisper_large_v3 DATASET=primary
+```
+
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+
+#### Observed Evidence
+| Task | Grade | Device | Metrics | Gates | Ver. |
+|------|-------|--------|---------|-------|------|
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:136.2%<br>rtf:0.50x<br>latency_ms:14982ms | ❌ is_truncated | 2026-02-13 |
 
 ---
 
@@ -73,7 +200,89 @@ make asr MODEL=faster_whisper DATASET=primary
 #### Observed Evidence
 | Task | Grade | Device | Metrics | Gates | Ver. |
 |------|-------|--------|---------|-------|------|
-| asr | EvidenceGrade.GOLDEN_BATCH | mps | wer:24.1%<br>rtf:0.12x<br>latency_ms:19802ms | ❌ is_truncated | 2026-01-09 |
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:134.5%<br>rtf:0.10x<br>latency_ms:2883ms | ❌ is_truncated | 2026-02-13 |
+
+---
+
+### faster_whisper_large_v3
+
+**faster_whisper_large_v3** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr |
+| Accelerators | cpu, cuda |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=faster_whisper_large_v3 DATASET=primary
+```
+
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+
+#### Observed Evidence
+| Task | Grade | Device | Metrics | Gates | Ver. |
+|------|-------|--------|---------|-------|------|
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:136.2%<br>rtf:1.28x<br>latency_ms:38534ms | ❌ is_truncated | 2026-02-13 |
+
+---
+
+### glm_asr_nano_2512
+
+**glm_asr_nano_2512** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr |
+| Accelerators | cpu, cuda, mps |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=glm_asr_nano_2512 DATASET=primary
+```
+
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+
+#### Observed Evidence
+| Task | Grade | Device | Metrics | Gates | Ver. |
+|------|-------|--------|---------|-------|------|
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:100.0%<br>rtf:0.00x<br>latency_ms:1ms | ❌ wer_valid | 2026-02-13 |
+
+---
+
+### glm_tts
+
+**glm_tts** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | tts |
+| Accelerators | cpu, cuda, mps |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=glm_tts DATASET=primary
+```
+
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.TTS | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
 
 ---
 
@@ -116,6 +325,25 @@ make asr MODEL=heuristic_diarization DATASET=primary
 
 ---
 
+### kyutai_streaming
+
+**kyutai_streaming** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr_stream |
+| Accelerators | cpu, cuda, mps |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=kyutai_streaming DATASET=primary
+```
+
+---
+
 ### lfm2_5_audio
 
 **lfm2_5_audio** by Liquid AI
@@ -155,9 +383,8 @@ make asr MODEL=lfm2_5_audio DATASET=primary
 #### Observed Evidence
 | Task | Grade | Device | Metrics | Gates | Ver. |
 |------|-------|--------|---------|-------|------|
-| asr | EvidenceGrade.ADHOC | mps | wer:137.8%<br>rtf:0.18x<br>latency_ms:29259ms | ❌ is_truncated | 2026-01-09 |
-| tts | EvidenceGrade.SMOKE | mps | latency_ms:7053ms<br>rtf:2.13x | ✅ Pass | 2026-01-09 |
-| v2v | EvidenceGrade.SMOKE | cpu | latency_ms:5287ms | ✅ Pass | - |
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:134.5%<br>rtf:0.46x<br>latency_ms:13748ms | ❌ is_truncated | 2026-02-13 |
+| tts | EvidenceGrade.SMOKE | cpu | latency_ms:4447ms<br>rtf:1.49x | ✅ Pass | 2026-02-13 |
 
 **Known Issues:**
 - Requires patched harness for MPS support (detokenizer fix)
@@ -165,6 +392,102 @@ make asr MODEL=lfm2_5_audio DATASET=primary
 **Hardware Notes:**
 - MPS works well on Apple Silicon (via workaround)
 - CPU inference is possible but slow
+
+---
+
+### moonshine
+
+**moonshine** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr |
+| Accelerators | cpu, mps |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=moonshine DATASET=primary
+```
+
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+
+---
+
+### nb_whisper_small_onnx
+
+**nb_whisper_small_onnx** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr |
+| Accelerators | cpu, cuda |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=nb_whisper_small_onnx DATASET=primary
+```
+
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+
+#### Observed Evidence
+| Task | Grade | Device | Metrics | Gates | Ver. |
+|------|-------|--------|---------|-------|------|
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:100.0%<br>rtf:0.00x<br>latency_ms:1ms | ❌ wer_valid | 2026-02-13 |
+
+---
+
+### nemotron_streaming
+
+**nemotron_streaming** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr_stream |
+| Accelerators | cpu, cuda |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=nemotron_streaming DATASET=primary
+```
+
+---
+
+### parakeet_multitalker
+
+**parakeet_multitalker** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr |
+| Accelerators | cpu, cuda |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=parakeet_multitalker DATASET=primary
+```
+
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
 
 ---
 
@@ -205,6 +528,25 @@ make asr MODEL=pyannote_diarization DATASET=primary
 
 ---
 
+### rnnoise
+
+**rnnoise** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | enhance |
+| Accelerators | cpu |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=rnnoise DATASET=primary
+```
+
+---
+
 ### seamlessm4t
 
 **facebook/seamless-m4t-v2-large** by Unknown
@@ -222,10 +564,11 @@ make asr MODEL=pyannote_diarization DATASET=primary
 make asr MODEL=seamlessm4t DATASET=primary
 ```
 
-#### Observed Evidence
-| Task | Grade | Device | Metrics | Gates | Ver. |
-|------|-------|--------|---------|-------|------|
-| asr | EvidenceGrade.ADHOC | mps | wer:96.3%<br>rtf:0.11x<br>latency_ms:17563ms | ✅ Pass | 2026-01-09 |
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+| TaskType.MT | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
 
 ---
 
@@ -261,7 +604,55 @@ make asr MODEL=silero_vad DATASET=primary
 #### Observed Evidence
 | Task | Grade | Device | Metrics | Gates | Ver. |
 |------|-------|--------|---------|-------|------|
-| vad | EvidenceGrade.ADHOC | cpu | speech_ratio:0.44<br>num_segments:1.00<br>rtf:0.01x | ✅ Pass | 2026-01-09 |
+| vad | EvidenceGrade.SMOKE | cpu | speech_ratio:0.44<br>num_segments:1.00<br>rtf:0.01x | ✅ Pass | 2026-02-13 |
+
+---
+
+### voxtral
+
+**voxtral** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr, asr_stream |
+| Accelerators | cpu |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=voxtral DATASET=primary
+```
+
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+
+#### Observed Evidence
+| Task | Grade | Device | Metrics | Gates | Ver. |
+|------|-------|--------|---------|-------|------|
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:219.8%<br>rtf:0.00x<br>latency_ms:16ms | ❌ is_truncated | 2026-02-13 |
+
+---
+
+### voxtral_realtime_2602
+
+**voxtral_realtime_2602** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | asr_stream |
+| Accelerators | cpu, cuda, mps |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=voxtral_realtime_2602 DATASET=primary
+```
 
 ---
 
@@ -303,8 +694,7 @@ make asr MODEL=whisper DATASET=primary
 #### Observed Evidence
 | Task | Grade | Device | Metrics | Gates | Ver. |
 |------|-------|--------|---------|-------|------|
-| alignment | EvidenceGrade.SMOKE | cpu | violations_mean:0.00<br>coverage_mean:1.00 | ✅ Pass | - |
-| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:29.1%<br>rtf:1.89x<br>latency_ms:308317ms | ❌ is_truncated | 2026-01-09 |
+| asr | EvidenceGrade.GOLDEN_BATCH | cpu | wer:136.2%<br>rtf:0.50x<br>latency_ms:14948ms | ❌ is_truncated | 2026-02-13 |
 
 **Known Issues:**
 - Requires ffmpeg for some audio formats
@@ -332,8 +722,32 @@ make asr MODEL=whisper DATASET=primary
 make asr MODEL=whisper_cpp DATASET=primary
 ```
 
+#### Declared Capabilities (Intent)
+| Task | Role | Confidence | Notes |
+|------|------|------------|-------|
+| TaskType.ASR | TaskRole.PRIMARY | inferred | Inferred from registry capabilities |
+
 **Hardware Notes:**
 - Uses AVX/NEON SIMD for fast CPU inference
 - No GPU required
+
+---
+
+### yamnet
+
+**yamnet** by Unknown
+
+| Attribute | Value |
+|-----------|-------|
+| Status | experimental |
+| Capabilities | classify |
+| Accelerators | cpu |
+| Offline | ✅ |
+| License | Unknown |
+
+**Run:**
+```bash
+make asr MODEL=yamnet DATASET=primary
+```
 
 ---

@@ -1,0 +1,7 @@
+flow: !new:flow.flow.Flow
+    spkr_emb_adaLN: True
+    speech_token_cfg: False
+    remove_spkr_concat_condition: True
+    mel_dim: 80
+    mel_framerate: 50
+    input_frame_rate: 25

@@ -88,6 +88,19 @@ This folder contains reusable prompts that guide agents and contributors when pe
 | `prompts/coordination/agent-delegation-v1.0.md` | Delegate work to sub-agents |
 | `prompts/coordination/agent-handoff-protocol-v1.0.md` | Standardize agent handoffs |
 
+### Sprint Operations
+
+| Prompt | Purpose |
+|--------|---------|
+| `prompts/sprint/hf-pro-agent-picklist-v1.0.md` | Pick a sprint role and start immediately |
+| `prompts/sprint/hf-pro-edge-small-executor-v1.0.md` | Execute edge/small model queue |
+| `prompts/sprint/hf-pro-domain-specialist-executor-v1.0.md` | Execute specialist capability queue |
+| `prompts/sprint/hf-pro-realtime-streaming-executor-v1.0.md` | Execute realtime/streaming queue |
+| `prompts/sprint/hf-pro-general-baselines-executor-v1.0.md` | Execute baseline/high-coverage queue |
+| `prompts/sprint/hf-pro-qa-referee-v1.0.md` | Audit ledgers and prioritize reruns |
+| `prompts/sprint/hf-pro-synthesis-lead-v1.0.md` | Build final recommendation synthesis |
+| `prompts/sprint/hf-pro-streaming-integration-fixer-v1.0.md` | Fix streaming adapter/integration blockers |
+
 ### Documentation
 
 | Prompt | Purpose |
@@ -211,6 +224,15 @@ prompts/
 │   └── pr-review-v1.0.md
 ├── security/
 │   └── security-review-v1.0.md
+├── sprint/
+│   ├── hf-pro-agent-picklist-v1.0.md
+│   ├── hf-pro-edge-small-executor-v1.0.md
+│   ├── hf-pro-domain-specialist-executor-v1.0.md
+│   ├── hf-pro-realtime-streaming-executor-v1.0.md
+│   ├── hf-pro-general-baselines-executor-v1.0.md
+│   ├── hf-pro-qa-referee-v1.0.md
+│   ├── hf-pro-synthesis-lead-v1.0.md
+│   └── hf-pro-streaming-integration-fixer-v1.0.md
 ├── triage/
 │   └── issue-triage-v1.0.md
 ├── workflow/
@@ -240,6 +262,7 @@ When adding a new prompt:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 4.0 | 2026-02-12 | Added HF Pro sprint multi-agent prompt pack |
 | 3.0 | 2026-02-05 | Added exploration, coordination, documentation, mentoring, guidance prompts |
 | 2.0 | 2026-02-05 | Added model, QA, security, triage, hardening prompts |
 | 1.0 | 2026-02-04 | Initial workflow and audit prompts |

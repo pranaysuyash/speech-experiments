@@ -562,6 +562,21 @@ class StreamingAdapter(ABC):
         
         logger.debug(f"[{self.model_type}] Finalized stream {self._handle.stream_id}")
         return self._finalize_result
+
+    def get_transcript(self) -> dict[str, Any]:
+        """
+        Get the current transcript snapshot.
+
+        Default behavior returns cached final result if available.
+        Subclasses may override for partial results.
+        """
+        if self._finalize_result is not None:
+            return {
+                "text": self._finalize_result.get("text", ""),
+                "is_final": True,
+            }
+
+        return {"text": "", "is_final": False}
     
     def close(self) -> None:
         """

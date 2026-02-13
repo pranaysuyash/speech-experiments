@@ -1,19 +1,28 @@
 import json
+import logging
 import os
-import signal
-import subprocess
 import threading
-from datetime import UTC, datetime
+import time
+import subprocess
+import signal
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional, List
+from datetime import datetime, timezone
 
 from harness.session import SessionRunner
+
+logger = logging.getLogger("server.lifecycle")
 
 # Concurrency State
 _WORKER_LOCK = threading.Lock()
 _ACTIVE_RUNS_COUNT = 0
 _MAX_CONCURRENT_RUNS = 3
-_ACTIVE_RUN_ID: str | None = None
+_ACTIVE_RUN_ID: Optional[str] = None
+
+# Timeout configuration
+_MAX_RUN_DURATION_SECONDS = int(
+    os.environ.get("MODEL_LAB_MAX_RUN_DURATION_SECONDS", str(60 * 60 * 2))
+)  # 2 hours default
 
 
 class RunnerBusyError(Exception):
@@ -22,8 +31,67 @@ class RunnerBusyError(Exception):
     pass
 
 
+class RunTimeoutError(Exception):
+    """Raised when a run exceeds maximum duration."""
+
+    pass
+
+
 def _runs_root() -> Path:
     return Path(os.environ.get("MODEL_LAB_RUNS_ROOT", "runs")).resolve()
+
+
+def get_max_duration_seconds() -> int:
+    """Get max run duration from env."""
+    return _MAX_RUN_DURATION_SECONDS
+
+
+def check_run_timeout(manifest_path: Path) -> bool:
+    """
+    Check if a run has exceeded max duration.
+
+    Returns True if run should be terminated, False otherwise.
+    """
+    import time
+
+    if not manifest_path.exists():
+        return False
+
+    try:
+        manifest = json.loads(manifest_path.read_text())
+        started_at = manifest.get("started_at")
+
+        if not started_at:
+            return False
+
+        # Parse ISO timestamp
+        from datetime import datetime
+
+        start_time = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        elapsed = time.time() - start_time.timestamp()
+
+        if elapsed > _MAX_RUN_DURATION_SECONDS:
+            logger.warning(
+                f"Run timeout",
+                extra={
+                    "elapsed_seconds": elapsed,
+                    "max_seconds": _MAX_RUN_DURATION_SECONDS,
+                },
+            )
+            return True
+
+        return False
+
+    except Exception:
+        return False
+
+
+def atomic_write_json(path: Path, data: Any) -> None:
+    """Write JSON data atomically to a file."""
+    tmp = path.with_suffix(".json.tmp")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
 
 
 def try_acquire_worker() -> bool:
@@ -43,13 +111,15 @@ def release_worker() -> None:
 
 
 def launch_run_worker(
-    runner: SessionRunner, run_request_data: dict[str, Any], background: bool = True
-) -> dict[str, Any]:
+    runner: SessionRunner, run_request_data: Dict[str, Any], background: bool = True
+) -> Dict[str, Any]:
     """
     Launch a run worker subprocess.
     """
     global _ACTIVE_RUN_ID
     _ACTIVE_RUN_ID = runner.run_id
+
+    logger.info(f"Launching run worker", extra={"run_id": runner.run_id, "background": background})
 
     # 1. Write run_request.json
     run_request_path = runner.session_dir / "run_request.json"
@@ -80,7 +150,7 @@ def launch_run_worker(
             "run_id": runner.run_id,
             "status": "RUNNING",
             "requested_at": run_request_data.get("requested_at"),
-            "started_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": run_request_data.get("source"),
             "use_case_id": run_request_data.get("use_case_id"),
             "pipeline": {
@@ -182,6 +252,94 @@ def launch_run_worker(
     return {"run_id": runner.run_id, "run_dir": str(runner.session_dir), "worker_pid": proc.pid}
 
 
+def rerun_pipeline(
+    run_id: str, config_overrides: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Re-run a pipeline with optional config changes."""
+    from server.services.runs_index import get_index
+
+    index = get_index()
+    run_data = index.get_run(run_id)
+
+    if not run_data:
+        raise ValueError("Run not found")
+
+    # Load run_request.json to get original input file
+    run_request_path = Path(run_data["root_path"]) / "run_request.json"
+    if not run_request_path.exists():
+        raise ValueError("Cannot rerun: run_request.json missing")
+
+    try:
+        run_request = json.loads(run_request_path.read_text())
+    except Exception as e:
+        raise ValueError(f"Failed to read run request: {e}")
+
+    # Find original input file
+    manifest_path = Path(run_data["manifest_path"])
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except Exception:
+        raise ValueError("Failed to read manifest")
+
+    input_path_str = manifest.get("input_path")
+    if not input_path_str:
+        raise ValueError("Cannot rerun: original input path not found")
+
+    input_path = Path(input_path_str)
+    if not input_path.exists():
+        raise ValueError(f"Cannot rerun: input file missing: {input_path}")
+
+    # Get original configuration
+    original_steps = run_request.get("steps_requested")
+    original_config = run_request.get("config", {})
+    preprocessing = run_request.get("preprocessing", [])
+
+    # Merge config overrides
+    merged_config = {**original_config, **(config_overrides or {})}
+
+    # Acquire worker
+    if not try_acquire_worker():
+        raise RunnerBusyError("Runner is busy with another job")
+
+    try:
+        runs_root = Path(os.environ.get("MODEL_LAB_RUNS_ROOT", "runs")).resolve()
+        runner = SessionRunner(
+            input_path,
+            runs_root,
+            steps=original_steps,
+            config=merged_config,
+        )
+
+        now = datetime.now(timezone.utc)
+
+        # Create new run_request with parent reference
+        new_run_request = {
+            "schema_version": "1",
+            "requested_at": now.isoformat(),
+            "source": "rerun",
+            "parent_run_id": run_id,
+            "use_case_id": run_request.get("use_case_id", "rerun"),
+            "steps_preset": run_request.get("steps_preset", "custom"),
+            "steps_requested": original_steps,
+            "filename_original": input_path.name,
+            "sha256": run_request.get("sha256"),
+            "config": merged_config,
+            "preprocessing": preprocessing,
+        }
+
+        result = launch_run_worker(runner, new_run_request, background=True)
+
+        return {
+            "run_id": runner.run_id,
+            "parent_run_id": run_id,
+            "console_url": f"/runs/{runner.run_id}",
+            "worker_pid": result.get("worker_pid"),
+        }
+    except Exception:
+        release_worker()
+        raise
+
+
 def update_manifest_pid(manifest_path: Path, pid: int) -> None:
     """Persist PID to manifest for robust lifecycle management."""
     try:
@@ -194,7 +352,7 @@ def update_manifest_pid(manifest_path: Path, pid: int) -> None:
 
 
 def update_manifest_status(
-    manifest_path: Path, status: str, error: dict[str, str] | None = None
+    manifest_path: Path, status: str, error: Optional[Dict[str, str]] = None
 ) -> None:
     """Helper to update status atomically."""
     try:
@@ -208,7 +366,7 @@ def update_manifest_status(
             m["status"] = status
             if error:
                 m["error"] = error
-            m["updated_at"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            m["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             atomic_write_json(manifest_path, m)
     except Exception:
         pass
@@ -219,6 +377,8 @@ def kill_run(run_id: str) -> tuple[bool, str]:
     Kill a running job.
     Returns (success, outcome_code).
     """
+    logger.info(f"Kill requested", extra={"run_id": run_id})
+
     run_dir = _runs_root() / "sessions" / "unknown" / run_id
     from server.services.runs_index import get_index
 
@@ -275,7 +435,7 @@ def kill_manifest_update(manifest_path: Path):
         if m.get("status") in ["RUNNING", "STALE"]:
             m["status"] = "CANCELLED"
             m["error"] = {"type": "UserCancelled", "message": "Run cancelled by user."}
-            m["updated_at"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            m["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             tmp = manifest_path.with_suffix(".json.tmp")
             tmp.write_text(json.dumps(m, indent=2, sort_keys=True))
             os.replace(tmp, manifest_path)
@@ -283,16 +443,17 @@ def kill_manifest_update(manifest_path: Path):
         pass
 
 
-def retry_run(run_id: str, from_step: str | None = None) -> dict[str, Any]:
+def retry_run(run_id: str, from_step: Optional[str] = None) -> Dict[str, Any]:
     """
     Retry a run.
     """
+    logger.info(f"Retry requested", extra={"run_id": run_id, "from_step": from_step})
 
     def _iso_now() -> str:
-        return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Pure-manifest invalidation: keep this lightweight (no model imports).
-    def _reset_step_entry(entry: dict[str, Any]) -> None:
+    def _reset_step_entry(entry: Dict[str, Any]) -> None:
         entry["status"] = "PENDING"
         entry["artifacts"] = []
         entry["warnings"] = []
@@ -304,7 +465,7 @@ def retry_run(run_id: str, from_step: str | None = None) -> dict[str, Any]:
         entry.pop("error", None)
 
     # Step dependency graph (names only). Mirrors harness.session.SessionRunner._register_steps.
-    _DEPS: dict[str, list[str]] = {
+    _DEPS: Dict[str, List[str]] = {
         "ingest": [],
         "asr": ["ingest"],
         "diarization": ["ingest"],
@@ -323,8 +484,8 @@ def retry_run(run_id: str, from_step: str | None = None) -> dict[str, Any]:
         ],
     }
 
-    def _collect_dependents(step_name: str) -> list[str]:
-        out: list[str] = []
+    def _collect_dependents(step_name: str) -> List[str]:
+        out: List[str] = []
         visited: set[str] = set()
 
         def dfs(s: str) -> None:
@@ -337,7 +498,7 @@ def retry_run(run_id: str, from_step: str | None = None) -> dict[str, Any]:
         dfs(step_name)
         return out
 
-    def _invalidate_step_and_downstream(m: dict[str, Any], step_name: str) -> None:
+    def _invalidate_step_and_downstream(m: Dict[str, Any], step_name: str) -> None:
         steps = m.setdefault("steps", {})
 
         entry = steps.get(step_name)
