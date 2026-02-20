@@ -2,7 +2,7 @@
 # Single entrypoint for all operations
 
 .PHONY: setup setup-kernel lint format test lab asr tts scorecard list-models clean \
-	hf-preflight hf-plan hf-run-all hf-report hf-prefetch
+	hf-preflight hf-plan hf-run-all hf-report hf-prefetch hf-frontier
 
 # Default Python for uv
 PYTHON := uv run python
@@ -342,6 +342,7 @@ help:
 	@echo "    make hf-run-all    - Run all queues in parallel + report"
 	@echo "    make hf-report     - Aggregate ledgers into reports"
 	@echo "    make hf-prefetch   - Prefetch HF Hub assets (small strategy)"
+	@echo "    make hf-frontier   - Scan HF Hub for frontier speech models (transformers/mlx/gguf)"
 	@echo ""
 	@echo "  Cleanup:"
 	@echo "    make clean         - Remove cache files"
@@ -364,6 +365,9 @@ hf-report:
 
 hf-prefetch:
 	$(PYTHON) scripts/hf_prefetch.py --strategy small
+
+hf-frontier:
+	$(PYTHON) scripts/hf_frontier_scan.py --limit 60
 
 # =============================================================================
 # Isolation (LCS-I)

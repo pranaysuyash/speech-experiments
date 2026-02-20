@@ -45,6 +45,7 @@ def _check_task_prereqs(task: dict[str, Any]) -> tuple[bool, str]:
     This keeps the sprint moving and makes reports more decision-ready.
     """
     import os
+    import platform
     import shutil
 
     model_id = str(task.get("model_id") or "")
@@ -96,6 +97,9 @@ def _check_task_prereqs(task: dict[str, Any]) -> tuple[bool, str]:
         whisper_cfg = cfg.get("whisper_cpp") or {}
         if not whisper_cfg.get("model_path"):
             return False, "Missing models/whisper_cpp/config.yaml whisper_cpp.model_path"
+
+    if model_id == "seamlessm4t" and platform.system() == "Darwin":
+        return False, "Known macOS crash-loop for seamlessm4t in current env (temporarily skipped)"
 
     return True, "ok"
 
@@ -154,6 +158,7 @@ def run_queue(
     max_tasks: int | None,
     dry_run: bool,
     skip_unmet_prereqs: bool,
+    task_timeout_sec: int,
 ) -> int:
     agent_id = queue["agent_id"]
     run_dir = execution_root / agent_id
@@ -266,28 +271,42 @@ def run_queue(
             continue
 
         start = time.perf_counter()
-        proc = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            cwd=Path.cwd(),
-        )
-        duration_s = time.perf_counter() - start
-        artifact_path = _extract_artifact_path(proc.stdout, proc.stderr)
+        try:
+            proc = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                cwd=Path.cwd(),
+                timeout=task_timeout_sec,
+            )
+            duration_s = time.perf_counter() - start
+            artifact_path = _extract_artifact_path(proc.stdout, proc.stderr)
+            stdout_text = proc.stdout or ""
+            stderr_text = proc.stderr or ""
+            status = "ok" if proc.returncode == 0 else "failed"
+            exit_code: int | None = proc.returncode
+        except subprocess.TimeoutExpired as exc:
+            duration_s = time.perf_counter() - start
+            artifact_path = None
+            stdout_text = (exc.stdout or "") if isinstance(exc.stdout, str) else ""
+            stderr_text = (exc.stderr or "") if isinstance(exc.stderr, str) else ""
+            stderr_text += f"\n[TIMEOUT] Exceeded {task_timeout_sec}s"
+            status = "failed_timeout"
+            exit_code = None
+
         stub = _safe_file_stub(task_id)
         stdout_log = log_dir / f"{stub}.stdout.log"
         stderr_log = log_dir / f"{stub}.stderr.log"
-        stdout_log.write_text(proc.stdout or "", encoding="utf-8")
-        stderr_log.write_text(proc.stderr or "", encoding="utf-8")
+        stdout_log.write_text(stdout_text, encoding="utf-8")
+        stderr_log.write_text(stderr_text, encoding="utf-8")
 
-        status = "ok" if proc.returncode == 0 else "failed"
         row = {
             "timestamp": now,
             "agent_id": agent_id,
             "task": task,
             "status": status,
-            "exit_code": proc.returncode,
+            "exit_code": exit_code,
             "duration_s": round(duration_s, 3),
             "artifact_path": artifact_path,
             "stdout_log": str(stdout_log),
@@ -297,7 +316,7 @@ def run_queue(
         _append_jsonl(ledger_path, row)
         executed += 1
 
-        if proc.returncode != 0:
+        if status != "ok":
             failures += 1
             if not continue_on_error:
                 break
@@ -342,6 +361,12 @@ def main() -> int:
         action="store_true",
         help="Attempt tasks even if fast prereq checks indicate they will fail",
     )
+    parser.add_argument(
+        "--task-timeout-sec",
+        type=int,
+        default=1800,
+        help="Per-task timeout in seconds (default: 1800)",
+    )
     args = parser.parse_args()
 
     queue = _load_queue(args.queue)
@@ -353,6 +378,7 @@ def main() -> int:
         max_tasks=args.max_tasks,
         dry_run=args.dry_run,
         skip_unmet_prereqs=not args.no_skip_unmet_prereqs,
+        task_timeout_sec=args.task_timeout_sec,
     )
 
 

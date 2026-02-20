@@ -46,6 +46,12 @@ def main() -> int:
         default=None,
         help="Execute at most N tasks per queue",
     )
+    parser.add_argument(
+        "--task-timeout-sec",
+        type=int,
+        default=1800,
+        help="Per-task timeout in seconds passed to worker (default: 1800)",
+    )
     args = parser.parse_args()
 
     # 1) Plan
@@ -94,6 +100,7 @@ def main() -> int:
             cmd.append("--dry-run")
         if args.max_tasks is not None:
             cmd += ["--max-tasks", str(args.max_tasks)]
+        cmd += ["--task-timeout-sec", str(args.task_timeout_sec)]
         procs.append(subprocess.Popen(cmd, cwd=PROJECT_ROOT))
 
     exit_codes = [p.wait() for p in procs]
@@ -124,4 +131,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
