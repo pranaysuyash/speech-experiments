@@ -26,6 +26,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from harness.env import load_dotenv_if_present
+
 STATUS_ORDER = {
     "production": 0,
     "candidate": 1,
@@ -460,6 +462,18 @@ def write_outputs(plan: dict[str, Any], output_dir: Path) -> None:
     queue_dir = output_dir / "agent_queues"
     queue_dir.mkdir(parents=True, exist_ok=True)
 
+    # These files live under runs/ and are treated as artifacts. Always include a
+    # provenance field so they don't trip "runs/* must have provenance" invariants.
+    plan.setdefault(
+        "provenance",
+        {
+            "kind": "sprint_plan",
+            "tool": "scripts/hf_sprint_plan.py",
+            "generated_at": plan.get("generated_at"),
+            "sprint_id": plan.get("sprint", {}).get("id"),
+        },
+    )
+
     (output_dir / "plan.json").write_text(
         json.dumps(plan, indent=2, default=str),
         encoding="utf-8",
@@ -484,6 +498,16 @@ def write_outputs(plan: dict[str, Any], output_dir: Path) -> None:
                 )
 
     for agent_id, queue in sorted(plan["queues"].items()):
+        queue.setdefault(
+            "provenance",
+            {
+                "kind": "agent_queue",
+                "tool": "scripts/hf_sprint_plan.py",
+                "generated_at": plan.get("generated_at"),
+                "sprint_id": plan.get("sprint", {}).get("id"),
+                "agent_id": agent_id,
+            },
+        )
         queue_json = queue_dir / f"{agent_id}.json"
         queue_md = queue_dir / f"{agent_id}.md"
         queue_json.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
@@ -511,6 +535,7 @@ def write_outputs(plan: dict[str, Any], output_dir: Path) -> None:
 
 
 def main() -> int:
+    load_dotenv_if_present()
     parser = argparse.ArgumentParser(description="Generate HF sprint multi-agent plan")
     parser.add_argument(
         "--config",

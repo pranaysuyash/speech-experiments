@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "faster-whisper>=1.2.1",
     "fastapi>=0.115.0",
+    "huggingface-hub>=0.26.0",
     "ipywidgets>=8.1.8",
     "jupyter>=1.1.1",
     "jupyterlab>=4.5.1",
@@ -20,6 +21,7 @@ dependencies = [
     "plotly>=6.5.0",
     "psutil>=7.2.1",
     "pydantic>=2.12.5",
+    "python-dotenv>=1.0.1",
     "python-multipart>=0.0.9",
     "requests>=2.32.5",
     "scipy>=1.16.3",
@@ -37,6 +39,8 @@ dependencies = [
     "sentence-transformers>=5.2.0",
     "scikit-learn>=1.8.0",
     "pyannote-audio>=4.0.4",
+    "speechbrain>=1.0.0",
+    "spacy>=3.7.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +49,19 @@ dev = [
     "pre-commit>=4.0.1",
     "pytest>=8.3.4",
     "mypy>=1.14.1",
+]
+
+# Optional sprint deps. Keep them opt-in: some are heavyweight and may conflict
+# with system-specific builds (TF/NeMo especially).
+hf_sprint_light = [
+    "demucs>=4.0.0",
+    "laion-clap>=1.1.0",
+    "onnxruntime>=1.17.0",
+]
+hf_sprint_heavy = [
+    "nemo_toolkit[asr]>=1.20.0",
+    "tensorflow>=2.16.0",
+    "tensorflow-hub>=0.13.0",
 ]
 
 [tool.ruff]
@@ -64,4 +81,3 @@ dev = [
     "types-pyyaml>=6.0.12.20250915",
     "types-requests>=2.32.4.20260107",
 ]
-

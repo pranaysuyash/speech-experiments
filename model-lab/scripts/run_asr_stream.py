@@ -20,6 +20,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from harness.env import load_dotenv_if_present
+
 DATASET_MAP = {
     "smoke": (
         Path("data/audio/SMOKE/conversation_2ppl_10s.wav"),
@@ -165,6 +167,7 @@ def run_streaming_adhoc(
 
 
 def main() -> int:
+    load_dotenv_if_present()
     parser = argparse.ArgumentParser(description="Run streaming ASR benchmark")
     parser.add_argument("--model", required=True, help="Model ID")
     parser.add_argument("--device", default=None, help="cpu | mps | cuda (auto if omitted)")

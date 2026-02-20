@@ -8,10 +8,17 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from harness.env import load_dotenv_if_present
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -168,15 +175,19 @@ def write_markdown_summary(rows: list[dict[str, Any]], out_path: Path, sprint_id
     lines.append("")
     lines.append("## Agent Summary")
     lines.append("")
-    lines.append("| agent_id | total | ok | failed | manual_skips |")
-    lines.append("|---|---:|---:|---:|---:|")
+    lines.append("| agent_id | total | ok | failed | manual_skips | prereq_skips | completed_skips |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|")
 
     for agent_id in sorted(by_agent):
         items = by_agent[agent_id]
         ok = sum(1 for x in items if x["status"] == "ok")
         failed = sum(1 for x in items if x["status"] == "failed")
         manual = sum(1 for x in items if x["status"] == "skipped_manual")
-        lines.append(f"| {agent_id} | {len(items)} | {ok} | {failed} | {manual} |")
+        prereq = sum(1 for x in items if x["status"] == "skipped_prereq")
+        completed = sum(1 for x in items if x["status"] == "skipped_completed")
+        lines.append(
+            f"| {agent_id} | {len(items)} | {ok} | {failed} | {manual} | {prereq} | {completed} |"
+        )
 
     lines.append("")
     lines.append("## Model WER (where available)")
@@ -193,6 +204,7 @@ def write_markdown_summary(rows: list[dict[str, Any]], out_path: Path, sprint_id
 
 
 def main() -> int:
+    load_dotenv_if_present()
     parser = argparse.ArgumentParser(description="Generate HF sprint report")
     parser.add_argument(
         "--execution-root",

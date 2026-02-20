@@ -19,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import yaml
 
+from harness.env import load_dotenv_if_present
+
 from harness.audio_io import AudioLoader, GroundTruthLoader
 from harness.media_ingest import FFmpegNotFoundError, IngestError, ingest_media
 from harness.metrics_asr import ASRMetrics, diagnose_output_quality
@@ -606,6 +608,7 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None, pre: str =
 
 
 def main():
+    load_dotenv_if_present()
     parser = argparse.ArgumentParser(description="Run ASR tests using Bundle Contract v1")
     parser.add_argument(
         "--model", type=str, required=True, help="Model ID (registered in harness.registry)"

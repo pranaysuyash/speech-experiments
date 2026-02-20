@@ -11,15 +11,93 @@ This script is intentionally simple:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import subprocess
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from harness.env import load_dotenv_if_present
+
 ARTIFACT_RE = re.compile(r"ARTIFACT_PATH:(?P<path>.+)")
+
+
+def _can_import(module: str) -> bool:
+    try:
+        return importlib.util.find_spec(module) is not None
+    except Exception:
+        return False
+
+
+def _check_task_prereqs(task: dict[str, Any]) -> tuple[bool, str]:
+    """
+    Fast, best-effort prereq checks.
+
+    Goal: skip tasks that we know will fail (missing auth, missing modules, missing binaries/config).
+    This keeps the sprint moving and makes reports more decision-ready.
+    """
+    import os
+    import shutil
+
+    model_id = str(task.get("model_id") or "")
+
+    if model_id == "pyannote_diarization":
+        if not os.environ.get("HF_TOKEN") and not os.environ.get("HUGGINGFACE_HUB_TOKEN"):
+            return False, "Missing HF_TOKEN/HUGGINGFACE_HUB_TOKEN (required for pyannote)"
+        if not _can_import("pyannote.audio"):
+            return False, "Missing python module: pyannote.audio"
+
+    if model_id in {"nemotron_streaming", "parakeet_multitalker"}:
+        if not _can_import("nemo.collections.asr"):
+            return False, "Missing python module: nemo.collections.asr (package: nemo_toolkit[asr])"
+
+    if model_id == "yamnet":
+        if not _can_import("tensorflow"):
+            return False, "Missing python module: tensorflow"
+        if not _can_import("tensorflow_hub"):
+            return False, "Missing python module: tensorflow_hub"
+
+    if model_id == "clap":
+        if not _can_import("laion_clap"):
+            return False, "Missing python module: laion_clap (package: laion-clap)"
+
+    if model_id == "demucs":
+        if not _can_import("demucs"):
+            return False, "Missing python module: demucs"
+
+    if model_id == "deepfilternet":
+        if not _can_import("deepfilternet"):
+            return False, "Missing python module: deepfilternet"
+
+    if model_id == "nb_whisper_small_onnx":
+        if not _can_import("onnxruntime"):
+            return False, "Missing python module: onnxruntime"
+
+    if model_id == "whisper_cpp":
+        if shutil.which("whisper-cli") is None:
+            return False, "Missing whisper.cpp binary in PATH (expected: whisper-cli)"
+        cfg_path = PROJECT_ROOT / "models" / "whisper_cpp" / "config.yaml"
+        try:
+            import yaml  # type: ignore
+        except Exception:
+            return False, "Missing python module: yaml (PyYAML)"
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            cfg = {}
+        whisper_cfg = cfg.get("whisper_cpp") or {}
+        if not whisper_cfg.get("model_path"):
+            return False, "Missing models/whisper_cpp/config.yaml whisper_cpp.model_path"
+
+    return True, "ok"
 
 
 def _load_queue(path: Path) -> dict[str, Any]:
@@ -75,6 +153,7 @@ def run_queue(
     force_rerun: bool,
     max_tasks: int | None,
     dry_run: bool,
+    skip_unmet_prereqs: bool,
 ) -> int:
     agent_id = queue["agent_id"]
     run_dir = execution_root / agent_id
@@ -92,6 +171,7 @@ def run_queue(
     failures = 0
     executed = 0
     skipped = 0
+    prereq_skipped = 0
 
     for task in tasks:
         task_id = task["task_id"]
@@ -130,6 +210,25 @@ def run_queue(
             _append_jsonl(ledger_path, row)
             skipped += 1
             continue
+
+        if skip_unmet_prereqs:
+            ok, reason = _check_task_prereqs(task)
+            if not ok:
+                row = {
+                    "timestamp": now,
+                    "agent_id": agent_id,
+                    "task": task,
+                    "status": "skipped_prereq",
+                    "exit_code": None,
+                    "duration_s": 0.0,
+                    "artifact_path": None,
+                    "stdout_log": None,
+                    "stderr_log": None,
+                    "prereq_reason": reason,
+                }
+                _append_jsonl(ledger_path, row)
+                prereq_skipped += 1
+                continue
 
         if not command:
             row = {
@@ -205,11 +304,14 @@ def run_queue(
 
     print(f"Agent: {agent_id}")
     print(f"Executed: {executed}, Skipped: {skipped}, Failures: {failures}")
+    if skip_unmet_prereqs:
+        print(f"Skipped (prereqs): {prereq_skipped}")
     print(f"Ledger: {ledger_path}")
     return 1 if failures else 0
 
 
 def main() -> int:
+    load_dotenv_if_present()
     parser = argparse.ArgumentParser(description="Execute an HF sprint queue")
     parser.add_argument("--queue", type=Path, required=True, help="Queue JSON path")
     parser.add_argument(
@@ -235,6 +337,11 @@ def main() -> int:
         help="Execute at most N tasks from the queue",
     )
     parser.add_argument("--dry-run", action="store_true", help="Record actions without executing")
+    parser.add_argument(
+        "--no-skip-unmet-prereqs",
+        action="store_true",
+        help="Attempt tasks even if fast prereq checks indicate they will fail",
+    )
     args = parser.parse_args()
 
     queue = _load_queue(args.queue)
@@ -245,6 +352,7 @@ def main() -> int:
         force_rerun=args.force_rerun,
         max_tasks=args.max_tasks,
         dry_run=args.dry_run,
+        skip_unmet_prereqs=not args.no_skip_unmet_prereqs,
     )
 
 

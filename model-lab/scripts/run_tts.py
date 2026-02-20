@@ -20,6 +20,8 @@ import yaml
 # Add parent to path for harness imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from harness.env import load_dotenv_if_present
+
 from harness.metrics_tts import detect_audio_issues
 from harness.registry import ModelRegistry
 from harness.run_provenance import create_provenance, create_run_context
@@ -278,6 +280,7 @@ def run_tts_test(model_id: str, dataset: str, device: str = None):
 
 
 def main():
+    load_dotenv_if_present()
     parser = argparse.ArgumentParser(description="Run TTS tests using Bundle Contract v1")
     parser.add_argument(
         "--model", type=str, required=True, help="Model ID (registered in harness.registry)"

@@ -23,6 +23,8 @@ import yaml
 # Add harness to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from harness.env import load_dotenv_if_present
+
 from harness.media_ingest import FFmpegNotFoundError, IngestError, ingest_media
 from harness.metrics_diarization import DiarizationMetrics
 from harness.preprocess_ops import results_to_artifact_section, run_preprocessing_chain
@@ -283,6 +285,7 @@ def save_run_artifact(
 
 
 def main():
+    load_dotenv_if_present()
     parser = argparse.ArgumentParser(description="Run Diarization evaluation")
     parser.add_argument("--model", required=True, help="Model ID (e.g., pyannote_diarization)")
 

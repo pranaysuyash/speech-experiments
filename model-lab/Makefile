@@ -1,7 +1,8 @@
 # Model Lab Makefile
 # Single entrypoint for all operations
 
-.PHONY: setup setup-kernel lint format test lab asr tts scorecard list-models clean
+.PHONY: setup setup-kernel lint format test lab asr tts scorecard list-models clean \
+	hf-preflight hf-plan hf-run-all hf-report hf-prefetch
 
 # Default Python for uv
 PYTHON := uv run python
@@ -12,7 +13,7 @@ RUNNER := $(PYTHON) scripts/run_bench.py
 # =============================================================================
 
 setup:
-	uv sync
+	uv sync --extra dev --group dev
 	@echo "✓ Environment synced"
 
 setup-kernel:
@@ -335,8 +336,34 @@ help:
 	@echo "  Analysis:"
 	@echo "    make scorecard     - Generate comparison scorecard"
 	@echo ""
+	@echo "  HF Pro Sprint:"
+	@echo "    make hf-preflight  - Check deps/tools/datasets/env for the sprint"
+	@echo "    make hf-plan       - Generate sprint plan + queues"
+	@echo "    make hf-run-all    - Run all queues in parallel + report"
+	@echo "    make hf-report     - Aggregate ledgers into reports"
+	@echo "    make hf-prefetch   - Prefetch HF Hub assets (small strategy)"
+	@echo ""
 	@echo "  Cleanup:"
 	@echo "    make clean         - Remove cache files"
+
+# =============================================================================
+# HF Pro Sprint (2026 Q1)
+# =============================================================================
+
+hf-preflight:
+	$(PYTHON) scripts/hf_sprint_preflight.py --config config/hf_sprint_2026q1.yaml
+
+hf-plan:
+	$(PYTHON) scripts/hf_sprint_plan.py --config config/hf_sprint_2026q1.yaml --output-dir runs/hf_sprint_2026q1
+
+hf-run-all:
+	$(PYTHON) scripts/hf_sprint_run_all.py --preflight
+
+hf-report:
+	$(PYTHON) scripts/hf_sprint_report.py --execution-root runs/hf_sprint_2026q1/execution --out-dir runs/hf_sprint_2026q1/reports --sprint-id hf_pro_2026q1
+
+hf-prefetch:
+	$(PYTHON) scripts/hf_prefetch.py --strategy small
 
 # =============================================================================
 # Isolation (LCS-I)

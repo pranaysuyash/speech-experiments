@@ -3534,6 +3534,156 @@ ModelRegistry.register_loader(
 )
 
 
+# ---------------------------------------------------------------------------
+# Parler-TTS
+# ---------------------------------------------------------------------------
+
+
+def load_parler_tts(config: dict, device: str) -> Bundle:
+    """Text-to-speech with natural language voice description using Parler-TTS."""
+    from transformers import AutoTokenizer
+    from parler_tts import ParlerTTSForConditionalGeneration
+    import torch
+
+    model_name = config.get("model_name", "parler-tts/parler-tts-mini-v1.1")
+    actual_device = device if device != "mps" else "cpu"
+
+    model = ParlerTTSForConditionalGeneration.from_pretrained(model_name).to(actual_device)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model.eval()
+
+    def synthesize(text, voice_description="A female speaker with a warm, clear voice", **kwargs):
+        import numpy as np
+        input_ids = tokenizer(voice_description, return_tensors="pt").input_ids.to(actual_device)
+        prompt_ids = tokenizer(text, return_tensors="pt").input_ids.to(actual_device)
+        with torch.no_grad():
+            generation = model.generate(input_ids=input_ids, prompt_input_ids=prompt_ids)
+        audio = generation.cpu().numpy().squeeze()
+        sr = model.config.sampling_rate
+        return {"audio": audio, "sample_rate": sr, "duration_s": len(audio) / sr, "text": text, "voice_description": voice_description}
+
+    return {
+        "model_type": "parler_tts",
+        "device": actual_device,
+        "capabilities": ["tts"],
+        "modes": ["batch"],
+        "tts": {"synthesize": synthesize},
+        "raw": {"model": model, "tokenizer": tokenizer},
+    }
+
+
+ModelRegistry.register_loader(
+    "parler_tts",
+    load_parler_tts,
+    "Parler-TTS: Text-to-speech with natural language voice description",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["tts"],
+    hardware=["cpu", "cuda"],
+    modes=["batch"],
+)
+
+
+# ---------------------------------------------------------------------------
+# Bark TTS
+# ---------------------------------------------------------------------------
+
+
+def load_bark_tts(config: dict, device: str) -> Bundle:
+    """Multi-speaker TTS with effects using Suno's Bark."""
+    from transformers import AutoProcessor, BarkModel
+    import torch
+
+    model_name = config.get("model_name", "suno/bark-small")
+    actual_device = device if device != "mps" else "cpu"
+
+    processor = AutoProcessor.from_pretrained(model_name)
+    model = BarkModel.from_pretrained(model_name).to(actual_device)
+    model.eval()
+
+    def synthesize(text, voice_preset="v2/en_speaker_6", **kwargs):
+        inputs = processor(text, voice_preset=voice_preset, return_tensors="pt").to(actual_device)
+        with torch.no_grad():
+            audio_array = model.generate(**inputs)
+        audio = audio_array.cpu().numpy().squeeze()
+        sr = model.generation_config.sample_rate
+        return {"audio": audio, "sample_rate": sr, "duration_s": len(audio) / sr, "text": text, "voice_preset": voice_preset}
+
+    return {
+        "model_type": "bark_tts",
+        "device": actual_device,
+        "capabilities": ["tts"],
+        "modes": ["batch"],
+        "tts": {"synthesize": synthesize},
+        "raw": {"model": model, "processor": processor},
+    }
+
+
+ModelRegistry.register_loader(
+    "bark_tts",
+    load_bark_tts,
+    "Bark TTS: Multi-speaker text-to-speech with effects (Suno)",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["tts"],
+    hardware=["cpu", "cuda"],
+    modes=["batch"],
+)
+
+
+# ---------------------------------------------------------------------------
+# Pitch Detection (CREPE)
+# ---------------------------------------------------------------------------
+
+
+def load_pitch_crepe(config: dict, device: str) -> Bundle:
+    """Pitch (F0) detection using CREPE neural network."""
+    def detect_pitch(audio, sr=16000, **kwargs):
+        import numpy as np
+        try:
+            import crepe
+            time_arr, frequency, confidence, activation = crepe.predict(audio, sr, viterbi=True)
+            voiced_mask = confidence > 0.5
+            voiced_f0 = frequency[voiced_mask]
+            return {
+                "time": time_arr.tolist(),
+                "frequency": frequency.tolist(),
+                "confidence": confidence.tolist(),
+                "mean_f0": float(np.mean(voiced_f0)) if len(voiced_f0) > 0 else 0.0,
+                "std_f0": float(np.std(voiced_f0)) if len(voiced_f0) > 0 else 0.0,
+                "voiced_ratio": float(np.mean(voiced_mask)),
+            }
+        except ImportError:
+            import librosa
+            f0, voiced_flag, voiced_probs = librosa.pyin(audio.astype(np.float32), fmin=50, fmax=500, sr=sr)
+            voiced_f0 = f0[voiced_flag] if voiced_flag is not None else np.array([])
+            return {
+                "frequency": f0.tolist() if f0 is not None else [],
+                "mean_f0": float(np.nanmean(f0)) if f0 is not None and not np.all(np.isnan(f0)) else 0.0,
+                "voiced_ratio": float(np.mean(voiced_flag)) if voiced_flag is not None else 0.0,
+            }
+
+    return {
+        "model_type": "pitch_crepe",
+        "device": "cpu",
+        "capabilities": ["pitch"],
+        "modes": ["batch"],
+        "pitch": {"detect": detect_pitch},
+    }
+
+
+ModelRegistry.register_loader(
+    "pitch_crepe",
+    load_pitch_crepe,
+    "Pitch Detection: F0 estimation using CREPE / librosa fallback",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["pitch"],
+    hardware=["cpu"],
+    modes=["batch"],
+)
+
+
 def load_model_from_config(config_path: Path, device: str = "cpu") -> Bundle:
     """
     Load model from YAML config file.
