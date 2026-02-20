@@ -12,6 +12,26 @@ from typing import Any
 import numpy as np
 
 
+def _resolve_stream_ops(asr_stream_ns: dict[str, Any]) -> dict[str, Any]:
+    """Resolve compatibility aliases across stream namespaces."""
+    start = asr_stream_ns.get("start") or asr_stream_ns.get("start_stream")
+    push_audio = asr_stream_ns.get("push_audio")
+    finalize = asr_stream_ns.get("finalize")
+    close = asr_stream_ns.get("close")
+    get_transcript = asr_stream_ns.get("get_transcript")
+
+    if start is None or push_audio is None or finalize is None:
+        raise KeyError("asr_stream namespace missing required start/push_audio/finalize method(s)")
+
+    return {
+        "start": start,
+        "push_audio": push_audio,
+        "get_transcript": get_transcript,
+        "finalize": finalize,
+        "close": close,
+    }
+
+
 def measure_streaming_latency(
     asr_stream_ns: dict[str, Any],
     audio: np.ndarray,
@@ -72,18 +92,31 @@ def measure_streaming_latency(
     t_first_partial = None
     t_last_partial = None
     
+    ops = _resolve_stream_ops(asr_stream_ns)
+
     # Start streaming
-    handle = asr_stream_ns["start"](sr=sr)
+    handle = ops["start"](sr=sr)
     
     # Record start time
     t0 = time.perf_counter()
     
     # Push chunks and collect events
     for i, chunk in enumerate(chunks):
-        asr_stream_ns["push_audio"](handle, chunk)
-        
-        # Get current transcript
-        result = asr_stream_ns["get_transcript"](handle)
+        push_events = ops["push_audio"](handle, chunk)
+
+        # Get current transcript when supported; otherwise infer from push events.
+        result = None
+        if ops["get_transcript"] is not None:
+            result = ops["get_transcript"](handle)
+        else:
+            if isinstance(push_events, list) and push_events:
+                last = push_events[-1]
+                if isinstance(last, dict):
+                    result = {
+                        "text": last.get("text", ""),
+                        "is_final": bool(last.get("is_final") or last.get("type") == "final"),
+                    }
+
         t_now = time.perf_counter()
         
         if result:
@@ -111,7 +144,7 @@ def measure_streaming_latency(
     
     # Measure finalize latency separately
     t_finalize_start = time.perf_counter()
-    final_result = asr_stream_ns["finalize"](handle)
+    final_result = ops["finalize"](handle)
     t_finalize_end = time.perf_counter()
     finalize_latency_ms = (t_finalize_end - t_finalize_start) * 1000
     
@@ -148,7 +181,7 @@ def measure_streaming_latency(
     # Real-time factor
     real_time_factor = total_time_s / audio_duration_s if audio_duration_s > 0 else 0.0
     
-    return {
+    result_metrics = {
         # Primary metrics
         "first_token_latency_ms": first_token_latency_ms,
         "partial_update_rate_hz": round(partial_update_rate_hz, 2),
@@ -160,6 +193,12 @@ def measure_streaming_latency(
         "num_finals": len(finals),
         "audio_duration_s": round(audio_duration_s, 3),
     }
+    if ops["close"] is not None:
+        try:
+            ops["close"](handle)
+        except Exception:
+            pass
+    return result_metrics
 
 
 def format_latency_report(metrics: dict[str, Any]) -> str:

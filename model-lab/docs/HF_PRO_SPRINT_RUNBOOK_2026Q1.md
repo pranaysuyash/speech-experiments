@@ -44,6 +44,7 @@ uv run python scripts/hf_sprint_preflight.py --config config/hf_sprint_2026q1.ya
 
 Notes:
 - Some models in the sprint are intentionally "heavy" (TensorFlow, NeMo, ONNX runtime). If you don't install those deps, tasks will be skipped as `skipped_prereq` by the worker.
+- `mlx_whisper` (edge track) requires `mlx-whisper` and Apple Silicon.
 - `pyannote_diarization` requires HF auth (`HF_TOKEN` or `HUGGINGFACE_HUB_TOKEN`) and often requires accepting the model terms on the HF model page.
 - `deepfilternet` currently conflicts with this repo's `numpy>=2.x` constraints; treat it as "isolated venv only" or leave it skipped.
 
@@ -117,6 +118,24 @@ Outputs:
 - `runs/hf_sprint_2026q1/frontier/frontier_scan.md`
 
 Use this before each sprint pass to pick candidate additions (especially realtime and Voxtral-adjacent repos).
+
+### Voxtral Transformers Backend Toggle
+
+Current Voxtral loaders support a safe default (`backend: mock`) and optional Transformers runtime.
+
+To enable Transformers runtime, set in:
+- `models/voxtral/config.yaml`
+- `models/voxtral_realtime_2602/config.yaml`
+
+```yaml
+config:
+  backend: transformers
+  local_files_only: false
+```
+
+Recommendation:
+- Keep `local_files_only: true` for daily runs to avoid accidental multi-GB downloads.
+- Flip to `false` only for explicit model bring-up windows.
 
 ## 8) Daily Cadence Through March 1, 2026
 

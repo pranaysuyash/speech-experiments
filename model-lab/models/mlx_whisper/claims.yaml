@@ -1,0 +1,6 @@
+model_id: mlx_whisper
+capabilities:
+  asr: true
+streaming: false
+notes:
+  - "Requires Apple Silicon + mlx-whisper runtime"

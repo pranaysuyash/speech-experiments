@@ -100,21 +100,35 @@ def run_streaming_asr_bench(
     if "asr_stream" not in bundle.get("capabilities", []):
         raise ValueError(f"{model_id} does not support asr_stream")
 
+    # Resolve compatible stream surface names
+    stream_ns = bundle["asr_stream"]
+    start = stream_ns.get("start") or stream_ns.get("start_stream")
+    push_audio = stream_ns.get("push_audio")
+    finalize = stream_ns.get("finalize")
+    close = stream_ns.get("close")
+    if start is None or push_audio is None or finalize is None:
+        raise ValueError(f"{model_id} asr_stream missing required start/push_audio/finalize methods")
+
     # Run latency measurement
     t_start = time.perf_counter()
-    latency_metrics = measure_streaming_latency(bundle["asr_stream"], audio, sr, chunk_ms=chunk_ms)
+    latency_metrics = measure_streaming_latency(stream_ns, audio, sr, chunk_ms=chunk_ms)
     wall_s = time.perf_counter() - t_start
 
     # Get final transcript from a fresh run for WER
-    handle = bundle["asr_stream"]["start"](sr=sr)
+    handle = start(sr=sr)
 
     chunk_samples = int(sr * chunk_ms / 1000)
     for i in range(0, len(audio), chunk_samples):
         chunk = audio[i : i + chunk_samples]
         if len(chunk) > 0:
-            bundle["asr_stream"]["push_audio"](handle, chunk)
+            push_audio(handle, chunk)
 
-    final = bundle["asr_stream"]["finalize"](handle)
+    final = finalize(handle)
+    if close is not None:
+        try:
+            close(handle)
+        except Exception:
+            pass
     hypothesis = final.get("text", "")
 
     # Compute WER/CER if reference provided
@@ -129,9 +143,9 @@ def run_streaming_asr_bench(
     if reference:
         asr_metrics = ASRMetrics()
         wer_result = asr_metrics.calculate_wer(reference, hypothesis)
+        metrics["wer"] = wer_result[0] if isinstance(wer_result, tuple) else wer_result.get("wer")
         cer_result = asr_metrics.calculate_cer(reference, hypothesis)
-        metrics["wer"] = wer_result["wer"]
-        metrics["cer"] = cer_result["cer"]
+        metrics["cer"] = float(cer_result)
         metrics["transcript"] = hypothesis
 
     return create_result_schema(
@@ -211,9 +225,9 @@ def run_batch_asr_bench(
     if reference:
         asr_metrics = ASRMetrics()
         wer_result = asr_metrics.calculate_wer(reference, hypothesis)
+        metrics["wer"] = wer_result[0] if isinstance(wer_result, tuple) else wer_result.get("wer")
         cer_result = asr_metrics.calculate_cer(reference, hypothesis)
-        metrics["wer"] = wer_result["wer"]
-        metrics["cer"] = cer_result["cer"]
+        metrics["cer"] = float(cer_result)
 
     return create_result_schema(
         model_id=model_id,

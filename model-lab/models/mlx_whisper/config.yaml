@@ -1,0 +1,13 @@
+model_id: mlx_whisper
+display_name: "MLX Whisper"
+description: "Apple Silicon optimized Whisper inference via mlx-whisper"
+
+source:
+  provider: "mlx-community"
+  repo: "mlx-community/whisper-small.en-asr-fp16"
+  hub: "https://huggingface.co/mlx-community/whisper-small.en-asr-fp16"
+  license: "MIT"
+
+config:
+  model_name: mlx-community/whisper-small.en-asr-fp16
+  language: en

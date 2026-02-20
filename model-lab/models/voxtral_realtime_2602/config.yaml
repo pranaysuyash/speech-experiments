@@ -26,3 +26,6 @@ config:
   streaming: true
   # Configurable delay knob (model supports 80ms-2.4s)
   transcription_delay_ms: 200  # Default: 200ms (recommended range: 100-500ms)
+  backend: mock  # set to transformers to use HF Transformers runtime
+  model_name: mistralai/Voxtral-Mini-4B-Realtime-2602
+  local_files_only: true

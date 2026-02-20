@@ -82,6 +82,10 @@ def _check_task_prereqs(task: dict[str, Any]) -> tuple[bool, str]:
         if not _can_import("onnxruntime"):
             return False, "Missing python module: onnxruntime"
 
+    if model_id == "mlx_whisper":
+        if not _can_import("mlx_whisper"):
+            return False, "Missing python module: mlx_whisper (package: mlx-whisper)"
+
     if model_id == "whisper_cpp":
         if shutil.which("whisper-cli") is None:
             return False, "Missing whisper.cpp binary in PATH (expected: whisper-cli)"

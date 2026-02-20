@@ -64,6 +64,7 @@ def _check_model_prereqs(model_id: str) -> list[CheckResult]:
     # Map of model_id -> python module(s) required to even attempt loading.
     required_modules: dict[str, list[str]] = {
         "pyannote_diarization": ["pyannote.audio"],
+        "mlx_whisper": ["mlx_whisper"],
         "yamnet": ["tensorflow", "tensorflow_hub"],
         "clap": ["laion_clap"],
         "demucs": ["demucs"],

@@ -28,3 +28,7 @@ config:
   sample_rate: 16000
   chunk_ms: 160  # 160ms chunks for streaming
   frame_ms: 20   # 20ms frames
+  backend: mock  # set to transformers to use HF Transformers runtime
+  model_name: mistralai/Voxtral-Mini-4B-Realtime-2602
+  local_files_only: true
+  emit_every_chunks: 2

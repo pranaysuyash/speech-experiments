@@ -31,6 +31,7 @@ agents:
     description: Edge and compact ASR candidates optimized for small footprint.
     include_models:
       - moonshine
+      - mlx_whisper
       - nb_whisper_small_onnx
       - whisper_cpp
       - distil_whisper
