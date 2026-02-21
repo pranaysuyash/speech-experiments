@@ -31,6 +31,10 @@ Maintain a dated, reproducible view of new speech/realtime model activity releva
 ```bash
 uv run python scripts/hf_frontier_scan.py --limit 60
 ```
+2. Run official-vs-community runtime matrix benchmark:
+```bash
+uv run python scripts/runtime_matrix_benchmark.py --dataset asr_smoke_v1 --stream-dataset asr_smoke_v1
+```
 2. Refresh cache (small assets):
 ```bash
 uv run python scripts/hf_prefetch.py --strategy small
@@ -42,6 +46,7 @@ uv run python scripts/hf_sprint_run_all.py --preflight --task-timeout-sec 1800
 4. Review:
   - `runs/hf_sprint_2026q1/reports/summary.md`
   - `runs/hf_sprint_2026q1/reports/task_results.csv`
+  - `runs/hf_sprint_2026q1/frontier/runtime_matrix.md`
 
 ## External References
 
