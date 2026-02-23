@@ -9,6 +9,8 @@ const SIZE_WARNING_BYTES = 500 * 1024 * 1024; // 500MB
 
 type Mode = 'single' | 'compare';
 type PipelineMode = 'preset' | 'template' | 'custom';
+type SuggestionGoal = 'asr' | 'diarization' | 'meeting' | 'general';
+type SuggestionQuality = 'fast' | 'balanced' | 'high';
 
 interface Candidate {
   candidate_id: string;
@@ -49,6 +51,16 @@ interface PreprocessingOp {
   description: string;
 }
 
+interface WorkflowSuggestion {
+  id: string;
+  label: string;
+  rationale: string;
+  template?: string;
+  steps?: string[];
+  preprocessing: string[];
+  estimated_profile: string;
+}
+
 interface ModelConfig {
   asr: {
     model_size: string;
@@ -73,6 +85,7 @@ export default function WorkbenchPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
+  const [referenceText, setReferenceText] = useState('');
 
   // Selections
   const [mode, setMode] = useState<Mode>('single');
@@ -103,6 +116,13 @@ export default function WorkbenchPage() {
   const [preprocessingOps, setPreprocessingOps] = useState<PreprocessingOp[]>(
     [],
   );
+  const [workflowSuggestions, setWorkflowSuggestions] = useState<
+    WorkflowSuggestion[]
+  >([]);
+  const [suggestionGoal, setSuggestionGoal] = useState<SuggestionGoal>('general');
+  const [suggestionQuality, setSuggestionQuality] =
+    useState<SuggestionQuality>('balanced');
+  const [suggestionRealtime, setSuggestionRealtime] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [selectedSteps, setSelectedSteps] = useState<string[]>([
     'ingest',
@@ -128,6 +148,39 @@ export default function WorkbenchPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const inferGoalFromUseCase = (id: string): SuggestionGoal => {
+    const normalized = id.toLowerCase();
+    if (normalized.includes('meeting') || normalized.includes('summary')) {
+      return 'meeting';
+    }
+    if (normalized.includes('diar') || normalized.includes('speaker')) {
+      return 'diarization';
+    }
+    if (normalized.includes('asr') || normalized.includes('transcrib')) {
+      return 'asr';
+    }
+    return 'general';
+  };
+
+  const refreshSuggestions = async (
+    ucId: string,
+    goal: SuggestionGoal,
+    quality: SuggestionQuality,
+    realtime: boolean,
+  ) => {
+    try {
+      const suggestions = await api.getPipelineSuggestions({
+        use_case_id: ucId,
+        goal,
+        quality,
+        realtime,
+      });
+      setWorkflowSuggestions(suggestions);
+    } catch {
+      // Non-fatal
+    }
+  };
+
   // 1. Initial Load: Use Cases + Presets + Pipeline Config + User Templates
   useEffect(() => {
     (async () => {
@@ -144,13 +197,24 @@ export default function WorkbenchPage() {
         setPipelineSteps(steps);
         setPipelineTemplates(templates);
         setPreprocessingOps(prepOps);
-        if (ucs.length > 0) setUseCaseId(ucs[0].use_case_id);
+        const initialUseCase = ucs[0]?.use_case_id ?? '';
+        const inferredGoal = inferGoalFromUseCase(initialUseCase);
+        if (initialUseCase) {
+          setUseCaseId(initialUseCase);
+          setSuggestionGoal(inferredGoal);
+        }
         if (prsts.length > 0)
           setSelectedPreset(
             prsts.find((p) => p.steps_preset === 'full')?.steps_preset ||
               prsts[0].steps_preset,
           );
         if (templates.length > 0) setSelectedTemplate(templates[0].name);
+        await refreshSuggestions(
+          initialUseCase,
+          inferredGoal,
+          'balanced',
+          false,
+        );
 
         // Load user templates from server
         try {
@@ -166,6 +230,16 @@ export default function WorkbenchPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!useCaseId) return;
+    refreshSuggestions(
+      useCaseId,
+      suggestionGoal,
+      suggestionQuality,
+      suggestionRealtime,
+    );
+  }, [useCaseId, suggestionGoal, suggestionQuality, suggestionRealtime]);
 
   // Save user template (server-side)
   const saveUserTemplate = async () => {
@@ -224,6 +298,20 @@ export default function WorkbenchPage() {
     setPipelineMode('custom');
   };
 
+  const applySuggestion = (suggestion: WorkflowSuggestion) => {
+    if (suggestion.template) {
+      setPipelineMode('template');
+      setSelectedTemplate(suggestion.template);
+    } else if (suggestion.steps && suggestion.steps.length > 0) {
+      setPipelineMode('custom');
+      setSelectedSteps(suggestion.steps);
+    } else {
+      setPipelineMode('preset');
+      setSelectedPreset('full');
+    }
+    setSelectedPreprocessing(suggestion.preprocessing || []);
+  };
+
   // Resolve dependencies when custom steps change
   useEffect(() => {
     if (pipelineMode !== 'custom' || selectedSteps.length === 0) {
@@ -243,6 +331,7 @@ export default function WorkbenchPage() {
   // 2. Load Candidates when Use Case changes
   useEffect(() => {
     if (!useCaseId) return;
+    setSuggestionGoal(inferGoalFromUseCase(useCaseId));
     (async () => {
       try {
         const cands = await api.getCandidatesForUseCase(useCaseId);
@@ -335,6 +424,7 @@ export default function WorkbenchPage() {
           pipelineTemplate:
             pipelineMode === 'template' ? selectedTemplate : undefined,
           config: configOverrides,
+          referenceText,
         });
         navigate(`/runs/${result.run_id}`);
         return;
@@ -364,6 +454,7 @@ export default function WorkbenchPage() {
           steps_preset: selectedPreset,
         },
         pipelineOptions,
+        referenceText,
       );
       const expId = exp.experiment_id;
 
@@ -472,6 +563,25 @@ export default function WorkbenchPage() {
           </div>
         )}
 
+        <div>
+          <label className='block'>
+            <span className='block font-semibold mb-1'>
+              Reference Transcript (Optional)
+            </span>
+            <textarea
+              value={referenceText}
+              onChange={(e) => setReferenceText(e.target.value)}
+              disabled={isSubmitting}
+              rows={6}
+              placeholder='Paste ground-truth transcript to compute WER/CER in run results.'
+              className='w-full border p-2 rounded font-mono text-sm'
+            />
+            <span className='text-xs text-gray-500'>
+              If provided, run results will include WER/CER.
+            </span>
+          </label>
+        </div>
+
         {/* Row 3: Candidate Selection */}
         <div className='border-t pt-4'>
           {mode === 'single' ? (
@@ -544,6 +654,81 @@ export default function WorkbenchPage() {
 
           {showAdvanced && (
             <div className='mt-4 space-y-4 p-4 bg-gray-50 rounded-lg'>
+              {workflowSuggestions.length > 0 && (
+                <div>
+                  <span className='block font-semibold mb-2 text-sm'>
+                    Suggested Workflows
+                  </span>
+                  <div className='grid grid-cols-1 md:grid-cols-4 gap-2 mb-3'>
+                    <label className='block'>
+                      <span className='block text-[11px] text-gray-500 mb-1'>
+                        Goal
+                      </span>
+                      <select
+                        value={suggestionGoal}
+                        onChange={(e) =>
+                          setSuggestionGoal(e.target.value as SuggestionGoal)
+                        }
+                        disabled={isSubmitting}
+                        className='w-full border p-1.5 rounded text-xs bg-white'
+                      >
+                        <option value='general'>General</option>
+                        <option value='asr'>ASR</option>
+                        <option value='diarization'>Diarization</option>
+                        <option value='meeting'>Meeting</option>
+                      </select>
+                    </label>
+                    <label className='block'>
+                      <span className='block text-[11px] text-gray-500 mb-1'>
+                        Quality
+                      </span>
+                      <select
+                        value={suggestionQuality}
+                        onChange={(e) =>
+                          setSuggestionQuality(e.target.value as SuggestionQuality)
+                        }
+                        disabled={isSubmitting}
+                        className='w-full border p-1.5 rounded text-xs bg-white'
+                      >
+                        <option value='fast'>Fast</option>
+                        <option value='balanced'>Balanced</option>
+                        <option value='high'>High</option>
+                      </select>
+                    </label>
+                    <label className='flex items-center gap-2 mt-5 md:mt-0'>
+                      <input
+                        type='checkbox'
+                        checked={suggestionRealtime}
+                        onChange={(e) => setSuggestionRealtime(e.target.checked)}
+                        disabled={isSubmitting}
+                        className='rounded'
+                      />
+                      <span className='text-xs text-gray-700'>Realtime</span>
+                    </label>
+                  </div>
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-2'>
+                    {workflowSuggestions.slice(0, 4).map((s) => (
+                      <button
+                        key={s.id}
+                        type='button'
+                        onClick={() => applySuggestion(s)}
+                        className='text-left border rounded p-2 bg-white hover:border-blue-300'
+                        disabled={isSubmitting}
+                        title={s.rationale}
+                      >
+                        <div className='flex items-center justify-between'>
+                          <div className='text-sm font-medium'>{s.label}</div>
+                          <span className='text-[10px] text-gray-500 uppercase'>
+                            {s.estimated_profile}
+                          </span>
+                        </div>
+                        <div className='text-xs text-gray-600'>{s.rationale}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Pipeline Mode Selection */}
               <div>
                 <span className='block font-semibold mb-2 text-sm'>

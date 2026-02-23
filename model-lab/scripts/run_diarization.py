@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from harness.env import load_dotenv_if_present
 
-from harness.media_ingest import FFmpegNotFoundError, IngestError, ingest_media
+from harness.media_ingest import FFmpegNotFoundError, IngestConfig, IngestError, ingest_media
 from harness.metrics_diarization import DiarizationMetrics
 from harness.preprocess_ops import results_to_artifact_section, run_preprocessing_chain
 from harness.registry import ModelRegistry
@@ -71,7 +71,8 @@ def run_diarization_adhoc(model_id: str, input_path: str, device: str = "cpu", p
 
     # Ingest media (handles video extraction if needed)
     try:
-        ingest = ingest_media(input_path)
+        ingest_artifacts_dir = Path(f"runs/{model_id}/diarization/_adhoc_ingest")
+        ingest = ingest_media(input_path, ingest_artifacts_dir, IngestConfig())
     except FFmpegNotFoundError as e:
         logger.error(f"❌ {e}")
         logger.error("   Video support requires ffmpeg. Install: brew install ffmpeg")
@@ -80,16 +81,24 @@ def run_diarization_adhoc(model_id: str, input_path: str, device: str = "cpu", p
         logger.error(f"❌ Ingest failed: {e}")
         sys.exit(4)
 
-    logger.info(f"Source: {ingest.source_media_hash[:12]} ({ingest.original_format})")
-    logger.info(f"Audio: {ingest.audio_hash[:12]} ({ingest.audio_duration_s:.2f}s)")
-    if ingest.is_extracted:
-        logger.info(f"Extracted via: {ingest.ingest_tool} {ingest.ingest_version}")
+    source_hash = ingest["source_media_hash"]
+    audio_hash = ingest["audio_content_hash"]
+    processed_audio_path = Path(ingest["processed_audio_path"])
+    source_suffix = input_path.suffix.lower() or "<unknown>"
+    is_extracted = processed_audio_path.resolve() != input_path.resolve()
+
+    logger.info(f"Source: {source_hash[:12]} ({source_suffix})")
+    logger.info(f"Audio: {audio_hash[:12]} ({ingest['duration_s']:.2f}s)")
+    if is_extracted:
+        logger.info(f"Extracted via: ffmpeg {ingest['ffmpeg_version']}")
 
     # Run preprocessing chain if specified
     preprocessing_results = []
-    audio_for_model = ingest.audio
-    sr_for_model = ingest.sample_rate
-    processed_duration_s = ingest.audio_duration_s
+    audio_for_model, sr_for_model = sf.read(str(processed_audio_path))
+    if audio_for_model.ndim > 1:
+        audio_for_model = audio_for_model.mean(axis=1)
+    audio_for_model = audio_for_model.astype(np.float32)
+    processed_duration_s = float(ingest["duration_s"])
 
     if pre:
         operators = [op.strip() for op in pre.split(",") if op.strip()]
@@ -151,15 +160,15 @@ def run_diarization_adhoc(model_id: str, input_path: str, device: str = "cpu", p
         )
 
         final_audio_hash = (
-            preprocessing_results[-1].out_audio_hash if preprocessing_results else ingest.audio_hash
+            preprocessing_results[-1].out_audio_hash if preprocessing_results else audio_hash
         )
 
         schema_inputs = InputsSchema(
             audio_path=str(input_path),
             audio_hash=final_audio_hash,
-            source_media_path=str(ingest.source_media_path) if ingest.is_extracted else None,
-            source_media_hash=ingest.source_media_hash if ingest.is_extracted else None,
-            dataset_id=f"adhoc_{ingest.audio_hash[:12]}",
+            source_media_path=ingest.get("source_media_path"),
+            source_media_hash=source_hash,
+            dataset_id=f"adhoc_{audio_hash[:12]}",
             audio_duration_s=processed_duration_s,
             sample_rate=sr_for_model,
         )
@@ -170,15 +179,15 @@ def run_diarization_adhoc(model_id: str, input_path: str, device: str = "cpu", p
             "segment_count": len(segments),
             "latency_s": latency,
             "duration_s": processed_duration_s,
-            "source_duration_s": ingest.audio_duration_s,
+            "source_duration_s": float(ingest["duration_s"]),
         }
 
         # Ingest provenance
         ingest_provenance = {
-            "ingest_tool": ingest.ingest_tool,
-            "ingest_version": ingest.ingest_version,
-            "is_extracted": ingest.is_extracted,
-            "original_format": ingest.original_format,
+            "ingest_tool": "ffmpeg",
+            "ingest_version": ingest["ffmpeg_version"],
+            "is_extracted": is_extracted,
+            "original_format": source_suffix,
         }
 
         schema_artifact = RunnerArtifact(
@@ -219,9 +228,8 @@ def run_diarization_adhoc(model_id: str, input_path: str, device: str = "cpu", p
         logger.info(f"✓ Adhoc run completed: {num_speakers} speakers detected")
         print(f"ARTIFACT_PATH:{run_file}")
         return result_obj, str(run_file)
-
-    finally:
-        ingest.cleanup()
+    except Exception:
+        raise
 
 
 def save_run_artifact(

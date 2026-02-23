@@ -8,6 +8,7 @@ def test_create_workbench_run_returns_quickly_and_writes_running_manifest(monkey
     # Ensure the API writes inputs/runs under temp dirs
     monkeypatch.setenv("MODEL_LAB_INPUTS_ROOT", str(tmp_path / "inputs"))
     monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(tmp_path / "runs"))
+    monkeypatch.setenv("MODEL_LAB_MIN_FREE_BYTES", "0")
 
     # Fix imports for importlib mode
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -80,6 +81,7 @@ def test_create_workbench_run_busy_returns_409(monkeypatch, tmp_path):
     """
     monkeypatch.setenv("MODEL_LAB_INPUTS_ROOT", str(tmp_path / "inputs"))
     monkeypatch.setenv("MODEL_LAB_RUNS_ROOT", str(tmp_path / "runs"))
+    monkeypatch.setenv("MODEL_LAB_MIN_FREE_BYTES", "0")
 
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 

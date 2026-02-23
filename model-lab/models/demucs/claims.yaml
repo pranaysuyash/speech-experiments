@@ -10,13 +10,13 @@ io:
   format: float32
   sample_rate: 44100
 ci: false
-ci_reason: "PyTorch/torchaudio heavyweight, isolated venv required"
+ci_reason: 'PyTorch/torchaudio heavyweight, isolated venv required'
 
 claims:
   - id: demucs_separate_structural
     task: separate
     type: structural
-    description: "Separates audio into stems (vocals, drums, bass, other)"
+    description: 'Separates audio into stems (vocals, drums, bass, other)'
     enforcement: required
     test_ref: claims.separate.smoke_v1
     thresholds:
@@ -27,7 +27,7 @@ claims:
   - id: demucs_output_format
     task: separate
     type: structural
-    description: "Output shape is {stems: {name: audio}, sr: int}"
+    description: 'Output shape is {stems: {name: audio}, sr: int}'
     enforcement: required
     test_ref: claims.separate.output_format_v1
     thresholds:

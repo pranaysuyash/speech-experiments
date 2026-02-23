@@ -332,11 +332,18 @@ class PipelineConfig:
                 # target_lufs could be added to IngestConfig if needed
 
             elif op_name == "normalize_volume":
-                # Not directly supported by current IngestConfig - log warning
-                logger.warning(
-                    "normalize_volume not yet wired to IngestConfig, using loudnorm instead"
-                )
-                kwargs["normalize"] = True
+                method = str(params.get("method", "peak")).lower()
+                target_db = float(params.get("target_db", -1.0))
+                if method == "peak":
+                    kwargs["peak_normalize"] = True
+                    kwargs["peak_target_db"] = target_db
+                else:
+                    # RMS/other methods map to loudness normalization fallback.
+                    logger.warning(
+                        "normalize_volume method '%s' not fully supported in ingest path; using loudnorm fallback",
+                        method,
+                    )
+                    kwargs["normalize"] = True
 
             elif op_name == "resample":
                 if "target_sr" in params:

@@ -106,6 +106,18 @@ class UserTemplateRequest(BaseModel):
     description: str | None = None
 
 
+class WorkflowSuggestion(BaseModel):
+    """A task-aware workflow suggestion."""
+
+    id: str
+    label: str
+    rationale: str
+    template: str | None = None
+    steps: list[str] | None = None
+    preprocessing: list[str] = []
+    estimated_profile: str = "balanced"
+
+
 # ============================================================================
 # Endpoints
 # ============================================================================
@@ -149,6 +161,145 @@ def get_pipeline_templates() -> JSONResponse:
     Templates are pre-configured pipelines for common use cases.
     """
     return JSONResponse(content=list_pipeline_templates())
+
+
+def _build_workflow_suggestions(
+    *,
+    use_case_id: str | None = None,
+    goal: str | None = None,
+    realtime: bool = False,
+    quality: str = "balanced",
+) -> list[dict[str, Any]]:
+    """
+    Build deterministic workflow suggestions based on use-case intent.
+
+    Notes:
+    - All steps are optional at run time; these are suggested defaults.
+    - Include an explicit full pipeline option for comprehensive analysis.
+    """
+    uc = (use_case_id or "").lower()
+    task_goal = (goal or "").lower().strip()
+    q = quality.lower().strip() or "balanced"
+
+    # Inference from use_case_id if goal not explicit
+    if not task_goal:
+        if "diar" in uc or "speaker" in uc:
+            task_goal = "diarization"
+        elif "summary" in uc or "meeting" in uc:
+            task_goal = "meeting"
+        elif "asr" in uc or "transcrib" in uc:
+            task_goal = "asr"
+        else:
+            task_goal = "general"
+
+    suggestions: list[WorkflowSuggestion] = []
+
+    # Always include a full pipeline recommendation
+    suggestions.append(
+        WorkflowSuggestion(
+            id="full_pipeline",
+            label="Full Pipeline",
+            rationale="Complete end-to-end run with transcription, diarization, alignment, chaptering, summaries, actions, and bundle.",
+            template="full_meeting",
+            preprocessing=["trim_silence", "normalize_loudness"],
+            estimated_profile="high_quality",
+        )
+    )
+
+    if task_goal in {"asr", "general"}:
+        if realtime:
+            suggestions.append(
+                WorkflowSuggestion(
+                    id="asr_realtime",
+                    label="ASR Realtime",
+                    rationale="Low-latency transcription path; minimal steps and conservative preprocessing.",
+                    template="fast_asr",
+                    preprocessing=["trim_silence"],
+                    estimated_profile="fast",
+                )
+            )
+        else:
+            suggestions.append(
+                WorkflowSuggestion(
+                    id="asr_fast",
+                    label="ASR Fast",
+                    rationale="Fast transcription without speaker pipeline.",
+                    template="fast_asr",
+                    preprocessing=["trim_silence"],
+                    estimated_profile="fast",
+                )
+            )
+            suggestions.append(
+                WorkflowSuggestion(
+                    id="asr_hq",
+                    label="ASR High Quality",
+                    rationale="ASR with stronger preprocessing; best for clean benchmarking and quality scoring.",
+                    steps=["ingest", "asr", "bundle"],
+                    preprocessing=["trim_silence", "normalize_loudness"],
+                    estimated_profile="high_quality",
+                )
+            )
+
+    if task_goal in {"diarization", "meeting"}:
+        suggestions.append(
+            WorkflowSuggestion(
+                id="speaker_focus",
+                label="Speaker Focus",
+                rationale="Optimized for speaker segmentation + aligned transcript without full summarization overhead.",
+                template="asr_diarization",
+                preprocessing=["trim_silence", "normalize_loudness"],
+                estimated_profile="balanced",
+            )
+        )
+
+    if task_goal == "meeting":
+        suggestions.append(
+            WorkflowSuggestion(
+                id="quick_summary",
+                label="Quick Summary",
+                rationale="Get transcript and summary quickly with fewer steps.",
+                template="quick_summary",
+                preprocessing=["trim_silence"],
+                estimated_profile="balanced",
+            )
+        )
+
+    # Quality override nudges preprocessing and ordering preference
+    if q == "fast":
+        for s in suggestions:
+            if s.preprocessing and "normalize_loudness" in s.preprocessing:
+                s.preprocessing = [op for op in s.preprocessing if op != "normalize_loudness"]
+        suggestions.sort(key=lambda s: 0 if s.estimated_profile == "fast" else 1)
+    elif q in {"high", "hq", "quality"}:
+        suggestions.sort(key=lambda s: 0 if s.estimated_profile == "high_quality" else 1)
+
+    return [s.model_dump() for s in suggestions]
+
+
+@router.get("/suggestions")
+def get_workflow_suggestions(
+    use_case_id: str | None = None,
+    goal: str | None = None,
+    realtime: bool = False,
+    quality: str = "balanced",
+) -> JSONResponse:
+    """
+    Return task-aware suggested workflows.
+
+    Query params:
+    - use_case_id: current use case id (optional)
+    - goal: one of asr/diarization/meeting/general (optional, inferred from use_case_id if omitted)
+    - realtime: prioritize low-latency lanes
+    - quality: fast|balanced|high
+    """
+    return JSONResponse(
+        content=_build_workflow_suggestions(
+            use_case_id=use_case_id,
+            goal=goal,
+            realtime=realtime,
+            quality=quality,
+        )
+    )
 
 
 @router.get("/templates/{name}")

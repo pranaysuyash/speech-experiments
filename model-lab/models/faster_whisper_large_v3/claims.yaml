@@ -10,13 +10,13 @@ io:
   format: float32
   sample_rate: 16000
 ci: false
-ci_reason: "CTranslate2 + large model weights, isolated venv required"
+ci_reason: 'CTranslate2 + large model weights, isolated venv required'
 
 claims:
   - id: faster_whisper_large_v3_asr_structural
     task: asr
     type: structural
-    description: "Speech-to-text transcription with word-level timestamps"
+    description: 'Speech-to-text transcription with word-level timestamps'
     enforcement: required
     test_ref: claims.asr.smoke_v1
     thresholds:
@@ -26,7 +26,7 @@ claims:
   - id: faster_whisper_large_v3_multilingual
     task: asr
     type: capacity
-    description: "Supports 99+ languages with auto-detection"
+    description: 'Supports 99+ languages with auto-detection'
     enforcement: optional
     test_ref: claims.asr.language_count_v1
-    source: "https://huggingface.co/Systran/faster-whisper-large-v3"
+    source: 'https://huggingface.co/Systran/faster-whisper-large-v3'

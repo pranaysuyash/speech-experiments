@@ -15,6 +15,8 @@ from fastapi import HTTPException
 
 from server.services.runs_index import get_index
 from server.services.safe_files import safe_file_path
+from harness.metrics_asr import ASRMetrics
+from harness.protocol import NormalizationValidator
 
 logger = logging.getLogger("server.results")
 
@@ -100,6 +102,7 @@ def compute_result_v1(run_id: str) -> dict[str, Any] | None:
         # Word Count & Confidence
         word_count = 0
         segment_count = 0
+        transcript_text = ""
 
         # Try to load transcript
         try:
@@ -109,7 +112,10 @@ def compute_result_v1(run_id: str) -> dict[str, Any] | None:
             segment_count = len(segments)
             for seg in segments:
                 text = seg.get("text", "")
+                transcript_text += (text + " ")
                 word_count += len(text.split())
+            if not transcript_text.strip():
+                transcript_text = str(transcript.get("text", "") or "")
                 # Confidence if available?
                 # Example format might not have it, but if it did:
                 # confidence_sum += seg.get("avg_logprob", 0) # Placeholder
@@ -118,6 +124,25 @@ def compute_result_v1(run_id: str) -> dict[str, Any] | None:
             pass
 
         confidence_avg = None  # Not yet standard in our transcripts
+
+        # Optional quality metrics from user-provided reference transcript.
+        wer = None
+        cer = None
+        reference_word_count = None
+        try:
+            run_request_path = safe_file_path(run_id, "run_request.json")
+            run_request = json.loads(run_request_path.read_text())
+            reference_text = (run_request.get("reference_text") or "").strip()
+            if reference_text and transcript_text.strip():
+                normalized_ref = NormalizationValidator.normalize_text(reference_text)
+                normalized_hyp = NormalizationValidator.normalize_text(transcript_text.strip())
+                wer_value, _, _, _ = ASRMetrics.calculate_wer(normalized_ref, normalized_hyp)
+                cer_value = ASRMetrics.calculate_cer(normalized_ref, normalized_hyp)
+                wer = float(wer_value)
+                cer = float(cer_value)
+                reference_word_count = len(reference_text.split())
+        except Exception as quality_err:
+            logger.warning(f"Failed optional WER/CER projection for {run_id}: {quality_err}")
 
         # 4. Input Duration
         audio_duration_s = manifest.get("input_duration_s")  # If available
@@ -155,6 +180,9 @@ def compute_result_v1(run_id: str) -> dict[str, Any] | None:
                 "word_count": word_count,
                 "segment_count": segment_count,
                 "confidence_avg": confidence_avg,
+                "wer": wer,
+                "cer": cer,
+                "reference_word_count": reference_word_count,
             },
             "quality_flags": {
                 "is_partial": is_partial,

@@ -10,17 +10,17 @@ io:
   format: float32
   sample_rate: 24000
 ci: false
-ci_reason: "PyTorch + HuggingFace model weights + heavy dependencies"
+ci_reason: 'PyTorch + HuggingFace model weights + heavy dependencies'
 
 # Reproducibility Pins
 pins:
   repo:
     url: https://github.com/zai-org/GLM-TTS.git
     commit: c5dc7aecc3b4032032d631b271e767893984f821
-    date: "2025-12-17"
+    date: '2025-12-17'
   pynini:
     source: pypi
-    version: "2.1.7"
+    version: '2.1.7'
     system_deps:
       - openfst (brew install openfst)
   patches:
@@ -33,7 +33,7 @@ claims:
   - id: glm_tts_structural
     task: tts
     type: structural
-    description: "Text-to-speech synthesis"
+    description: 'Text-to-speech synthesis'
     enforcement: required
     test_ref: claims.tts.smoke_v1
     thresholds:
@@ -43,29 +43,29 @@ claims:
   - id: glm_tts_quality
     task: tts
     type: capacity
-    description: "High-quality speech synthesis from GLM-4"
+    description: 'High-quality speech synthesis from GLM-4'
     enforcement: optional
     test_ref: claims.tts.quality_v1
-    source: "https://huggingface.co/THUDM/glm-4-voice"
+    source: 'https://huggingface.co/THUDM/glm-4-voice'
 
   - id: glm_tts_rtf_cpu
     task: tts
     type: performance
-    description: "Real-time factor on CPU"
+    description: 'Real-time factor on CPU'
     enforcement: optional
     test_ref: claims.tts.rtf_cpu_v1
     device: cpu
     rtf: 10.36
     measurement:
-      text: "Hello world"  # 2 words, ~2.3s output
+      text: 'Hello world' # 2 words, ~2.3s output
       text_length_chars: 11
       output_duration_s: 2.3
       wall_time_s: 23.8
-      timing_method: "wall_clock"
-      includes: "model_loading,tokenization,inference,vocoder"
-      excludes: "checkpoint_download,first_run_compilation"
+      timing_method: 'wall_clock'
+      includes: 'model_loading,tokenization,inference,vocoder'
+      excludes: 'checkpoint_download,first_run_compilation'
       samples: 3
-      date: "2026-02-08"
+      date: '2026-02-08'
     notes: |
       RTF 10.36 means 10.36 seconds of compute per 1 second of audio.
       This is expected for a 4B+ parameter model on CPU.
@@ -74,14 +74,14 @@ claims:
 # Benchmark Methodology Notes
 benchmark_notes: |
   RTF Variance Explanation:
-  
+
   LFM2.5 RTF changed from ~1.32 to 2.82 because:
   1. Different text length: Early tests used short text (~10 chars)
      Current tests use benchmark text "Hello world" (11 chars)
   2. Different measurement window: Early tests excluded model loading
      Current tests include full pipeline from text input to audio output
   3. Device stability: MPS shows more variance than CPU
-  
+
   GLM-TTS RTF 10.36 (CPU) methodology:
   - Device: Apple M3 Pro (CPU)
   - Text: "Hello world" (11 characters)
@@ -89,7 +89,7 @@ benchmark_notes: |
   - Wall time: ~23.8 seconds average (n=3)
   - RTF calculation: 23.8 / 2.3 = 10.36
   - Measurement: Full inference time including LLM generation
-  
+
   For reproducible benchmarks:
   1. Use same text length
   2. Use same device

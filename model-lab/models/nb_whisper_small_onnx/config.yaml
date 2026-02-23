@@ -7,8 +7,8 @@ description: "Norwegian Whisper (small) with ONNX runtime for cross-platform inf
 
 # Model source
 source:
-  repo: "NbAiLab/nb-whisper-small-ONNX"
-  hub: "https://huggingface.co/NbAiLab/nb-whisper-small-ONNX"
+  repo: "NbAiLab/nb-whisper-small"
+  hub: "https://huggingface.co/NbAiLab/nb-whisper-small"
   license: "MIT"
 
 # Variants

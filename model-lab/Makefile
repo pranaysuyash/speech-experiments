@@ -2,7 +2,8 @@
 # Single entrypoint for all operations
 
 .PHONY: setup setup-kernel lint format test lab asr tts scorecard list-models clean \
-	hf-preflight hf-plan hf-run-all hf-report hf-prefetch hf-frontier hf-runtime-matrix
+	hf-preflight hf-plan hf-run-all hf-report hf-prefetch hf-frontier hf-runtime-matrix \
+	asr-preprocess-matrix
 
 # Default Python for uv
 PYTHON := uv run python
@@ -81,8 +82,24 @@ import soundfile as sf; \
 from harness.registry import ModelRegistry; \
 audio, sr = sf.read('$(AUDIO)'); \
 bundle = ModelRegistry.load_model('$(MODEL)', {}, device='cpu'); \
-result = bundle['asr']['transcribe'](audio, sr=sr); \
-print('Text:', result.get('text', result))"
+	result = bundle['asr']['transcribe'](audio, sr=sr); \
+	print('Text:', result.get('text', result))"
+
+# Usage:
+# make asr-preprocess-matrix AUDIO=data/audio/PRIMARY/llm_recording_pranay.m4a TEXT=data/text/PRIMARY/llm.txt MODELS="faster_whisper faster_distil_whisper_large_v3" PRE="trim_silence trim_silence,normalize_loudness"
+asr-preprocess-matrix:
+ifndef AUDIO
+	$(error AUDIO is required. Usage: make asr-preprocess-matrix AUDIO=... TEXT=...)
+endif
+ifndef TEXT
+	$(error TEXT is required. Usage: make asr-preprocess-matrix AUDIO=... TEXT=...)
+endif
+	$(PYTHON) scripts/preprocess_matrix_asr.py \
+		--audio $(AUDIO) \
+		--text $(TEXT) \
+		--models $(if $(MODELS),$(MODELS),faster_whisper faster_distil_whisper_large_v3) \
+		$(foreach p,$(PRE),--pre $(p)) \
+		--device $(if $(DEVICE),$(DEVICE),mps)
 
 # Usage: make asr-stream-audio MODEL=kyutai_streaming AUDIO=inputs/sample_16k.wav [CHUNK_MS=160]
 asr-stream-audio:

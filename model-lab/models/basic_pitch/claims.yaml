@@ -10,13 +10,13 @@ io:
   format: float32
   sample_rate: 22050
 ci: false
-ci_reason: "TensorFlow heavyweight, isolated venv required"
+ci_reason: 'TensorFlow heavyweight, isolated venv required'
 
 claims:
   - id: basic_pitch_music_transcription_structural
     task: music_transcription
     type: structural
-    description: "Returns list of notes with onset, offset, and pitch"
+    description: 'Returns list of notes with onset, offset, and pitch'
     enforcement: required
     test_ref: claims.music_transcription.smoke_v1
     thresholds:
@@ -28,7 +28,7 @@ claims:
   - id: basic_pitch_deterministic_structure
     task: music_transcription
     type: structural
-    description: "Output structure is consistent regardless of input"
+    description: 'Output structure is consistent regardless of input'
     enforcement: required
     test_ref: claims.music_transcription.structure_v1
     thresholds:

@@ -102,6 +102,9 @@ export interface ResultSummary {
     word_count?: number;
     segment_count?: number;
     confidence_avg?: number;
+    wer?: number;
+    cer?: number;
+    reference_word_count?: number;
   };
   quality_flags: {
     is_partial: boolean;
@@ -248,7 +251,8 @@ export const api = {
       steps?: string[];
       preprocessing?: string[];
       pipelineTemplate?: string;
-    }
+    },
+    referenceText?: string
   ): Promise<any> => {
     const form = new FormData();
     form.append('file', file);
@@ -268,6 +272,9 @@ export const api = {
     }
     if (pipelineOptions?.pipelineTemplate) {
       form.append('pipeline_template', pipelineOptions.pipelineTemplate);
+    }
+    if (referenceText && referenceText.trim().length > 0) {
+      form.append('reference_text', referenceText.trim());
     }
     const res = await axios.post(`${API_BASE}/experiments`, form);
     return res.data;
@@ -366,6 +373,26 @@ export const api = {
     return res.data;
   },
 
+  getPipelineSuggestions: async (params?: {
+    use_case_id?: string;
+    goal?: 'asr' | 'diarization' | 'meeting' | 'general';
+    realtime?: boolean;
+    quality?: 'fast' | 'balanced' | 'high';
+  }): Promise<{
+    id: string;
+    label: string;
+    rationale: string;
+    template?: string;
+    steps?: string[];
+    preprocessing: string[];
+    estimated_profile: string;
+  }[]> => {
+    const res = await axios.get(`${API_BASE}/pipelines/suggestions`, {
+      params,
+    });
+    return res.data;
+  },
+
   resolvePipelineSteps: async (steps: string[]): Promise<{ requested_steps: string[]; resolved_steps: string[]; added_dependencies: string[] }> => {
     const res = await axios.post(`${API_BASE}/pipelines/resolve`, { steps });
     return res.data;
@@ -396,6 +423,7 @@ export const api = {
       preprocessing?: string[];
       pipelineTemplate?: string;
       config?: Record<string, unknown>;
+      referenceText?: string;
     }
   ): Promise<{ run_id: string; run_dir: string; console_url: string }> => {
     const form = new FormData();
@@ -413,6 +441,9 @@ export const api = {
     }
     if (options?.config) {
       form.append('config', JSON.stringify(options.config));
+    }
+    if (options?.referenceText && options.referenceText.trim().length > 0) {
+      form.append('reference_text', options.referenceText.trim());
     }
     const res = await axios.post(`${API_BASE}/workbench/runs`, form);
     return res.data;

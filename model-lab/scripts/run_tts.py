@@ -9,13 +9,14 @@ Usage: uv run python -m scripts.run_tts --model lfm2_5_audio --dataset tts_smoke
 import argparse
 import hashlib
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import torchaudio
 import yaml
+import soundfile as sf
 
 # Add parent to path for harness imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -152,11 +153,8 @@ def run_tts_test(model_id: str, dataset: str, device: str = None):
         audio_filename = f"{prompt_id}_{datetime.now().strftime('%H%M%S')}.wav"
         audio_path = audio_dir / audio_filename
 
-        # Save as WAV
-        import torch
-
-        audio_tensor = torch.from_numpy(audio_np).unsqueeze(0)
-        torchaudio.save(str(audio_path), audio_tensor, sr)
+        # Save as WAV (avoid torchaudio/ffmpeg dylib conflicts on macOS)
+        sf.write(str(audio_path), audio_np, sr)
 
         audio_sha256 = compute_file_sha256(audio_path)
 
@@ -296,12 +294,21 @@ def main():
 
     try:
         result = run_tts_test(args.model, args.dataset, device=args.device)
+        rc = 0
         if result["audio_health"]["all_healthy"]:
             print("\n🎉 TTS test completed successfully!")
-            return 0
         else:
             print("\n⚠️ TTS test completed with audio health issues")
-            return 1
+            rc = 1
+
+        # Workaround: Kokoro native deps can crash during Python teardown on macOS.
+        # Use hard-exit to preserve the computed run status for automation.
+        if sys.platform == "darwin" and args.model == "kokoro_tts":
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os._exit(rc)
+
+        return rc
     except Exception as e:
         print(f"\n❌ TTS test failed: {e}")
         import traceback

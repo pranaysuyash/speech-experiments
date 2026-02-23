@@ -960,6 +960,12 @@ export default function RunDetail({ onBack }: RunDetailProps) {
                                     {result.metrics.confidence_avg != null && (
                                         <span>🎯 {(result.metrics.confidence_avg * 100).toFixed(1)}%</span>
                                     )}
+                                    {result.metrics.wer != null && (
+                                        <span>WER {(result.metrics.wer * 100).toFixed(1)}%</span>
+                                    )}
+                                    {result.metrics.cer != null && (
+                                        <span>CER {(result.metrics.cer * 100).toFixed(1)}%</span>
+                                    )}
                                 </>
                             )}
                         </div>

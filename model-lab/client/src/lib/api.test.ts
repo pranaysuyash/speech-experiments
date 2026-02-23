@@ -394,6 +394,30 @@ describe('API Client', () => {
       expect(result).toEqual(mockTemplates);
     });
 
+    it('getPipelineSuggestions should fetch task-aware suggestions', async () => {
+      const mockSuggestions = [
+        {
+          id: 'full_pipeline',
+          label: 'Full Pipeline',
+          rationale: 'Complete end-to-end run',
+          template: 'full_meeting',
+          preprocessing: ['trim_silence'],
+          estimated_profile: 'high_quality'
+        }
+      ];
+      mockedAxios.get.mockResolvedValueOnce({ data: mockSuggestions });
+
+      const result = await api.getPipelineSuggestions({
+        use_case_id: 'meeting_smoke',
+        quality: 'balanced'
+      });
+
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/pipelines/suggestions', {
+        params: { use_case_id: 'meeting_smoke', quality: 'balanced' }
+      });
+      expect(result).toEqual(mockSuggestions);
+    });
+
     it('resolvePipelineSteps should POST steps to resolve dependencies', async () => {
       const mockResponse = {
         requested_steps: ['diarization'],

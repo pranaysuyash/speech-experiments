@@ -10,13 +10,13 @@ io:
   format: float32
   sample_rate: 16000
 ci: false
-ci_reason: "PyTorch + HuggingFace model weights"
+ci_reason: 'PyTorch + HuggingFace model weights'
 
 claims:
   - id: glm_asr_nano_asr_structural
     task: asr
     type: structural
-    description: "Speech-to-text transcription"
+    description: 'Speech-to-text transcription'
     enforcement: required
     test_ref: claims.asr.smoke_v1
     thresholds:
@@ -25,9 +25,9 @@ claims:
   - id: glm_asr_nano_non_whisper
     task: asr
     type: structural
-    description: "Non-Whisper decoder architecture"
+    description: 'Non-Whisper decoder architecture'
     enforcement: required
     test_ref: claims.asr.non_whisper_v1
     thresholds:
       non_whisper: true
-    notes: "GLM-4 based architecture, different from Whisper family"
+    notes: 'GLM-4 based architecture, different from Whisper family'

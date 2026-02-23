@@ -350,102 +350,66 @@ def run_faster_whisper_asr(model: Any, audio_path: str, config: dict[str, Any]) 
 
 
 def run_tts_inference(model: Any, text: str, config: dict[str, Any]) -> bytes:
-    """Run actual TTS inference."""
+    """Run TTS inference using the model bundle contract."""
     try:
-        model_type = model.get("model_type", "unknown")
+        if "tts" not in model.get("capabilities", []):
+            raise ValueError(f"Model does not support TTS: {model.get('model_type', 'unknown')}")
 
-        if model_type == "lfm2_5_audio":
-            return run_lfm_tts(model, text, config)
+        synthesize_fn = model["tts"]["synthesize"]
+        result = synthesize_fn(text, **config)
+
+        audio = None
+        sample_rate = 24000
+
+        # Backward compatibility: some older wrappers return (audio, sr)
+        if isinstance(result, tuple) and len(result) == 2:
+            audio, sample_rate = result
+        elif isinstance(result, dict):
+            audio = result.get("audio")
+            sample_rate = int(result.get("sample_rate", result.get("sr", 24000)))
         else:
-            raise ValueError(f"Unsupported model type for TTS: {model_type}")
+            raise ValueError(f"Unexpected TTS synthesize result type: {type(result)}")
+
+        if audio is None:
+            raise ValueError("TTS synthesis returned no audio")
+
+        import io
+        import wave
+
+        import numpy as np
+        # Convert to numpy
+        if hasattr(audio, "detach"):
+            audio_np = audio.detach().cpu().numpy()
+        elif hasattr(audio, "cpu"):
+            audio_np = audio.cpu().numpy()
+        else:
+            audio_np = np.asarray(audio)
+
+        # Ensure mono float32
+        if audio_np.ndim > 1:
+            audio_np = np.squeeze(audio_np)
+        audio_np = audio_np.astype(np.float32, copy=False)
+        if audio_np.size == 0:
+            raise ValueError("TTS synthesis returned empty audio")
+
+        # Normalize safely to [-1, 1]
+        peak = float(np.max(np.abs(audio_np)))
+        if peak > 0:
+            audio_np = audio_np / peak
+
+        # Convert to 16-bit PCM WAV bytes
+        audio_int16 = (audio_np * 32767).astype(np.int16)
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(audio_int16.tobytes())
+
+        return buffer.getvalue()
 
     except Exception as e:
         logger.error(f"TTS inference failed: {e}")
-        raise
-
-
-def run_lfm_tts(model: Any, text: str, config: dict[str, Any]) -> bytes:
-    """Run LFM TTS inference."""
-    try:
-        import io
-
-        import numpy as np
-        import torch
-
-        # Get model components
-        lfm_model = model["model"]
-        processor = model["processor"]
-        device = model["device"]
-
-        # Apply config
-        speaker_id = config.get("speaker_id")
-        speed = config.get("speed", 1.0)
-
-        # Prepare inputs
-        inputs = processor(text=text, return_tensors="pt")
-        if device != "cpu":
-            inputs = {k: v.to(device) for k, v in inputs.items()}
-
-        # Add speaker embedding if available
-        if speaker_id and hasattr(lfm_model, "speaker_embeddings"):
-            # This is model-specific and may need adjustment
-            speaker_emb = lfm_model.speaker_embeddings[speaker_id]
-            inputs["speaker_embeddings"] = speaker_emb.unsqueeze(0)
-
-        # Generate speech
-        with torch.no_grad():
-            outputs = lfm_model.generate(**inputs, do_sample=True, temperature=0.8, max_length=500)
-
-            # Extract audio from outputs
-            if hasattr(outputs, "audio"):
-                audio = outputs.audio
-            elif hasattr(outputs, "waveform"):
-                audio = outputs.waveform
-            else:
-                # Fallback: assume first tensor is audio
-                audio = list(outputs.values())[0] if isinstance(outputs, dict) else outputs[0]
-
-            # Convert to numpy
-            if isinstance(audio, torch.Tensor):
-                audio_np = audio.cpu().numpy()
-            else:
-                audio_np = np.array(audio)
-
-            # Ensure proper shape and scaling
-            if audio_np.ndim > 1:
-                audio_np = audio_np.squeeze()
-
-            # Normalize to [-1, 1] range
-            audio_np = audio_np / np.max(np.abs(audio_np))
-
-            # Apply speed modification if needed
-            if speed != 1.0:
-                # Simple speed modification (in real implementation, use proper resampling)
-                if speed > 1.0:
-                    audio_np = audio_np[:: int(speed)]  # Speed up
-                else:
-                    # Speed down - simple interpolation
-                    import scipy.signal
-
-                    audio_np = scipy.signal.resample(audio_np, int(len(audio_np) / speed))
-
-            # Convert to 16-bit PCM
-            audio_int16 = (audio_np * 32767).astype(np.int16)
-
-            # Create WAV bytes
-            import wave
-
-            buffer = io.BytesIO()
-            with wave.open(buffer, "wb") as wav_file:
-                wav_file.setnchannels(1)  # Mono
-                wav_file.setsampwidth(2)  # 16-bit
-                wav_file.setframerate(22050)  # Sample rate
-                wav_file.writeframes(audio_int16.tobytes())
-
-            return buffer.getvalue()
-
-    except Exception as e:
-        logger.error(f"LFM TTS inference failed: {e}")
         raise
 
 

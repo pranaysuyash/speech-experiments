@@ -1,0 +1,33 @@
+# Kokoro-TTS Claims Manifest
+# Contract: Bundle Contract v2
+
+model_id: kokoro_tts
+runtime: pytorch
+model_source: huggingface
+device_support: [cpu, cuda]
+streaming: false
+precision: fp32
+io:
+  format: float32
+  sample_rate: 24000
+ci: false
+ci_reason: "Requires model weight download from HF and runtime dependency setup"
+
+claims:
+  - id: kokoro_tts_audio_output
+    task: tts
+    type: structural
+    description: "TTS produces non-empty waveform output"
+    enforcement: required
+    test_ref: claims.tts.audio_output_v1
+    thresholds:
+      has_audio: true
+      sample_rate_valid: true
+
+  - id: kokoro_tts_quality_claim
+    task: tts
+    type: capacity
+    description: "High-quality speech synthesis from compact model"
+    enforcement: optional
+    test_ref: claims.tts.quality_v1
+    source: "https://huggingface.co/hexgrad/Kokoro-82M"

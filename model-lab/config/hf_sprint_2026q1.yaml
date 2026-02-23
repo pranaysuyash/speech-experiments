@@ -68,3 +68,4 @@ agents:
       - lfm2_5_audio
       - seamlessm4t
       - glm_tts
+      - kokoro_tts

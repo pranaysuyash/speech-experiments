@@ -81,7 +81,11 @@ def test_run_request_json_written_with_correct_schema():
             response = client.post(
                 "/api/workbench/runs",
                 files={"file": ("test.wav", wav_bytes, "audio/wav")},
-                data={"use_case_id": "test_case", "steps_preset": "ingest"},
+                data={
+                    "use_case_id": "test_case",
+                    "steps_preset": "ingest",
+                    "reference_text": "hello world",
+                },
             )
 
             assert response.status_code == 200
@@ -103,6 +107,7 @@ def test_run_request_json_written_with_correct_schema():
             assert request_data["sha256"] == wav_sha256, (
                 f"SHA256 mismatch: {request_data['sha256']} != {wav_sha256}"
             )
+            assert request_data["reference_text"] == "hello world"
             assert "requested_at" in request_data
 
 

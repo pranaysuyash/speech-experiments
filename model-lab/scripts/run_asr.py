@@ -22,7 +22,7 @@ import yaml
 from harness.env import load_dotenv_if_present
 
 from harness.audio_io import AudioLoader, GroundTruthLoader
-from harness.media_ingest import FFmpegNotFoundError, IngestError, ingest_media
+from harness.media_ingest import FFmpegNotFoundError, IngestConfig, IngestError, ingest_media
 from harness.metrics_asr import ASRMetrics, diagnose_output_quality
 from harness.preprocess_ops import results_to_artifact_section, run_preprocessing_chain
 from harness.protocol import NormalizationValidator, RunContract, create_validation_report
@@ -437,9 +437,11 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None, pre: str =
     input_path = Path(input_path).resolve()
     print(f"=== ASR Adhoc: {model_id} on {input_path.name} ===")
 
-    # Ingest media (handles video extraction if needed)
+    # Ingest media (handles audio/video through ffmpeg canonicalization)
     try:
-        ingest = ingest_media(input_path)
+        ingest_cfg = IngestConfig()
+        ingest_artifacts_dir = Path(f"runs/{model_id}/asr/_adhoc_ingest")
+        ingest = ingest_media(input_path, ingest_artifacts_dir, ingest_cfg)
     except FFmpegNotFoundError as e:
         print(f"❌ {e}")
         print("   Video support requires ffmpeg. Install: brew install ffmpeg")
@@ -448,15 +450,20 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None, pre: str =
         print(f"❌ Ingest failed: {e}")
         sys.exit(4)
 
-    print(f"Source: {ingest.source_media_hash[:12]} ({ingest.original_format})")
-    print(f"Audio: {ingest.audio_hash[:12]} ({ingest.audio_duration_s:.2f}s)")
-    if ingest.is_extracted:
-        print(f"Extracted via: {ingest.ingest_tool} {ingest.ingest_version}")
+    source_hash = ingest["source_media_hash"]
+    audio_hash = ingest["audio_content_hash"]
+    duration_s = float(ingest["duration_s"])
+    processed_audio_path = Path(ingest["processed_audio_path"])
+    source_suffix = input_path.suffix.lower() or "<unknown>"
+    print(f"Source: {source_hash[:12]} ({source_suffix})")
+    print(f"Audio: {audio_hash[:12]} ({duration_s:.2f}s)")
+    print(f"Ingest: ffmpeg ({ingest['ffmpeg_version']})")
 
     # Run preprocessing chain if specified
     preprocessing_results = []
-    audio_for_model = ingest.audio
-    sr_for_model = ingest.sample_rate
+    sample_rate = load_model_config(model_id).get("audio", {}).get("sample_rate", 16000)
+    audio_loader = AudioLoader(target_sample_rate=sample_rate)
+    audio_for_model, sr_for_model, _ = audio_loader.load_audio(processed_audio_path, model_id)
 
     if pre:
         operators = [op.strip() for op in pre.split(",") if op.strip()]
@@ -512,7 +519,6 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None, pre: str =
         print(transcript[:200] + "..." if len(transcript) > 200 else transcript)
 
         # Compute STRUCTURAL metrics only (no quality metrics for adhoc)
-        duration_s = ingest.audio_duration_s
         rtf = elapsed_s / duration_s if duration_s > 0 else 0
 
         # Create schema-validated artifact
@@ -530,13 +536,13 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None, pre: str =
         # Track source_media_hash for video containers
         schema_inputs = InputsSchema(
             audio_path=str(input_path),
-            audio_hash=ingest.audio_hash,  # Hash of decoded PCM
-            source_media_path=str(ingest.source_media_path) if ingest.is_extracted else None,
-            source_media_hash=ingest.source_media_hash if ingest.is_extracted else None,
-            dataset_id=f"adhoc_{ingest.audio_hash[:12]}",
+            audio_hash=audio_hash,  # Hash of decoded PCM
+            source_media_path=str(input_path),
+            source_media_hash=source_hash,
+            dataset_id=f"adhoc_{audio_hash[:12]}",
             dataset_hash=None,
             audio_duration_s=duration_s,
-            sample_rate=ingest.sample_rate,
+            sample_rate=sr_for_model,
         )
 
         # Quality metrics MUST be None for adhoc - schema enforces this
@@ -552,10 +558,11 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None, pre: str =
 
         # Ingest metadata for provenance
         ingest_provenance = {
-            "ingest_tool": ingest.ingest_tool,
-            "ingest_version": ingest.ingest_version,
-            "is_extracted": ingest.is_extracted,
-            "original_format": ingest.original_format,
+            "ingest_tool": "ffmpeg",
+            "ingest_version": ingest["ffmpeg_version"],
+            "is_extracted": processed_audio_path.resolve() != input_path.resolve(),
+            "original_format": source_suffix,
+            "processed_audio_path": str(processed_audio_path),
         }
 
         schema_artifact = RunnerArtifact(
@@ -603,8 +610,7 @@ def run_asr_adhoc(model_id: str, input_path: str, device: str = None, pre: str =
         return result_obj, str(result_file)
 
     finally:
-        # Cleanup temp audio file
-        ingest.cleanup()
+        pass
 
 
 def main():

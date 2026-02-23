@@ -135,6 +135,7 @@ async def create_experiment(
     steps: str | None = Form(None),  # comma-separated custom steps
     preprocessing: str | None = Form(None),  # comma-separated preprocessing ops
     pipeline_template: str | None = Form(None),  # named template
+    reference_text: str | None = Form(None),  # optional GT transcript for WER/CER
 ) -> JSONResponse:
     # Parse candidate_ids if provided
     parsed_candidate_ids = None
@@ -293,6 +294,8 @@ async def create_experiment(
         },
         "candidates": candidate_configs,
     }
+    if reference_text and reference_text.strip():
+        request_data["reference_text"] = reference_text.strip()
     # Add pipeline configuration if custom pipeline was specified
     if resolved_pipeline:
         request_data["pipeline_config"] = resolved_pipeline
@@ -416,6 +419,7 @@ def start_next_run(experiment_id: str) -> JSONResponse:
             },
             candidate_snapshot=candidate_snapshot,
             pipeline_config=pipeline_config,
+            reference_text=request.get("reference_text"),
         )
     except RunnerBusyError:
         return JSONResponse(status_code=409, content={"error_code": "RUNNER_BUSY"})

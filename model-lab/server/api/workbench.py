@@ -159,6 +159,7 @@ def start_run_from_path(
     candidate_snapshot: Optional[Dict[str, Any]] = None,
     config_overrides: Optional[Dict[str, Any]] = None,
     pipeline_config: Optional[Dict[str, Any]] = None,  # Custom pipeline configuration
+    reference_text: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Start a run from a file path (not multipart upload).
@@ -252,6 +253,8 @@ def start_run_from_path(
         # Add pipeline configuration if custom pipeline was used
         if pipeline_config:
             run_request_data["pipeline_config"] = pipeline_config
+        if reference_text and reference_text.strip():
+            run_request_data["reference_text"] = reference_text.strip()
 
         # Launch worker
         result = launch_run_worker(runner, run_request_data, background=True)
@@ -303,6 +306,7 @@ async def create_workbench_run(
     steps: Optional[str] = Form(None),
     preprocessing: Optional[str] = Form(None),
     pipeline_template: Optional[str] = Form(None),
+    reference_text: Optional[str] = Form(None),
 ) -> JSONResponse:
     """
     Create a run from the UI (multipart upload) and start processing asynchronously.
@@ -423,6 +427,8 @@ async def create_workbench_run(
             "sha256": sha256_hex,
             "config": config_overrides,
         }
+        if reference_text and reference_text.strip():
+            run_request_data["reference_text"] = reference_text.strip()
 
         # Attach dynamic pipeline details for reproducibility
         if pipeline_config_payload is not None:

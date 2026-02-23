@@ -254,7 +254,7 @@ Execution log:
 Status updates:
 
 - 2026-02-13 08:45 **IN_PROGRESS** — Diagnostic complete, remediation starting.
-- 2026-02-13 08:50 **IN_PROGRESS** — Alignment step bug FIXED (glob fallback for asr_*.json). Full pipeline verified end-to-end (8/8 steps COMPLETED). Backend invariant tests pass (7/7). Blocked on HF_TOKEN for gated model testing.
+- 2026-02-13 08:50 **IN_PROGRESS** — Alignment step bug FIXED (glob fallback for asr\_\*.json). Full pipeline verified end-to-end (8/8 steps COMPLETED). Backend invariant tests pass (7/7). Blocked on HF_TOKEN for gated model testing.
 
 ---
 

@@ -762,6 +762,176 @@ def load_distil_whisper(config: dict[str, Any], device: str) -> Bundle:
         ) from e
 
 
+def load_mlx_whisper(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load MLX Whisper with Bundle Contract v1.
+
+    Optimized for Apple Silicon via `mlx-whisper`.
+    """
+    try:
+        import importlib
+        import inspect
+        import json
+        from pathlib import Path
+
+        import mlx.core as mx
+        import mlx.nn as nn
+        import mlx_whisper
+        import numpy as np
+        import torch
+        from huggingface_hub import snapshot_download
+        from mlx.utils import tree_unflatten
+    except ImportError as e:
+        raise ImportError("mlx-whisper not installed. Install with: uv add mlx-whisper") from e
+
+    if device != "mps":
+        logger.warning("mlx_whisper is optimized for mps; continuing on %s", device)
+
+    model_name = (
+        config.get("model_name")
+        or config.get("config", {}).get("model_name")
+        or "mlx-community/whisper-small.en-asr-fp16"
+    )
+    default_language = config.get("language") or config.get("config", {}).get("language") or "en"
+    preferred_dtype = config.get("dtype", "float32")
+
+    # Patch mlx_whisper loader to ignore newer config keys that older ModelDimensions
+    # signatures don't accept (e.g., activation_dropout).
+    load_models_mod = importlib.import_module("mlx_whisper.load_models")
+    transcribe_mod = importlib.import_module("mlx_whisper.transcribe")
+    whisper_mod = importlib.import_module("mlx_whisper.whisper")
+    if not getattr(load_models_mod, "_model_lab_safe_config_patch", False):
+        model_dim_keys = set(inspect.signature(whisper_mod.ModelDimensions).parameters)
+        original_load_model = load_models_mod.load_model
+
+        def _safe_load_model(path_or_hf_repo: str, dtype: mx.Dtype = mx.float32):
+            model_path = Path(path_or_hf_repo)
+            if not model_path.exists():
+                model_path = Path(snapshot_download(repo_id=path_or_hf_repo))
+
+            with open(str(model_path / "config.json"), "r", encoding="utf-8") as f:
+                raw_config = json.loads(f.read())
+            raw_config.pop("model_type", None)
+            quantization = raw_config.pop("quantization", None)
+            filtered_config = {k: v for k, v in raw_config.items() if k in model_dim_keys}
+
+            alias_map = {
+                "n_mels": raw_config.get("n_mels", raw_config.get("num_mel_bins")),
+                "n_audio_ctx": raw_config.get(
+                    "n_audio_ctx", raw_config.get("max_source_positions")
+                ),
+                "n_audio_state": raw_config.get("n_audio_state", raw_config.get("d_model")),
+                "n_audio_head": raw_config.get(
+                    "n_audio_head", raw_config.get("encoder_attention_heads")
+                ),
+                "n_audio_layer": raw_config.get("n_audio_layer", raw_config.get("encoder_layers")),
+                "n_vocab": raw_config.get("n_vocab", raw_config.get("vocab_size")),
+                "n_text_ctx": raw_config.get(
+                    "n_text_ctx", raw_config.get("max_target_positions")
+                ),
+                "n_text_state": raw_config.get("n_text_state", raw_config.get("d_model")),
+                "n_text_head": raw_config.get(
+                    "n_text_head", raw_config.get("decoder_attention_heads")
+                ),
+                "n_text_layer": raw_config.get("n_text_layer", raw_config.get("decoder_layers")),
+            }
+            for key, value in alias_map.items():
+                if key in model_dim_keys and key not in filtered_config and value is not None:
+                    filtered_config[key] = value
+
+            dropped = sorted(set(raw_config) - set(filtered_config))
+            if dropped:
+                logger.info("mlx_whisper: dropping unsupported config keys: %s", dropped)
+
+            model_args = whisper_mod.ModelDimensions(**filtered_config)
+            wf = model_path / "weights.safetensors"
+            if not wf.exists():
+                wf = model_path / "weights.npz"
+            if not wf.exists():
+                wf = model_path / "model.safetensors"
+            if not wf.exists():
+                wf = model_path / "model.npz"
+            if not wf.exists():
+                raise FileNotFoundError(
+                    f"No supported MLX weight file found under {model_path}"
+                )
+            weights = mx.load(str(wf))
+
+            model = whisper_mod.Whisper(model_args, dtype)
+            if quantization is not None:
+                class_predicate = (
+                    lambda p, m: isinstance(m, (nn.Linear, nn.Embedding))
+                    and f"{p}.scales" in weights
+                )
+                nn.quantize(model, **quantization, class_predicate=class_predicate)
+
+            weights = tree_unflatten(list(weights.items()))
+            model.update(weights)
+            mx.eval(model.parameters())
+            return model
+
+        load_models_mod.load_model = _safe_load_model
+        transcribe_mod.load_model = _safe_load_model
+        load_models_mod._model_lab_safe_config_patch = True
+        load_models_mod._model_lab_original_load_model = original_load_model
+
+    def transcribe(audio, sr=16000, **kwargs):
+        if isinstance(audio, torch.Tensor):
+            audio = audio.detach().cpu().numpy()
+
+        audio = np.asarray(audio, dtype=np.float32)
+        if audio.ndim > 1:
+            audio = audio.mean(axis=0)
+
+        decode_kwargs = dict(kwargs)
+        decode_kwargs.pop("progress_callback", None)
+        language = decode_kwargs.pop("language", default_language)
+        decode_kwargs.setdefault("fp16", preferred_dtype == "float16")
+
+        result = mlx_whisper.transcribe(
+            audio,
+            path_or_hf_repo=model_name,
+            language=language,
+            **decode_kwargs,
+        )
+
+        segments = []
+        for segment in result.get("segments", []):
+            start = float(segment.get("start", segment.get("t0", 0.0)))
+            end = float(segment.get("end", segment.get("t1", start)))
+            text = (segment.get("text") or "").strip()
+            if text:
+                segments.append({"start": start, "end": end, "text": text})
+
+        return {
+            "text": (result.get("text") or "").strip(),
+            "segments": segments,
+            "language": result.get("language", language),
+            "meta": {"model": model_name},
+        }
+
+    return {
+        "model_type": "mlx_whisper",
+        "device": device,
+        "capabilities": ["asr"],
+        "modes": ["batch"],
+        "asr": {"transcribe": transcribe},
+        "raw": {"model_name": model_name},
+    }
+
+
+ModelRegistry.register_loader(
+    "mlx_whisper",
+    load_mlx_whisper,
+    "MLX Whisper: Apple Silicon optimized Whisper runtime",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["asr"],
+    hardware=["mps", "cpu"],
+    modes=["batch"],
+)
+
+
 def load_whisper_cpp(config: dict[str, Any], device: str) -> Bundle:
     """
     Whisper.cpp CLI adapter with Bundle Contract v1.
@@ -908,73 +1078,6 @@ def load_silero_vad(config: dict[str, Any], device: str) -> Bundle:
 
     except Exception as e:
         raise RuntimeError(f"Silero VAD loading failed: {e}") from e
-
-
-def load_mlx_whisper(config: dict[str, Any], device: str) -> Bundle:
-    """
-    Load MLX Whisper ASR backend (Apple Silicon focused).
-    """
-    try:
-        import tempfile
-
-        import numpy as np
-        import soundfile as sf
-        import torch
-
-        import mlx_whisper
-    except ImportError as e:
-        raise ImportError(
-            "mlx_whisper not installed. Install with: uv add mlx-whisper"
-        ) from e
-
-    runtime_cfg = config.get("config") if isinstance(config.get("config"), dict) else {}
-    model_name = str(
-        config.get("model_name")
-        or runtime_cfg.get("model_name")
-        or "mlx-community/whisper-small.en-asr-fp16"
-    )
-    language = str(runtime_cfg.get("language", "en"))
-
-    def transcribe(audio, sr=16000, **kwargs):
-        if isinstance(audio, torch.Tensor):
-            audio = audio.cpu().numpy()
-        audio = np.asarray(audio, dtype=np.float32)
-        if audio.ndim > 1:
-            audio = audio.mean(axis=0)
-
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp_path = tmp.name
-        try:
-            sf.write(tmp_path, audio, sr)
-            try:
-                result = mlx_whisper.transcribe(
-                    tmp_path,
-                    path_or_hf_repo=model_name,
-                    language=kwargs.get("language", language),
-                )
-            except TypeError:
-                result = mlx_whisper.transcribe(tmp_path, model=model_name)
-        finally:
-            import os
-
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-
-        text = result.get("text", "") if isinstance(result, dict) else str(result)
-        return {
-            "text": text.strip(),
-            "segments": result.get("segments", []) if isinstance(result, dict) else [],
-            "meta": {"model": model_name, "backend": "mlx_whisper"},
-        }
-
-    return {
-        "model_type": "mlx_whisper",
-        "device": "mps" if device in {"mps", "cpu"} else device,
-        "capabilities": ["asr"],
-        "modes": ["batch"],
-        "asr": {"transcribe": transcribe},
-        "raw": {"model_name": model_name},
-    }
 
 
 def load_pyannote_diarization(config: dict[str, Any], device: str) -> Bundle:
@@ -1219,18 +1322,6 @@ ModelRegistry.register_loader(
 
 
 ModelRegistry.register_loader(
-    "mlx_whisper",
-    load_mlx_whisper,
-    "MLX Whisper: Apple Silicon optimized Whisper inference",
-    status=ModelStatus.EXPERIMENTAL,
-    version="1.0.0",
-    capabilities=["asr"],
-    hardware=["mps", "cpu"],
-    modes=["batch"],
-)
-
-
-ModelRegistry.register_loader(
     "silero_vad",
     load_silero_vad,
     "Silero VAD: Production-grade voice activity detection",
@@ -1363,7 +1454,6 @@ def load_yamnet(config: dict[str, Any], device: str) -> Bundle:
     YAMNet classifies 521 AudioSet event classes using TensorFlow Hub.
     """
     try:
-        import os
         import numpy as np
 
         # Import TensorFlow and Hub
@@ -1465,7 +1555,6 @@ def load_rnnoise(config: dict[str, Any], device: str) -> Bundle:
     Native runtime (C library with Python bindings via pyrnnoise).
     """
     try:
-        import os
         import numpy as np
 
         # Import pyrnnoise Python bindings
@@ -1570,7 +1659,6 @@ def load_deepfilternet(config: dict[str, Any], device: str) -> Bundle:
     ERB-scale deep filtering. Production-grade quality.
     """
     try:
-        import os
         import numpy as np
 
         # Import deepfilternet
@@ -1685,7 +1773,6 @@ def load_clap(config: dict[str, Any], device: str) -> Bundle:
     First multi-surface model in the registry!
     """
     try:
-        import os
         import numpy as np
 
         # Import laion-clap
@@ -1867,24 +1954,7 @@ def load_voxtral(config: dict[str, Any], device: str) -> Bundle:
     if not api_key:
         logger.warning("MISTRAL_API_KEY not set. Voxtral will use mock mode.")
 
-    cfg_runtime = config.get("config") if isinstance(config.get("config"), dict) else {}
     variant = config.get("variant", "realtime")
-    backend = str(
-        config.get("backend")
-        or cfg_runtime.get("backend")
-        or os.environ.get("VOXTRAL_BACKEND", "mock")
-    ).lower()
-    model_name = str(
-        config.get("model_name")
-        or cfg_runtime.get("model_name")
-        or "mistralai/Voxtral-Mini-4B-Realtime-2602"
-    )
-    local_files_only = bool(
-        config.get("local_files_only", cfg_runtime.get("local_files_only", True))
-    )
-    emit_every_chunks = int(
-        config.get("emit_every_chunks", cfg_runtime.get("emit_every_chunks", 2))
-    )
 
     logger.info(f"Loading Voxtral ({variant})...")
 
@@ -1902,13 +1972,6 @@ def load_voxtral(config: dict[str, Any], device: str) -> Bundle:
             self._client = None
             self._accumulated_text = ""
             self._current_segment_id = ""
-            self._backend = backend
-            self._model_name = model_name
-            self._local_files_only = local_files_only
-            self._emit_every_chunks = max(1, emit_every_chunks)
-            self._chunks_processed = 0
-            self._audio_buffer: list[np.ndarray] = []
-            self._pipe = None
             self._chunk_config = ChunkConfig(
                 frame_ms=20,
                 chunk_ms=160,
@@ -1919,8 +1982,6 @@ def load_voxtral(config: dict[str, Any], device: str) -> Bundle:
             """Initialize Voxtral streaming session."""
             self._accumulated_text = ""
             self._current_segment_id = self.handle.get_or_create_segment_id("seg_0")
-            self._chunks_processed = 0
-            self._audio_buffer = []
 
             if self.api_key:
                 try:
@@ -1931,21 +1992,6 @@ def load_voxtral(config: dict[str, Any], device: str) -> Bundle:
                 except ImportError:
                     logger.warning("mistralai not installed, using mock mode")
                     self._client = None
-
-            if self._backend in {"transformers", "auto"} and self._pipe is None:
-                try:
-                    from transformers import pipeline
-
-                    model_kwargs = {"local_files_only": self._local_files_only}
-                    self._pipe = pipeline(
-                        "automatic-speech-recognition",
-                        model=self._model_name,
-                        model_kwargs=model_kwargs,
-                    )
-                    logger.info("Voxtral backend: transformers")
-                except Exception as exc:
-                    logger.warning(f"Voxtral transformers backend unavailable, falling back to mock: {exc}")
-                    self._pipe = None
 
         def _do_push_audio(
             self,
@@ -1967,28 +2013,10 @@ def load_voxtral(config: dict[str, Any], device: str) -> Bundle:
             self.handle.advance_audio_position(chunk_duration_ms)
             t_end = self.handle._audio_position_ms
 
-            self._chunks_processed += 1
-            self._audio_buffer.append(audio_arr)
-
-            if self._pipe is not None and self._chunks_processed % self._emit_every_chunks == 0:
-                try:
-                    merged = np.concatenate(self._audio_buffer, axis=0)
-                    out = self._pipe({"array": merged, "sampling_rate": 16000})
-                    text = (out.get("text", "") if isinstance(out, dict) else str(out)).strip()
-                    if text:
-                        self._accumulated_text = text
-                        yield StreamEvent(
-                            type=StreamEventType.PARTIAL,
-                            text=self._accumulated_text,
-                            seq=self.handle.next_seq(),
-                            segment_id=self._current_segment_id,
-                            t_audio_ms_start=t_start,
-                            t_audio_ms_end=t_end,
-                            t_emit_ms=time.time() * 1000,
-                        )
-                    return
-                except Exception as exc:
-                    logger.warning(f"Voxtral transformers chunk inference failed; falling back to mock: {exc}")
+            if self._client is not None:
+                # Real API call would go here
+                # For now, simulate with mock behavior
+                pass
 
             # Mock/simulation: accumulate text based on audio energy
             rms = np.sqrt(np.mean(audio_arr**2))
@@ -2031,15 +2059,6 @@ def load_voxtral(config: dict[str, Any], device: str) -> Bundle:
 
         def _do_finalize(self) -> dict[str, Any]:
             """Return final ASR result."""
-            if self._pipe is not None and self._audio_buffer:
-                try:
-                    merged = np.concatenate(self._audio_buffer, axis=0)
-                    out = self._pipe({"array": merged, "sampling_rate": 16000})
-                    text = (out.get("text", "") if isinstance(out, dict) else str(out)).strip()
-                    if text:
-                        self._accumulated_text = text
-                except Exception as exc:
-                    logger.warning(f"Voxtral transformers finalize inference failed: {exc}")
             return {
                 "text": self._accumulated_text,
                 "segments": [
@@ -2076,25 +2095,6 @@ def load_voxtral(config: dict[str, Any], device: str) -> Bundle:
         list(adapter.flush())
         return adapter.finalize()
 
-    def start(sr: int = 16000, **kwargs) -> str:
-        handle = adapter.start_stream({"sample_rate": sr, **kwargs})
-        return handle.stream_id
-
-    def start_stream(cfg: dict[str, Any] | None = None):
-        return adapter.start_stream(cfg or {})
-
-    def push_audio(handle: str, audio: np.ndarray, sr: int = 16000):
-        return adapter.push_audio(audio, sr=sr)
-
-    def get_transcript(handle: str) -> dict[str, Any]:
-        return adapter.get_transcript()
-
-    def finalize(handle: str):
-        return adapter.finalize()
-
-    def close(handle: str | None = None):
-        adapter.close()
-
     return {
         "model_type": "voxtral",
         "device": "cpu",  # API-based
@@ -2102,13 +2102,11 @@ def load_voxtral(config: dict[str, Any], device: str) -> Bundle:
         "modes": ["batch", "streaming"],
         "asr": {"transcribe": transcribe},
         "asr_stream": {
-            "start": start,
-            "start_stream": start_stream,
-            "push_audio": push_audio,
-            "get_transcript": get_transcript,
-            "flush": lambda: adapter.flush(),
-            "finalize": finalize,
-            "close": close,
+            "start_stream": adapter.start_stream,
+            "push_audio": adapter.push_audio,
+            "flush": adapter.flush,
+            "finalize": adapter.finalize,
+            "close": adapter.close,
         },
         "raw": {"adapter": adapter},
     }
@@ -2732,81 +2730,108 @@ def load_nb_whisper_small_onnx(config: dict[str, Any], device: str) -> Bundle:
     """
     try:
         import numpy as np
+        import torch
+        from transformers import pipeline
+    except ImportError as e:
+        raise ImportError(
+            "transformers/PyTorch not installed. Install with:\n"
+            "pip install -r models/nb_whisper_small_onnx/requirements.txt"
+        ) from e
 
-        try:
-            import onnxruntime as ort
-            from transformers import WhisperProcessor
-        except ImportError:
-            raise ImportError(
-                "onnxruntime/transformers not installed. Install with:\n"
-                "pip install -r models/nb_whisper_small_onnx/requirements.txt"
-            ) from None
+    model_id = (
+        config.get("model_name")
+        or config.get("config", {}).get("model_name")
+        or "NbAiLab/nb-whisper-small"
+    )
+    language = config.get("language") or config.get("config", {}).get("language") or "no"
 
-        model_id = "NbAiLab/nb-whisper-small"
+    backend = "transformers_fallback"
+    asr_pipe = None
 
-        # ONNX execution providers
-        if device == "cuda":
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        else:
-            providers = ["CPUExecutionProvider"]
+    # Preferred: ONNXRuntime via optimum if available.
+    try:
+        import onnxruntime as ort
+        from optimum.onnxruntime import ORTModelForSpeechSeq2Seq
+        from transformers import AutoProcessor
 
-        logger.info(f"Loading NB-Whisper-Small-ONNX with providers: {providers}...")
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if device == "cuda" else ["CPUExecutionProvider"]
+        logger.info("Loading NB-Whisper ONNX (optimum) with providers: %s", providers)
+        processor = AutoProcessor.from_pretrained(model_id)
+        ort_model = ORTModelForSpeechSeq2Seq.from_pretrained(
+            model_id,
+            subfolder="onnx",
+            use_merged=False,
+            encoder_file_name="encoder_model.onnx",
+            decoder_file_name="decoder_model.onnx",
+            decoder_with_past_file_name="decoder_with_past_model.onnx",
+            provider=providers[0],
+        )
+        asr_pipe = pipeline(
+            "automatic-speech-recognition",
+            model=ort_model,
+            tokenizer=processor.tokenizer,
+            feature_extractor=processor.feature_extractor,
+        )
+        backend = "onnxruntime_optimum"
+    except Exception as onnx_exc:
+        logger.warning(
+            "NB-Whisper ONNX backend unavailable (%s). Falling back to transformers runtime.",
+            onnx_exc,
+        )
+        torch_device = "cpu"
+        if device == "cuda" and torch.cuda.is_available():
+            torch_device = "cuda:0"
+        asr_pipe = pipeline(
+            "automatic-speech-recognition",
+            model=model_id,
+            device=torch_device,
+        )
 
-        try:
-            processor = WhisperProcessor.from_pretrained(model_id)
-            # Note: for full ONNX, need optimum-cli or pre-exported model
-            # This is a fallback that uses processor only
-            onnx_model = None  # Would load actual ONNX model here
-        except Exception as e:
-            logger.warning(f"ONNX model loading failed: {e}. Using fallback.")
-            processor = None
-            onnx_model = None
+    def transcribe(audio, sr=16000, **kwargs):
+        """Transcribe audio using NB-Whisper (ONNX preferred, transformers fallback)."""
+        if hasattr(audio, "numpy"):
+            audio = audio.numpy()
+        audio = np.asarray(audio, dtype=np.float32)
 
-        def transcribe(audio, sr=16000, **kwargs):
-            """Transcribe audio using NB-Whisper-ONNX."""
-            if hasattr(audio, "numpy"):
-                audio = audio.numpy()
-            audio = np.asarray(audio, dtype=np.float32)
+        if audio.ndim > 1:
+            audio = audio.mean(axis=0)
 
-            if audio.ndim > 1:
-                audio = audio.mean(axis=0)
+        if sr != 16000:
+            try:
+                import librosa
 
-            if sr != 16000:
-                try:
-                    import librosa
+                audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
+            except ImportError:
+                pass
 
-                    audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
-                except ImportError:
-                    pass
-
-            # If ONNX model not loaded, return placeholder
-            if processor is None or onnx_model is None:
-                return {
-                    "text": "[NB-Whisper-ONNX requires pre-exported ONNX model]",
-                    "error": "Use optimum-cli to export model to ONNX format",
-                }
-
-            # Process with ONNX
-            inputs = processor(audio, sampling_rate=16000, return_tensors="np")
-            # Run ONNX inference
-            # outputs = onnx_model.run(None, dict(inputs))
-
-            return {
-                "text": "",
-                "language": "no",
-            }
+        result = asr_pipe(
+            {"array": audio, "sampling_rate": 16000},
+            return_timestamps=True,
+            generate_kwargs={"language": language},
+        )
+        text = (result.get("text") if isinstance(result, dict) else str(result)) or ""
+        chunks = result.get("chunks", []) if isinstance(result, dict) else []
+        segments = []
+        for c in chunks:
+            ts = c.get("timestamp") if isinstance(c, dict) else None
+            if ts and len(ts) == 2 and ts[0] is not None and ts[1] is not None:
+                segments.append({"start": float(ts[0]), "end": float(ts[1]), "text": c.get("text", "")})
 
         return {
-            "model_type": "nb_whisper_small_onnx",
-            "device": device,
-            "capabilities": ["asr"],
-            "modes": ["batch"],
-            "asr": {"transcribe": transcribe},
-            "raw": {"model": onnx_model, "processor": processor},
+            "text": text.strip(),
+            "segments": segments,
+            "language": language,
+            "meta": {"backend": backend, "model": model_id},
         }
 
-    except ImportError as e:
-        raise ImportError(f"Failed to load NB-Whisper-ONNX: {e}") from e
+    return {
+        "model_type": "nb_whisper_small_onnx",
+        "device": device,
+        "capabilities": ["asr"],
+        "modes": ["batch"],
+        "asr": {"transcribe": transcribe},
+        "raw": {"pipeline": asr_pipe, "backend": backend},
+    }
 
 
 ModelRegistry.register_loader(
@@ -2918,12 +2943,20 @@ def load_kyutai_streaming(config: dict[str, Any], device: str) -> Bundle:
             handle = adapter.start_stream({"sample_rate": sr, **kwargs})
             return handle.stream_id
 
+        def start_stream(sr: int = 16000, **kwargs) -> str:
+            """Bundle Contract v2 stream start."""
+            return start(sr=sr, **kwargs)
+
         def push_audio(handle: str, audio: np.ndarray, sr: int = 16000) -> None:
             """Push audio chunk to stream."""
             if hasattr(audio, "numpy"):
                 audio = audio.numpy()
             audio = np.asarray(audio, dtype=np.float32)
             adapter.push_audio(audio, sr=sr)
+
+        def flush(handle: str) -> list[dict[str, Any]]:
+            """Flush pending events."""
+            return list(adapter.flush())
 
         def get_transcript(handle: str) -> dict[str, Any]:
             """Get current transcript."""
@@ -2933,7 +2966,7 @@ def load_kyutai_streaming(config: dict[str, Any], device: str) -> Bundle:
             """Finalize stream and get final transcript."""
             return adapter.finalize()
 
-        def close(handle: str | None = None) -> None:
+        def close(handle: str) -> None:
             """Close stream resources."""
             adapter.close()
 
@@ -2943,9 +2976,10 @@ def load_kyutai_streaming(config: dict[str, Any], device: str) -> Bundle:
             "capabilities": ["asr_stream"],
             "modes": ["streaming"],
             "asr_stream": {
+                "start_stream": start_stream,
                 "start": start,
-                "start_stream": lambda cfg=None: adapter.start_stream(cfg or {}),
                 "push_audio": push_audio,
+                "flush": flush,
                 "get_transcript": get_transcript,
                 "finalize": finalize,
                 "close": close,
@@ -3101,6 +3135,119 @@ ModelRegistry.register_loader(
 
 
 # =============================================================================
+# Kokoro-TTS (LCS-23)
+# =============================================================================
+
+
+def load_kokoro_tts(config: dict[str, Any], device: str) -> Bundle:
+    """
+    Load Kokoro-82M TTS with Bundle Contract v2.
+
+    Lightweight CPU/CUDA text-to-speech using the official kokoro package.
+    """
+    try:
+        import importlib.util
+        import numpy as np
+        import torch
+        from kokoro import KPipeline
+    except ImportError as e:
+        raise ImportError(
+            "kokoro package not installed. Install with:\n"
+            "uv pip install -r models/kokoro_tts/requirements.txt"
+        ) from e
+
+    # misaki/espeak bootstrap may shell out to `python -m pip` on first run.
+    if importlib.util.find_spec("pip") is None:
+        raise RuntimeError(
+            "kokoro_tts runtime requires pip module in this environment. Install with:\n"
+            "uv pip install pip"
+        )
+
+    # Kokoro currently supports cpu/cuda via torch; map unsupported devices to cpu.
+    if device == "cuda" and torch.cuda.is_available():
+        actual_device = "cuda"
+    else:
+        actual_device = "cpu"
+
+    lang_code = str(config.get("lang_code", "a"))
+    repo_id = str(config.get("repo_id", "hexgrad/Kokoro-82M"))
+    default_voice = str(config.get("voice", "af_heart"))
+    default_speed = float(config.get("speed", 1.0))
+    split_pattern = config.get("split_pattern", r"\n+")
+
+    pipeline = KPipeline(
+        lang_code=lang_code,
+        repo_id=repo_id,
+        device=actual_device,
+    )
+
+    def synthesize(text: str, **kwargs) -> dict[str, Any]:
+        voice = str(kwargs.get("voice", default_voice))
+        speed = float(kwargs.get("speed", default_speed))
+        split = kwargs.get("split_pattern", split_pattern)
+
+        chunks: list[np.ndarray] = []
+        for result in pipeline(text, voice=voice, speed=speed, split_pattern=split):
+            audio_chunk = result.audio
+            if audio_chunk is None:
+                continue
+            if hasattr(audio_chunk, "detach"):
+                audio_np = audio_chunk.detach().cpu().numpy()
+            else:
+                audio_np = np.asarray(audio_chunk)
+            if audio_np.ndim > 1:
+                audio_np = np.squeeze(audio_np)
+            chunks.append(audio_np.astype(np.float32, copy=False))
+
+        if not chunks:
+            audio = np.zeros(1, dtype=np.float32)
+        else:
+            audio = np.concatenate(chunks)
+
+        # Trim leading/trailing near-silence to reduce false "mostly_silent" flags
+        # on short punctuation-heavy utterances while preserving internal pauses.
+        silence_threshold = float(kwargs.get("silence_trim_threshold", 0.006))
+        non_silent = np.flatnonzero(np.abs(audio) > silence_threshold)
+        if non_silent.size > 0:
+            start = int(non_silent[0])
+            end = int(non_silent[-1]) + 1
+            audio = audio[start:end]
+
+        sr = 24000
+        return {
+            "audio": audio,
+            "sample_rate": sr,
+            "duration_s": len(audio) / sr if sr > 0 else 0.0,
+            "meta": {
+                "model": "hexgrad/Kokoro-82M",
+                "voice": voice,
+                "lang_code": lang_code,
+            },
+        }
+
+    return {
+        "model_type": "kokoro_tts",
+        "device": actual_device,
+        "capabilities": ["tts"],
+        "modes": ["batch"],
+        "tts": {"synthesize": synthesize},
+        "raw": {"pipeline": pipeline},
+    }
+
+
+ModelRegistry.register_loader(
+    "kokoro_tts",
+    load_kokoro_tts,
+    "Kokoro-TTS: Lightweight high-quality text-to-speech (hexgrad/Kokoro-82M)",
+    status=ModelStatus.EXPERIMENTAL,
+    version="1.0.0",
+    capabilities=["tts"],
+    hardware=["cpu", "cuda"],
+    modes=["batch"],
+)
+
+
+# =============================================================================
 # Voxtral Realtime 2602 (LCS-22)
 # =============================================================================
 
@@ -3113,7 +3260,6 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
     Reuses StreamingAdapter for lifecycle.
     """
     try:
-        import os
         import numpy as np
 
         try:
@@ -3134,26 +3280,8 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
         else:
             torch_device = "cpu"
 
-        cfg_runtime = config.get("config") if isinstance(config.get("config"), dict) else {}
-        backend = str(
-            config.get("backend")
-            or cfg_runtime.get("backend")
-            or os.environ.get("VOXTRAL_REALTIME_BACKEND", "mock")
-        ).lower()
-        model_name = str(
-            config.get("model_name")
-            or cfg_runtime.get("model_name")
-            or "mistralai/Voxtral-Mini-4B-Realtime-2602"
-        )
-        local_files_only = bool(
-            config.get("local_files_only", cfg_runtime.get("local_files_only", True))
-        )
-
         # Configurable delay knob (model supports 80ms-2.4s)
-        transcription_delay_ms = config.get(
-            "transcription_delay_ms",
-            cfg_runtime.get("transcription_delay_ms", 200),
-        )
+        transcription_delay_ms = config.get("transcription_delay_ms", 200)
         # Clamp to model's supported range
         transcription_delay_ms = max(80, min(2400, transcription_delay_ms))
 
@@ -3173,12 +3301,6 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
                 self._sample_rate = 16000
                 self._chunks_processed = 0
                 self._accumulated_text = ""
-                self._backend = backend
-                self._model_name = model_name
-                self._local_files_only = local_files_only
-                self._pipe = None
-                self._audio_buffer: list[np.ndarray] = []
-                self._emit_every_chunks = max(1, int(self._delay_ms / max(chunk_ms, 1)))
 
             def _do_start_stream(self, config: dict[str, Any]) -> None:
                 """Initialize stream state."""
@@ -3186,50 +3308,13 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
                 self._chunks_processed = 0
                 self._accumulated_text = ""
                 self._sample_rate = config.get("sample_rate", 16000)
-                self._audio_buffer = []
-
-                if self._backend in {"transformers", "auto"} and self._pipe is None:
-                    try:
-                        from transformers import pipeline
-
-                        self._pipe = pipeline(
-                            "automatic-speech-recognition",
-                            model=self._model_name,
-                            model_kwargs={"local_files_only": self._local_files_only},
-                        )
-                        logger.info("Voxtral Realtime backend: transformers")
-                    except Exception as exc:
-                        logger.warning(
-                            f"Voxtral Realtime transformers backend unavailable, falling back to mock: {exc}"
-                        )
-                        self._pipe = None
 
             def _do_push_audio(
                 self, audio: bytes | np.ndarray, sr: int
             ) -> Iterator[StreamEvent]:
                 """Process a single audio chunk with delay."""
                 self._chunks_processed += 1
-                if isinstance(audio, bytes):
-                    from harness.streaming import normalize_audio_input
-
-                    audio_arr = normalize_audio_input(audio, "float32")
-                else:
-                    audio_arr = np.asarray(audio, dtype=np.float32)
-                self._audio_buffer.append(audio_arr)
-
-                if self._pipe is not None and self._chunks_processed % self._emit_every_chunks == 0:
-                    try:
-                        merged = np.concatenate(self._audio_buffer, axis=0)
-                        out = self._pipe({"array": merged, "sampling_rate": 16000})
-                        text = (out.get("text", "") if isinstance(out, dict) else str(out)).strip()
-                        if text:
-                            self._accumulated_text = text
-                    except Exception as exc:
-                        logger.warning(
-                            f"Voxtral Realtime transformers chunk inference failed; falling back to mock: {exc}"
-                        )
-                if not self._accumulated_text:
-                    self._accumulated_text = f"[voxtral chunks={self._chunks_processed}]"
+                self._accumulated_text = f"[voxtral chunks={self._chunks_processed}]"
 
                 segment_id = self.handle.get_or_create_segment_id("seg_0")
                 event = StreamEvent(
@@ -3245,18 +3330,8 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
 
             def _do_finalize(self) -> dict[str, Any]:
                 """Finalize and return final transcript."""
-                if self._pipe is not None and self._audio_buffer:
-                    try:
-                        merged = np.concatenate(self._audio_buffer, axis=0)
-                        out = self._pipe({"array": merged, "sampling_rate": 16000})
-                        text = (out.get("text", "") if isinstance(out, dict) else str(out)).strip()
-                        if text:
-                            self._accumulated_text = text
-                    except Exception as exc:
-                        logger.warning(f"Voxtral Realtime transformers finalize inference failed: {exc}")
                 return {
-                    "text": self._accumulated_text
-                    or f"[Voxtral final: {self._chunks_processed} chunks, delay={self._delay_ms}ms]",
+                    "text": f"[Voxtral final: {self._chunks_processed} chunks, delay={self._delay_ms}ms]",
                     "is_final": True,
                     "chunks_processed": self._chunks_processed,
                     "delay_ms": self._delay_ms,
@@ -3277,12 +3352,20 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
             handle = adapter.start_stream({"sample_rate": sr, **kwargs})
             return handle.stream_id
 
+        def start_stream(sr: int = 16000, **kwargs) -> str:
+            """Bundle Contract v2 stream start."""
+            return start(sr=sr, **kwargs)
+
         def push_audio(handle: str, audio: np.ndarray, sr: int = 16000) -> None:
             """Push audio chunk to stream."""
             if hasattr(audio, "numpy"):
                 audio = audio.numpy()
             audio = np.asarray(audio, dtype=np.float32)
             adapter.push_audio(audio, sr=sr)
+
+        def flush(handle: str) -> list[dict[str, Any]]:
+            """Flush pending events."""
+            return list(adapter.flush())
 
         def get_transcript(handle: str) -> dict[str, Any]:
             """Get current transcript."""
@@ -3292,7 +3375,7 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
             """Finalize stream and get final transcript."""
             return adapter.finalize()
 
-        def close(handle: str | None = None) -> None:
+        def close(handle: str) -> None:
             """Close stream resources."""
             adapter.close()
 
@@ -3306,9 +3389,10 @@ def load_voxtral_realtime_2602(config: dict[str, Any], device: str) -> Bundle:
                 "chunk_ms": chunk_ms,
             },
             "asr_stream": {
+                "start_stream": start_stream,
                 "start": start,
-                "start_stream": lambda cfg=None: adapter.start_stream(cfg or {}),
                 "push_audio": push_audio,
+                "flush": flush,
                 "get_transcript": get_transcript,
                 "finalize": finalize,
                 "close": close,

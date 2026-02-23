@@ -10,13 +10,13 @@ io:
   format: float32
   sample_rate: 16000
 ci: false
-ci_reason: "NeMo heavy dependency, requires dedicated venv .venv.nemo_nemotron"
+ci_reason: 'NeMo heavy dependency, requires dedicated venv .venv.nemo_nemotron'
 
 claims:
   - id: nemotron_streaming_asr_stream_structural
     task: asr_stream
     type: structural
-    description: "Real-time streaming speech recognition"
+    description: 'Real-time streaming speech recognition'
     enforcement: required
     test_ref: claims.asr_stream.smoke_v1
     thresholds:
@@ -27,9 +27,9 @@ claims:
   - id: nemotron_streaming_nemo_runtime
     task: asr_stream
     type: structural
-    description: "NeMo runtime with streaming support"
+    description: 'NeMo runtime with streaming support'
     enforcement: required
     test_ref: claims.asr_stream.nemo_runtime_v1
     thresholds:
       runtime: nemo
-    notes: "Requires NVIDIA NeMo toolkit"
+    notes: 'Requires NVIDIA NeMo toolkit'

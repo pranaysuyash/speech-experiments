@@ -1,0 +1,49 @@
+# Kokoro-TTS Configuration
+# Schema Version: 2.0 (Strict Capabilities)
+
+model_type: kokoro_tts
+
+metadata:
+  model_name: hexgrad/Kokoro-82M
+  provider: hexgrad
+  version: "0.9"
+  license: "Apache-2.0"
+  description: "Lightweight multilingual text-to-speech with strong CPU performance"
+  repo_url: "https://huggingface.co/hexgrad/Kokoro-82M"
+
+official_sources:
+  - kind: "hf"
+    url: "https://huggingface.co/hexgrad/Kokoro-82M"
+    note: "Primary model card"
+
+declared_capabilities:
+  - task: "tts"
+    role: "primary"
+    notes: "Batch text-to-speech synthesis"
+
+evaluation:
+  primary_tasks: ["tts"]
+  secondary_tasks: []
+  skip_tasks: []
+  default_datasets:
+    tts: "tts_smoke_v1"
+
+deployment:
+  runtimes: ["local", "api"]
+  offline_capable: true
+  targets: ["desktop", "server"]
+
+hardware:
+  accelerators_supported: ["cpu", "cuda"]
+  notes:
+    - "MPS not currently exposed by kokoro runtime; fallback to CPU on Apple Silicon"
+
+install:
+  method: "pip"
+  deps_pain: "low"
+
+runtime_defaults:
+  lang_code: "a"
+  voice: "af_heart"
+  speed: 1.0
+  sample_rate: 24000

@@ -215,6 +215,15 @@ class TestPipelineConfigToIngestConfig:
         assert ingest_cfg.gate_threshold_db == -45.0
         assert ingest_cfg.sample_rate == 22050
 
+    def test_normalize_volume_peak_maps_to_peak_normalize(self):
+        config = PipelineConfig(
+            steps=["ingest"],
+            preprocessing=["normalize_volume(target_db=-2, method=peak)"],
+        )
+        ingest_cfg = config.to_ingest_config()
+        assert ingest_cfg.peak_normalize is True
+        assert ingest_cfg.peak_target_db == -2.0
+
 
 class TestParsePreprocessingOp:
     """Test parsing of new operators."""
